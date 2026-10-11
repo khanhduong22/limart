@@ -22,8 +22,8 @@ PURPLE='\033[0;35m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-COMPOSE_FILE="docker-compose.monorepo.yml"
-LEGACY_CONTAINER="checkin-app"
+COMPOSE_FILE="docker-compose.yml"
+# Legacy container (checkin-app) is permanently decommissioned
 NETWORK_NAME="ops_bridge"
 ACTIVE_API_CONTAINER="limart-api"
 CANDIDATE_API_CONTAINER="${ACTIVE_API_CONTAINER}_next"
@@ -101,13 +101,8 @@ deploy_dual_run() {
 
     ensure_network
 
-    # Step 1: Check status of legacy container
-    if docker ps --format '{{.Names}}' | grep -q "^${LEGACY_CONTAINER}$"; then
-        log_info "Legacy container '${LEGACY_CONTAINER}' is currently ACTIVE on port 3000."
-        log_info "Traffic will continue flowing to legacy container until cutover is complete."
-    else
-        log_warn "Legacy container '${LEGACY_CONTAINER}' is not currently running."
-    fi
+    # Step 1: Legacy container status (permanently decommissioned)
+    log_info "Legacy monolith container (checkin-app) is permanently decommissioned."
 
     # Step 2: Start persistent database & cache if not running
     log_info "Ensuring backing services (limart-db, limart-valkey) are running..."
@@ -262,7 +257,7 @@ deploy_dual_run() {
     echo -e "  • Updated       : ${BUILT_SERVICES}"
     echo -e ""
     echo -e "Useful Commands:"
-    echo -e "  • Stop legacy container  : ./scripts/deploy-monorepo.sh finalize"
+    echo -e "  • Prune unused images    : ./scripts/deploy-monorepo.sh finalize"
     echo -e "  • Emergency Rollback     : ./scripts/deploy-monorepo.sh rollback"
     echo -e "  • Inspect monorepo logs  : docker compose -f ${COMPOSE_FILE} logs -f"
 }
@@ -279,11 +274,7 @@ rollback() {
         log_success "Restored '${ACTIVE_API_CONTAINER}' from backup."
     fi
 
-    # Ensure legacy container is started
-    if docker ps -a --format '{{.Names}}' | grep -q "^${LEGACY_CONTAINER}$"; then
-        docker start "${LEGACY_CONTAINER}" || true
-        log_success "Legacy container '${LEGACY_CONTAINER}' started on port 3000."
-    fi
+    # Note: Legacy container (checkin-app) is permanently decommissioned and not restarted during rollback
 
     # Restore proxy configuration
     if [ -f "/etc/caddy/Caddyfile.bak" ]; then
@@ -300,14 +291,7 @@ rollback() {
 }
 
 finalize() {
-    log_info "Finalizing cutover: Stopping legacy container '${LEGACY_CONTAINER}'..."
-    if docker ps --format '{{.Names}}' | grep -q "^${LEGACY_CONTAINER}$"; then
-        docker stop "${LEGACY_CONTAINER}"
-        log_success "Legacy container '${LEGACY_CONTAINER}' stopped successfully."
-    else
-        log_info "Legacy container '${LEGACY_CONTAINER}' is already stopped."
-    fi
-
+    log_info "Legacy monolith container (checkin-app) is permanently decommissioned."
     log_info "Pruning old unused Docker images..."
     docker image prune -f --filter "until=24h"
     log_success "Clean up complete."

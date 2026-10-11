@@ -10,12 +10,12 @@ Hệ thống hiện đang vận hành song song trên hạ tầng **Contabo VPS*
 
 | Môi Trường | Domain | Kiến Trúc | Container Hoạt Động | Database | Nhánh Git |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| 🚀 **Production** | [limart.khanhdp.com](https://limart.khanhdp.com) | Monolith Next.js 16 Standalone (Port 3000) | `checkin-app` | PostgreSQL 17 (`checkin-db:5432`) | `main` |
-| 🧪 **Staging Canary** | [limart2.khanhdp.com](https://limart2.khanhdp.com) | Monorepo 3-Tier (API + Admin + Staff) | `checkin-api-v2` (Port 4000)<br>`checkin-admin-v2` (Port 3001)<br>`checkin-staff-v2` (Port 3002) | PostgreSQL 17 (`checkin_db` - Dual Run an toàn, KHÔNG auto-push) | `feat/monorepo-migration` |
+| 🚀 **Production** | [limart.khanhdp.com](https://limart.khanhdp.com)<br>[limart2.khanhdp.com](https://limart2.khanhdp.com) (Canary) | Monorepo 3-Tier (Hono API + Vite Admin SPA + Vite Staff PWA) | `limart-api` (Port 4000)<br>`limart-admin` (Port 3001)<br>`limart-staff` (Port 3002) | PostgreSQL 17 (`limart-db:5432`) | `main` |
+| 📦 **Legacy V1 Archive** | N/A | Next.js 16 Standalone (Decommissioned) | None (Đã khai tử hoàn toàn container `checkin-app`) | N/A | `backup/legacy-v1-main` |
 
 ### 🛠️ Dịch Vụ Hỗ Trợ (Shared Backing Services)
-- 🗄️ **PostgreSQL 17** (`checkin-db`): Cơ sở dữ liệu chính tích hợp sao lưu tự động WAL & Point-in-Time Recovery qua **pgBackRest** (`checkin_pgbackrest_data`).
-- ⚡ **Valkey 8 Cache** (`checkin-valkey`): Bộ nhớ đệm tốc độ cao (tương thích Redis), phân bổ 64MB LRU memory.
+- 🗄️ **PostgreSQL 17** (`limart-db`): Cơ sở dữ liệu chính tích hợp sao lưu tự động WAL & Point-in-Time Recovery qua **pgBackRest** (`checkin_pgbackrest_data`).
+- ⚡ **Valkey 8 Cache** (`limart-valkey`): Bộ nhớ đệm tốc độ cao (tương thích Redis), phân bổ 64MB LRU memory.
 - 🔍 **Meilisearch** (`meilisearch`): Công cụ tìm kiếm nhân viên, tác vụ tiếng Việt không dấu siêu tốc (<50ms).
 - 🌐 **Caddy 2 Reverse Proxy** (`caddy`): Quản lý SSL Cloudflare Origin CA, định tuyến traffic và forward real IP (`Cf-Connecting-Ip`).
 
@@ -41,14 +41,14 @@ checkin-app/
 │   ├── db/                   # Prisma Client, schema và cấu hình kết nối DB dùng chung (@checkin/db)
 │   ├── shared/               # Kiểu dữ liệu (Types), DTOs, hằng số và tiện ích dùng chung (@checkin/shared)
 │   └── zero-downtime-deploy/ # Bộ điều phối deploy Blue-Green và Graceful Shutdown
-├── src/                      # Source code hệ thống Next.js Monolith v1 (Production hiện tại)
+├── src/                      # Source code hệ thống Next.js Monolith v1 (Lưu trữ lịch sử)
 ├── prisma/                   # Root Prisma schema
 ├── docker/                   # Dockerfile tùy chỉnh (PostgreSQL 17 + pgBackRest)
 ├── scripts/                  # Scripts deploy, backup, sync database
 ├── .agent/                   # Cấu hình AI Agent (Rules, Skills, Workflows)
-├── docker-compose.yml        # Docker Compose cho Production v1
+├── docker-compose.yml        # Docker Compose chuẩn cho Monorepo 3-Tier (Production & Local)
 ├── docker-compose.staging.yml# Docker Compose cho Staging Canary v2
-└── docker-compose.monorepo.yml# Docker Compose cho Monorepo v2 chuẩn
+└── docker-compose.monorepo.yml# Mirror đồng bộ với docker-compose.yml (Hỗ trợ CI/CD)
 ```
 
 ---
@@ -82,7 +82,7 @@ cp .env.example .env.local
   pnpm --filter @checkin/admin-spa dev # Chạy Admin SPA (Port 3001)
   pnpm --filter @checkin/staff-pwa dev # Chạy Staff PWA (Port 3002)
   ```
-- **Chạy hệ thống Next.js Monolith v1**:
+- **Chạy hệ thống Next.js Monolith v1 (Legacy Archive)**:
   ```bash
   npm run dev                          # Port 3000
   ```
@@ -111,9 +111,13 @@ npm run test:e2e
 
 ## 🔄 Quy Trình Triển Khai (CI/CD Deployment)
 
-Mọi hoạt động triển khai đều được tự động hóa qua **GitHub Actions**:
-1. **Lên Staging (`limart2.khanhdp.com`)**: Push commit vào nhánh `feat/monorepo-migration`. Quy trình `.github/workflows/deploy-monorepo.yml` sẽ tự động build image và kích hoạt blue-green deployment.
-2. **Lên Production (`limart.khanhdp.com`)**: Push commit vào nhánh `main`. Quy trình `.github/workflows/deploy.yml` sẽ kiểm tra tests, build image và cập nhật VPS an toàn.
+Mọi hoạt động triển khai đều được tự động hóa qua **GitHub Actions** (Trunk-based workflow):
+1. **Pipeline Thống Nhất (`.github/workflows/deploy-monorepo.yml`)**: Kích hoạt khi push/merge commit vào nhánh `main`.
+2. **Quy trình triển khai**:
+   - Tự động phát hiện thay đổi theo app/package để build ảnh Docker tương ứng.
+   - Chạy test toàn bộ monorepo (`pnpm test`).
+   - Push ảnh Docker lên GHCR và SSH kích hoạt Blue-Green atomic zero-downtime swap trên VPS (`scripts/deploy-monorepo.sh`).
+   - Đảm bảo không gián đoạn dịch vụ dù chỉ 1 giây.
 
 > ⚠️ **LƯU Ý QUAN TRỌNG**:
 > - Tuyệt đối không tự ý build thủ công trên VPS qua SSH.

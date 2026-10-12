@@ -30,7 +30,7 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const push = (path: string) => {
     if (typeof window !== "undefined") {
       window.history.pushState(null, "", path);
-      setPathname(path);
+      setPathname(path.split("?")[0] || "/");
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -38,7 +38,7 @@ export const RouterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const replace = (path: string) => {
     if (typeof window !== "undefined") {
       window.history.replaceState(null, "", path);
-      setPathname(path);
+      setPathname(path.split("?")[0] || "/");
     }
   };
 

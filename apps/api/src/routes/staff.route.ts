@@ -102,8 +102,8 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
       todayDuties,
       activeUsers,
       swapCount,
-      staffRejectedCount,
-      userTaskRejectedCount,
+      rejectedStaffTasks,
+      rejectedUserTasks,
     ] = await Promise.all([
       prisma.workShift.findMany({
         where: {
@@ -162,18 +162,67 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
           start: { gte: new Date() },
         },
       }),
-      prisma.staffTask.count({
+      prisma.staffTask.findMany({
         where: { assigneeId: userId, status: "REJECTED" },
+        select: {
+          id: true,
+          title: true,
+          adminNote: true,
+          submittedAt: true,
+          createdAt: true,
+        },
       }),
-      prisma.userTask.count({
+      prisma.userTask.findMany({
         where: { userId, status: "REJECTED" },
+        select: {
+          id: true,
+          quantity: true,
+          unitPrice: true,
+          note: true,
+          evidenceLink: true,
+          adminNote: true,
+          submittedAt: true,
+          createdAt: true,
+          taskDefinition: {
+            select: { id: true, name: true, unit: true, baseReward: true },
+          },
+          taskItem: {
+            select: { id: true, title: true },
+          },
+        },
       }),
     ]);
 
     const streak = calculateStreak(recentCheckins, recentLeaves);
     const hasCheckedInToday = todayCheckins.some((ch) => ch.type === "checkin");
     const todayShift = todayShifts[0] || null;
-    const rejectedTasksCount = staffRejectedCount + userTaskRejectedCount;
+
+    const rejectedTasks = [
+      ...rejectedStaffTasks.map((t) => ({
+        id: t.id,
+        type: "STAFF_TASK" as const,
+        title: t.title,
+        reason: (t as any).rejectReason || t.adminNote || "Admin yêu cầu cập nhật lại kết quả",
+        date: t.submittedAt || t.createdAt,
+        link: "/staff-tasks",
+      })),
+      ...rejectedUserTasks.map((t) => {
+        const unit = t.taskDefinition?.unit;
+        let link = "/tasks?tab=history";
+        if (unit === "điểm") link = "/packing?tab=history";
+        else if (unit === "điểm-bưng") link = "/carrying?tab=history";
+        const title = t.taskItem?.title || t.taskDefinition?.name || t.note || "Nhiệm vụ";
+        return {
+          id: t.id,
+          type: unit === "điểm" ? ("PACKING" as const) : unit === "điểm-bưng" ? ("CARRYING" as const) : ("WFH" as const),
+          title,
+          reason: (t as any).rejectReason || t.adminNote || "Admin yêu cầu cập nhật lại kết quả",
+          date: t.submittedAt || t.createdAt,
+          link,
+        };
+      }),
+    ];
+    const rejectedTasksCount = rejectedTasks.length;
 
     let readAnnouncementIds = new Set<string>();
     try {
@@ -217,6 +266,7 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
         streak,
         swapCount,
         rejectedTasksCount,
+        rejectedTasks,
         hasCheckedInToday,
         stats: stats || {
           totalHours: 0,

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import useSWR from "swr";
 import {
   Briefcase,
@@ -63,6 +63,7 @@ interface UserTaskRecord {
   evidenceLink?: string;
   note?: string;
   rejectReason?: string;
+  adminNote?: string;
   createdAt: string;
   submittedAt?: string;
   taskDefinition?: {
@@ -85,7 +86,23 @@ interface UserTaskRecord {
 
 export const TasksView: React.FC = () => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"market" | "general" | "history">("market");
+  const [activeTab, setActiveTab] = useState<"market" | "general" | "history">(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "history") return "history";
+      if (params.get("tab") === "general") return "general";
+    }
+    return "market";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab === "history") setActiveTab("history");
+      else if (tab === "general") setActiveTab("general");
+    }
+  }, []);
 
   // Fetch data with SWR
   const { data: marketRes, mutate: mutateMarket, isLoading: loadingMarket } = useSWR<{
@@ -449,10 +466,10 @@ export const TasksView: React.FC = () => {
                   </div>
 
                   {/* Reject Reason Alert */}
-                  {t.status === "REJECTED" && t.rejectReason && (
+                  {t.status === "REJECTED" && (t.rejectReason || t.adminNote) && (
                     <div className="bg-rose-100/70 border border-rose-200 p-2 rounded-lg text-xs text-rose-800">
                       <p className="font-bold text-[11px]">Lý do từ chối:</p>
-                      <p className="text-[11px] mt-0.5">{t.rejectReason}</p>
+                      <p className="text-[11px] mt-0.5">{t.rejectReason || t.adminNote}</p>
                     </div>
                   )}
 

@@ -30,7 +30,8 @@ import { PwaInstallModal } from "./components/pwa";
 import { useAppVersionGuard, VersionGuardBanner } from "@checkin/spa-version-guard";
 
 function AppContent() {
-  const pathname = usePathname();
+  const rawPathname = usePathname();
+  const pathname = rawPathname ? rawPathname.split("?")[0] : "/";
   const router = useRouter();
   const [hasCheckedSession, setHasCheckedSession] = useState<boolean>(false);
 

@@ -312,6 +312,72 @@ describe("Staff Routes", () => {
       expect(typeof data.data.streak).toBe("number");
       expect(data.data.ipStatus).toBeDefined();
     });
+
+    it("returns rejected tasks details and count when user has rejected tasks", async () => {
+      mockUserFindUnique.mockResolvedValue({
+        id: "staff-1",
+        name: "Staff One",
+        email: "staff@example.com",
+        role: "USER",
+        isActive: true,
+        employmentType: "PART_TIME",
+        hourlyRate: 35000,
+        monthlySalary: 6000000,
+        adjustments: [],
+        payslips: [],
+        achievements: [],
+      });
+
+      mockStaffTaskFindMany.mockResolvedValue([
+        {
+          id: "st-rej-1",
+          title: "Kiểm kê kho cọ",
+          adminNote: "Thiếu ảnh chụp kệ số 2",
+          submittedAt: new Date("2026-10-10"),
+          createdAt: new Date("2026-10-09"),
+        },
+      ]);
+
+      mockUserTaskFindMany.mockResolvedValue([
+        {
+          id: "ut-rej-1",
+          quantity: 5,
+          unitPrice: 3000,
+          note: "Đóng gói bảng vẽ",
+          evidenceLink: "https://drive.google.com/test",
+          adminNote: "Hộp bị móp góc, yêu cầu đóng lại",
+          submittedAt: new Date("2026-10-11"),
+          createdAt: new Date("2026-10-10"),
+          taskDefinition: { id: "td-1", name: "Đóng gói", unit: "điểm", baseReward: 3000 },
+          taskItem: { id: "ti-1", title: "Đóng gói bảng 50x70" },
+        },
+      ]);
+
+      const res = await app.request("/api/staff/home-data", {
+        headers: { Cookie: `access_token=${authToken}` },
+      });
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.rejectedTasksCount).toBe(2);
+      expect(json.data.rejectedTasks).toHaveLength(2);
+      expect(json.data.rejectedTasks[0]).toEqual({
+        id: "st-rej-1",
+        type: "STAFF_TASK",
+        title: "Kiểm kê kho cọ",
+        reason: "Thiếu ảnh chụp kệ số 2",
+        date: expect.any(String),
+        link: "/staff-tasks",
+      });
+      expect(json.data.rejectedTasks[1]).toEqual({
+        id: "ut-rej-1",
+        type: "PACKING",
+        title: "Đóng gói bảng 50x70",
+        reason: "Hộp bị móp góc, yêu cầu đóng lại",
+        date: expect.any(String),
+        link: "/packing?tab=history",
+      });
+    });
   });
 
   describe("GET /api/staff/schedule", () => {

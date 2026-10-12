@@ -145,12 +145,22 @@ export interface ShiftDutyItem {
   date?: string | Date;
 }
 
+export interface RejectedTaskItem {
+  id: string;
+  type: "STAFF_TASK" | "PACKING" | "CARRYING" | "WFH";
+  title: string;
+  reason: string;
+  date: string | Date;
+  link: string;
+}
+
 export interface StaffHomeData {
   user: StaffUser;
   streak: number;
   swapCount: number;
   announcements: AnnouncementItem[];
   rejectedTasksCount: number;
+  rejectedTasks?: RejectedTaskItem[];
   stats: {
     totalHours: number;
     totalSalary: number;
@@ -195,6 +205,7 @@ export const DEFAULT_HOME_DATA: StaffHomeData = {
   swapCount: 2,
   announcements: [],
   rejectedTasksCount: 0,
+  rejectedTasks: [],
   stats: {
     totalHours: 42.5,
     totalSalary: 1062500,

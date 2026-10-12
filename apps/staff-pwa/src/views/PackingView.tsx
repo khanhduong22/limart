@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import useSWR from "swr";
 import {
   Package,
@@ -37,17 +37,22 @@ interface PackingHistoryItem {
   note?: string;
   evidenceLink?: string;
   rejectReason?: string;
+  adminNote?: string;
   createdAt: string;
   submittedAt?: string;
   taskDefinition?: {
+    id?: string;
     name?: string;
     title?: string;
     unit?: string;
+    baseReward?: number;
   };
   taskDef?: {
+    id?: string;
     name?: string;
     title?: string;
     unit?: string;
+    baseReward?: number;
   };
 }
 
@@ -61,7 +66,20 @@ interface PackingSummaryData {
 
 export const PackingView: React.FC = () => {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"pricelist" | "history">("pricelist");
+  const [activeTab, setActiveTab] = useState<"pricelist" | "history">(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "history") return "history";
+    }
+    return "pricelist";
+  });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tab") === "history") setActiveTab("history");
+    }
+  }, []);
 
   const { data: res, mutate, isLoading } = useSWR<{
     success: boolean;
@@ -307,11 +325,45 @@ export const PackingView: React.FC = () => {
                     </p>
                   )}
 
+                  {/* Reject Reason Alert */}
+                  {t.status === "REJECTED" && (t.rejectReason || t.adminNote) && (
+                    <div className="bg-rose-100/70 border border-rose-200 p-2 rounded-lg text-xs text-rose-800">
+                      <p className="font-bold text-[11px]">Lý do từ chối:</p>
+                      <p className="text-[11px] mt-0.5">{t.rejectReason || t.adminNote}</p>
+                    </div>
+                  )}
+
                   {t.evidenceLink && (
                     <div className="text-[11px] text-purple-700 truncate">
                       🔗 <a href={t.evidenceLink} target="_blank" rel="noreferrer" className="underline hover:text-purple-900">
                         {t.evidenceLink}
                       </a>
+                    </div>
+                  )}
+
+                  {/* Actions for rejected packing item */}
+                  {t.status === "REJECTED" && (
+                    <div className="flex justify-end pt-1 border-t border-stone-100">
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const def = t.taskDefinition || t.taskDef;
+                          if (def) {
+                            handleOpenModal({
+                              id: (t as any).taskDefId || def.id || (t as any).id,
+                              name: def.name || def.title,
+                              title: def.title || def.name,
+                              baseReward: def.baseReward || t.unitPrice || 0,
+                              unit: def.unit || "điểm",
+                            });
+                          } else {
+                            setActiveTab("pricelist");
+                          }
+                        }}
+                        className="h-7 text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 cursor-pointer"
+                      >
+                        Khai báo nộp lại
+                      </Button>
                     </div>
                   )}
                 </div>

@@ -12,9 +12,15 @@ export type AppEnv = {
 };
 
 export async function authMiddleware(c: Context<AppEnv>, next: Next) {
-  const token = getCookie(c, "access_token");
+  let token = getCookie(c, "access_token");
   if (!token) {
-    return c.json({ success: false, error: "Unauthorized: Missing authentication cookie" }, 401);
+    const authHeader = c.req.header("authorization") || c.req.header("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      token = authHeader.slice(7).trim();
+    }
+  }
+  if (!token) {
+    return c.json({ success: false, error: "Unauthorized: Missing authentication credentials" }, 401);
   }
   const payload = await verifyAccessToken(token);
   if (!payload) {

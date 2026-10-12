@@ -21,6 +21,9 @@ import {
   DEFAULT_STAFF,
   StaffProfile,
   fetcher,
+  getAuthToken,
+  setAuthToken,
+  removeAuthToken,
 } from "./lib/api-client";
 import { useOfflineQueue } from "./lib/use-offline-queue";
 import { initPWARegistration } from "./lib/pwa-register";
@@ -35,16 +38,40 @@ function AppContent() {
   const router = useRouter();
   const [hasCheckedSession, setHasCheckedSession] = useState<boolean>(false);
 
-  // Authentication Guard: check HttpOnly cookie session via /api/me
+  // Extract token from URL on mount (e.g. Google OAuth redirect callback)
   useEffect(() => {
-    // Verify if user is authenticated via HttpOnly cookie (e.g. Google OAuth redirect)
-    fetch("/api/me", { credentials: "include" })
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlToken = urlParams.get("token");
+      if (urlToken) {
+        setAuthToken(urlToken);
+        urlParams.delete("token");
+        const cleanSearch = urlParams.toString();
+        const newUrl = window.location.pathname + (cleanSearch ? `?${cleanSearch}` : "");
+        window.history.replaceState({}, document.title, newUrl);
+      }
+    } catch {}
+  }, []);
+
+  // Authentication Guard: check Dual-Auth (Cookie + Bearer Token) via /api/me (once on mount)
+  useEffect(() => {
+    const token = getAuthToken();
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
+    fetch("/api/me", { credentials: "include", headers })
       .then((res) => {
         if (res.ok) return res.json();
-        throw new Error("Unauthenticated");
+        if (res.status === 401) {
+          removeAuthToken();
+          throw new Error("Unauthenticated");
+        }
+        throw new Error(`HTTP ${res.status}`);
       })
       .then((data) => {
         if (data.success && data.user) {
+          if (data.token) {
+            setAuthToken(data.token);
+          }
           saveCachedProfile({
             id: data.user.id,
             name: data.user.name || "Nhân viên LimArt",
@@ -57,19 +84,31 @@ function AppContent() {
             gachaTickets: 1,
             achievements: data.user.achievements || [],
           });
-        } else if (pathname !== "/login") {
-          router.push("/login");
+          // If on login view, navigate to home
+          if (pathname === "/login") {
+            router.push("/");
+          }
+        } else {
+          if (pathname !== "/login") {
+            router.push("/login");
+          }
         }
       })
-      .catch(() => {
-        if (pathname !== "/login") {
-          router.push("/login");
+      .catch((err) => {
+        // If it's a network glitch/offline, DO NOT log out if cached profile exists!
+        const cached = getCachedProfile();
+        if (cached && cached.id && cached.id !== "staff_default") {
+          console.warn("[App] Offline/network error, continuing with cached session for:", cached.name);
+        } else if (err.message === "Unauthenticated") {
+          if (pathname !== "/login") {
+            router.push("/login");
+          }
         }
       })
       .finally(() => {
         setHasCheckedSession(true);
       });
-  }, [pathname, router]);
+  }, []);
 
   const { data: homeRes } = useSWR<{ success: boolean; data: any }>(
     hasCheckedSession && pathname !== "/login" ? "/api/staff/home-data" : null,

@@ -6,17 +6,27 @@ import { enqueueCheckin, isNetworkOnline } from "./offline-queue";
 
 const HOME_CACHE_KEY = "limart_staff_home_data_cache";
 
+const TOKEN_STORAGE_KEY = "limart_staff_jwt_token";
+
 export function getAuthToken(): string | null {
-  return null;
+  try {
+    return localStorage.getItem(TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
 }
 
-export function setAuthToken(_token: string) {
-  // Deprecated: Auth uses 100% HttpOnly cookie 'access_token'
+export function setAuthToken(token: string) {
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    }
+  } catch {}
 }
 
 export function removeAuthToken() {
   try {
-    localStorage.removeItem("limart_staff_jwt_token");
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem("admin_token");
     localStorage.removeItem("limart_staff_profile_cache");
     localStorage.removeItem(HOME_CACHE_KEY);
@@ -24,7 +34,8 @@ export function removeAuthToken() {
 }
 
 export function getAuthHeaders(): Record<string, string> {
-  return {};
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export async function loginWithEmail(): Promise<{ success: boolean; error: string }> {
@@ -35,11 +46,13 @@ export async function loginWithEmail(): Promise<{ success: boolean; error: strin
 }
 
 /**
- * Resilient authenticated fetch using HttpOnly cookie session (credentials: "include").
+ * Resilient authenticated fetch using HttpOnly cookie session (credentials: "include") + Bearer token.
  */
 export async function authFetch(url: string, init?: RequestInit): Promise<Response> {
+  const token = getAuthToken();
   const headers: Record<string, string> = {
     ...((init?.headers as Record<string, string>) || {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 
   const res = await fetch(url, {
@@ -265,10 +278,12 @@ export async function performCheckIn(
   }
 
   try {
+    const token = getAuthToken();
     const res = await fetch("/api/checkins", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
       credentials: "include",
       body: JSON.stringify({

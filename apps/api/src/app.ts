@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { getCookie } from "hono/cookie";
 import { cors } from "hono/cors";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
@@ -109,9 +110,14 @@ export function createApp() {
       return c.json({ success: false, error: "User not found or inactive" }, 404);
     }
 
+    const authHeader = c.req.header("authorization") || c.req.header("Authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : undefined;
+    const token = getCookie(c, "access_token") || bearerToken;
+
     return c.json({
       success: true,
       user,
+      token: token || undefined,
     });
   });
 

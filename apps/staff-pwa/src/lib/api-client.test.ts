@@ -39,6 +39,10 @@ import {
   loginWithEmail,
   authFetch,
   DEFAULT_HOME_DATA,
+  getAuthToken,
+  setAuthToken,
+  removeAuthToken,
+  getAuthHeaders,
 } from "./api-client";
 
 describe("Staff PWA API Client (Unified Cookie Auth)", () => {
@@ -169,5 +173,38 @@ describe("Staff PWA API Client (Unified Cookie Auth)", () => {
     const res = await loginWithEmail();
     expect(res.success).toBe(false);
     expect(res.error).toContain("Google");
+  });
+
+  describe("Token Storage & Dual-Auth Headers", () => {
+    it("stores and retrieves auth token from localStorage", () => {
+      expect(getAuthToken()).toBeNull();
+      setAuthToken("jwt_test_123");
+      expect(getAuthToken()).toBe("jwt_test_123");
+      expect(getAuthHeaders()).toEqual({ Authorization: "Bearer jwt_test_123" });
+      removeAuthToken();
+      expect(getAuthToken()).toBeNull();
+      expect(getAuthHeaders()).toEqual({});
+    });
+
+    it("attaches Authorization Bearer header when token is present in authFetch", async () => {
+      setAuthToken("valid_bearer_token");
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true }),
+      } as any);
+      global.fetch = mockFetch;
+
+      await authFetch("/api/staff/tasks");
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/staff/tasks",
+        expect.objectContaining({
+          credentials: "include",
+          headers: expect.objectContaining({
+            Authorization: "Bearer valid_bearer_token",
+          }),
+        })
+      );
+    });
   });
 });

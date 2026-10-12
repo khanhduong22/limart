@@ -182,8 +182,9 @@ authRoute.get("/callback/google", async (c) => {
     requestId: c.var.requestId || c.get("requestId"),
   });
 
-  const redirectUrl =
+  const targetBase =
     user.role === "ADMIN" ? "/admin" : user.role === "PARTNER" ? "/tasks" : "/";
+  const redirectUrl = `${targetBase}?token=${encodeURIComponent(accessToken)}`;
   return c.redirect(redirectUrl);
 });
 
@@ -298,8 +299,13 @@ authRoute.get("/me", authMiddleware, async (c) => {
     return c.json({ success: false, error: "User not found or inactive" }, 404);
   }
 
+  const authHeader = c.req.header("authorization") || c.req.header("Authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7).trim() : undefined;
+  const token = getCookie(c, "access_token") || bearerToken;
+
   return c.json({
     success: true,
     user,
+    token: token || undefined,
   });
 });

@@ -66,12 +66,12 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
   });
 
   describe("GET /api/me (Auth Middleware)", () => {
-    it("returns 401 when access_token cookie is missing", async () => {
+    it("returns 401 when authentication credentials (cookie and header) are missing", async () => {
       const res = await app.request("/api/me");
       expect(res.status).toBe(401);
       const data = await res.json();
       expect(data.success).toBe(false);
-      expect(data.error).toContain("Missing authentication cookie");
+      expect(data.error).toContain("Missing authentication credentials");
     });
 
     it("returns 200 and profile when valid access_token cookie is provided", async () => {
@@ -99,6 +99,35 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
       const data = await res.json();
       expect(data.success).toBe(true);
       expect(data.user.name).toBe("Valid Staff");
+      expect(data.token).toBe(token);
+    });
+
+    it("returns 200 and profile when valid Authorization: Bearer <token> is provided without cookie", async () => {
+      const token = await signAccessToken({
+        sub: "u-bearer",
+        email: "staff-bearer@limart.vn",
+        role: "USER",
+      });
+
+      mockFindUnique.mockResolvedValue({
+        id: "u-bearer",
+        name: "Bearer Staff",
+        email: "staff-bearer@limart.vn",
+        role: "USER",
+        isActive: true,
+      });
+
+      const res = await app.request("/api/me", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.user.name).toBe("Bearer Staff");
+      expect(data.token).toBe(token);
     });
 
     it("returns 401 when access_token cookie is invalid or corrupted", async () => {
@@ -225,7 +254,7 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
 
         const res = await app.request("/api/auth/callback/google?code=valid_code");
         expect(res.status).toBe(302);
-        expect(res.headers.get("location")).toBe("/");
+        expect(res.headers.get("location")).toMatch(/^\/\?token=/);
         const setCookie = res.headers.get("set-cookie");
         expect(setCookie).toContain("access_token");
         expect(setCookie).toContain(`Max-Age=${30 * 24 * 60 * 60}`);
@@ -246,7 +275,7 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
 
         const res = await app.request("/api/auth/callback/google?code=valid_code");
         expect(res.status).toBe(302);
-        expect(res.headers.get("location")).toBe("/admin");
+        expect(res.headers.get("location")).toMatch(/^\/admin\?token=/);
       });
 
       it("redirects PARTNER user to /tasks upon successful login", async () => {
@@ -264,7 +293,7 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
 
         const res = await app.request("/api/auth/callback/google?code=valid_code");
         expect(res.status).toBe(302);
-        expect(res.headers.get("location")).toBe("/tasks");
+        expect(res.headers.get("location")).toMatch(/^\/tasks\?token=/);
       });
 
       it("auto-assigns cuccung123456789@gmail.com to PARTNER and redirects to /tasks", async () => {
@@ -289,7 +318,7 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
 
         const res = await app.request("/api/auth/callback/google?code=valid_code");
         expect(res.status).toBe(302);
-        expect(res.headers.get("location")).toBe("/tasks");
+        expect(res.headers.get("location")).toMatch(/^\/tasks\?token=/);
         expect(mockUpdate).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { id: "u-thu" },
@@ -320,7 +349,7 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
 
         const res = await app.request("/api/auth/callback/google?code=valid_code");
         expect(res.status).toBe(302);
-        expect(res.headers.get("location")).toBe("/admin");
+        expect(res.headers.get("location")).toMatch(/^\/admin\?token=/);
         expect(mockUpdate).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { id: "u-khanh" },

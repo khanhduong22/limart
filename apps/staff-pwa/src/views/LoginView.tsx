@@ -1,8 +1,23 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, Info } from "lucide-react";
+import { getAuthToken } from "../lib/api-client";
 
 export const LoginView: React.FC = () => {
+  // Check if already authenticated on mount
+  useEffect(() => {
+    const token = getAuthToken();
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    fetch("/api/me", { credentials: "include", headers })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.success && data?.user) {
+          window.location.href = "/";
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // URL Error handling
   const [urlNotice, setUrlNotice] = useState<{
     type: "error" | "warning" | "info";

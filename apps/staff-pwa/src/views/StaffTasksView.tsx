@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react";
 import useSWR from "swr";
 import {
   ChevronLeft,
@@ -6,66 +6,23 @@ import {
   CheckCircle2,
   AlertCircle,
   TrendingUp,
-  Play,
-  Send,
-  Calendar,
   Lock,
-  Flame,
-  Check,
-  X,
-  User,
-  FileText,
-  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "@/lib/router";
 import { Button } from "@/components/ui/button";
+import { fetcher, toggleStaffTaskStatus } from "@/lib/api-client";
 import {
-  fetcher,
-  toggleStaffTaskStatus,
-} from "@/lib/api-client";
-
-interface StaffTask {
-  id: string;
-  title: string;
-  name?: string;
-  description?: string;
-  status: "TODO" | "DOING" | "DONE" | "APPROVED" | "REJECTED";
-  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
-  frequency?: string;
-  deadline?: string;
-  evidenceLink?: string;
-  notes?: string;
-  evidenceNote?: string;
-  adminNote?: string;
-  rejectReason?: string;
-  createdAt?: string;
-  startDate?: string;
-  completedAt?: string;
-  submittedAt?: string;
-  taskDefinition?: {
-    name?: string;
-    title?: string;
-  };
-  assignee?: {
-    id: string;
-    name: string;
-    image?: string;
-  };
-  createdBy?: {
-    id: string;
-    name: string;
-  };
-}
-
-interface KPIStats {
-  total: number;
-  approved: number;
-  doing: number;
-  pendingReview: number;
-  overdue: number;
-  completionRate: number;
-}
+  useStaffTasksStore,
+  StaffTask,
+  KPIStats,
+} from "@/stores/useStaffTasksStore";
+import {
+  TaskFilterTabs,
+  StaffTaskCard,
+  TaskDetailModal,
+  TaskSubmitModal,
+} from "@/components/tasks";
 
 interface StaffTasksResponse {
   allowed: boolean;
@@ -80,7 +37,23 @@ interface StaffTasksResponse {
 
 export const StaffTasksView: React.FC = () => {
   const router = useRouter();
-  const [filter, setFilter] = useState<"ALL" | "TODO" | "DOING" | "DONE" | "APPROVED">("ALL");
+
+  const {
+    filter,
+    finishingTask,
+    viewingTask,
+    evidenceLink,
+    note,
+    isProcessing,
+    setFilter,
+    openSubmitModal,
+    closeSubmitModal,
+    setEvidenceLink,
+    setNote,
+    setIsProcessing,
+    openDetailModal,
+    closeDetailModal,
+  } = useStaffTasksStore();
 
   const { data: res, error, mutate, isLoading } = useSWR<{
     success: boolean;
@@ -88,15 +61,6 @@ export const StaffTasksView: React.FC = () => {
     data: StaffTasksResponse["data"];
     error?: string;
   }>("/api/staff/staff-tasks", fetcher, { revalidateOnFocus: true });
-
-  // Complete submission modal
-  const [finishingTask, setFinishingTask] = useState<StaffTask | null>(null);
-  const [evidenceLink, setEvidenceLink] = useState("");
-  const [note, setNote] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
-
-  // View task details modal (read-only for staff)
-  const [viewingTask, setViewingTask] = useState<StaffTask | null>(null);
 
   // Check 403 / forbidden permission
   if (!isLoading && (error?.status === 403 || res?.allowed === false || res?.success === false)) {
@@ -169,7 +133,7 @@ export const StaffTasksView: React.FC = () => {
 
       if (result.success) {
         toast.success("🎉 Đã gửi báo cáo hoàn thành! Chờ Admin phê duyệt.");
-        setFinishingTask(null);
+        closeSubmitModal();
         mutate();
       } else {
         toast.error(result.error || "Không thể nộp báo cáo");
@@ -270,28 +234,11 @@ export const StaffTasksView: React.FC = () => {
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-1.5 md:gap-2 overflow-x-auto py-1 text-xs no-scrollbar">
-        {[
-          { key: "ALL", label: `Tất cả (${tasks.length})` },
-          { key: "TODO", label: "Cần làm" },
-          { key: "DOING", label: "Đang làm" },
-          { key: "DONE", label: "Chờ duyệt" },
-          { key: "APPROVED", label: "Đã duyệt" },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setFilter(tab.key as any)}
-            className={`px-3.5 py-1.5 md:px-4 md:py-2 rounded-full whitespace-nowrap text-xs md:text-sm font-bold transition-all cursor-pointer ${
-              filter === tab.key
-                ? "bg-indigo-700 text-white shadow-xs ring-2 ring-indigo-200"
-                : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <TaskFilterTabs
+        currentFilter={filter}
+        onFilterChange={setFilter}
+        totalCount={tasks.length}
+      />
 
       {/* Task List */}
       <div>
@@ -305,412 +252,40 @@ export const StaffTasksView: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {(filteredTasks || []).map((t) => {
-              const title = t.title || (t as any).name || t.taskDefinition?.name || t.taskDefinition?.title || "Công việc";
-              const isOverdue = t.deadline && new Date(t.deadline) < new Date() && t.status !== "APPROVED";
-
-              return (
-                <div
-                  key={t.id}
-                  onClick={() => setViewingTask(t)}
-                  className={`rounded-2xl border p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all active:scale-[0.99] group ${
-                    t.status === "APPROVED"
-                      ? "bg-emerald-50/40 border-emerald-200"
-                      : t.status === "REJECTED"
-                      ? "bg-rose-50/50 border-rose-200"
-                      : t.status === "DONE"
-                      ? "bg-sky-50/40 border-sky-200"
-                      : "bg-white border-stone-200"
-                  }`}
-                >
-                  <div className="space-y-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="space-y-1 flex-1 min-w-0">
-                        <h3 className="text-xs md:text-sm font-bold text-stone-900 leading-snug group-hover:text-indigo-900 transition-colors">
-                          {title}
-                        </h3>
-                        {t.description && (
-                          <p className="text-[11px] text-stone-500 line-clamp-2 leading-relaxed">{t.description}</p>
-                        )}
-                      </div>
-                      {/* Status Badge */}
-                      <div className="shrink-0">
-                        {t.status === "APPROVED" && (
-                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Đã duyệt
-                          </span>
-                        )}
-                        {t.status === "DONE" && (
-                          <span className="text-[10px] font-bold text-sky-800 bg-sky-100 border border-sky-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Chờ duyệt
-                          </span>
-                        )}
-                        {t.status === "DOING" && (
-                          <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
-                            Đang làm
-                          </span>
-                        )}
-                        {t.status === "TODO" && (
-                          <span className="text-[10px] font-bold text-stone-700 bg-stone-100 border border-stone-300 px-2 py-0.5 rounded-full">
-                            Cần làm
-                          </span>
-                        )}
-                        {t.status === "REJECTED" && (
-                          <span className="text-[10px] font-bold text-rose-800 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                            <AlertCircle className="w-3 h-3" /> Cần sửa
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Priority & Deadline details */}
-                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-stone-500 pt-1 border-t border-stone-100">
-                      {t.priority === "URGENT" && (
-                        <span className="font-extrabold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
-                          ⚡ Khẩn cấp
-                        </span>
-                      )}
-                      {t.frequency && (
-                        <span className="text-stone-600 bg-stone-100 px-1.5 py-0.5 rounded">
-                          🔄 {t.frequency}
-                        </span>
-                      )}
-                      {t.deadline && (
-                        <span
-                          className={`inline-flex items-center gap-1 ${
-                            isOverdue ? "text-rose-600 font-bold" : "text-stone-500"
-                          }`}
-                        >
-                          <Calendar className="w-3 h-3" /> Hạn: {new Date(t.deadline).toLocaleDateString("vi-VN")}
-                          {isOverdue && " (Quá hạn)"}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Evidence link & note */}
-                    {t.evidenceLink && (
-                      <div className="text-[11px] text-indigo-700 truncate">
-                        🔗 <a
-                          href={t.evidenceLink}
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="underline hover:text-indigo-900"
-                        >
-                          {t.evidenceLink}
-                        </a>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Card Bottom Area: View details trigger + Action button */}
-                  <div className="flex items-center justify-between pt-3 mt-2 border-t border-stone-100/80">
-                    <span className="text-[10px] text-indigo-600 font-semibold inline-flex items-center gap-0.5 hover:underline">
-                      Chi tiết &rarr;
-                    </span>
-
-                    <div className="flex items-center gap-1.5">
-                      {t.status === "TODO" && (
-                        <Button
-                          size="sm"
-                          disabled={isProcessing}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleStartTask(t.id);
-                          }}
-                          className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 rounded-lg cursor-pointer"
-                        >
-                          <Play className="w-3 h-3 mr-1" /> Bắt đầu làm
-                        </Button>
-                      )}
-                      {(t.status === "DOING" || t.status === "REJECTED") && (
-                        <Button
-                          size="sm"
-                          disabled={isProcessing}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setFinishingTask(t);
-                            setEvidenceLink(t.evidenceLink || "");
-                            setNote(t.notes || t.evidenceNote || "");
-                          }}
-                          className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 rounded-lg cursor-pointer"
-                        >
-                          <Send className="w-3 h-3 mr-1" /> Báo hoàn thành
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+            {(filteredTasks || []).map((t) => (
+              <StaffTaskCard
+                key={t.id}
+                task={t}
+                isProcessing={isProcessing}
+                onViewDetails={openDetailModal}
+                onStartTask={handleStartTask}
+                onSubmitTask={openSubmitModal}
+              />
+            ))}
           </div>
         )}
       </div>
 
       {/* READ-ONLY TASK DETAILS MODAL */}
-      {viewingTask && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
-          onClick={() => setViewingTask(null)}
-        >
-          <div
-            className="bg-white rounded-3xl p-5 md:p-6 max-w-md sm:max-w-lg md:max-w-xl w-full space-y-4 shadow-2xl border border-stone-200 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header with Title and Close Button */}
-            <div className="flex items-start justify-between gap-3 border-b border-stone-100 pb-3">
-              <div className="space-y-1.5 flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {viewingTask.status === "APPROVED" && (
-                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Đã duyệt
-                    </span>
-                  )}
-                  {viewingTask.status === "DONE" && (
-                    <span className="text-[10px] font-bold text-sky-800 bg-sky-100 border border-sky-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                      <Clock className="w-3 h-3" /> Chờ duyệt
-                    </span>
-                  )}
-                  {viewingTask.status === "DOING" && (
-                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
-                      Đang làm
-                    </span>
-                  )}
-                  {viewingTask.status === "TODO" && (
-                    <span className="text-[10px] font-bold text-stone-700 bg-stone-100 border border-stone-300 px-2 py-0.5 rounded-full">
-                      Cần làm
-                    </span>
-                  )}
-                  {viewingTask.status === "REJECTED" && (
-                    <span className="text-[10px] font-bold text-rose-800 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" /> Cần sửa
-                    </span>
-                  )}
-                  {viewingTask.priority === "URGENT" && (
-                    <span className="text-[10px] font-extrabold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
-                      ⚡ Khẩn cấp
-                    </span>
-                  )}
-                  {viewingTask.frequency && (
-                    <span className="text-[10px] text-stone-600 bg-stone-100 px-1.5 py-0.5 rounded">
-                      🔄 {viewingTask.frequency}
-                    </span>
-                  )}
-                </div>
-                <h2 className="text-sm sm:text-base font-extrabold text-stone-900 leading-snug break-words">
-                  {viewingTask.title || (viewingTask as any).name || viewingTask.taskDefinition?.name || "Chi tiết công việc"}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewingTask(null)}
-                className="p-1.5 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer shrink-0"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Scrollable Body Content */}
-            <div className="overflow-y-auto space-y-3.5 pr-1 text-xs text-stone-600 flex-1">
-              {/* Meta info: Creator & Deadline */}
-              <div className="grid grid-cols-2 gap-2 bg-stone-50 p-2.5 rounded-xl border border-stone-200/60 text-[11px]">
-                <div>
-                  <span className="text-stone-400 block text-[10px]">Người giao:</span>
-                  <span className="font-semibold text-stone-800 inline-flex items-center gap-1 mt-0.5">
-                    <User className="w-3 h-3 text-stone-500" />
-                    {viewingTask.createdBy?.name || "Quản trị viên"}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-stone-400 block text-[10px]">Hạn hoàn thành:</span>
-                  <span
-                    className={`font-semibold inline-flex items-center gap-1 mt-0.5 ${
-                      viewingTask.deadline &&
-                      new Date(viewingTask.deadline) < new Date() &&
-                      viewingTask.status !== "APPROVED"
-                        ? "text-rose-600 font-bold"
-                        : "text-stone-800"
-                    }`}
-                  >
-                    <Calendar className="w-3 h-3 text-stone-500" />
-                    {viewingTask.deadline
-                      ? new Date(viewingTask.deadline).toLocaleDateString("vi-VN", {
-                          day: "2-digit",
-                          month: "2-digit",
-                          year: "numeric",
-                        })
-                      : "Không giới hạn"}
-                  </span>
-                </div>
-              </div>
-
-              {/* Task Description (Full, Read-only, Selectable) */}
-              <div>
-                <label className="text-[11px] font-bold text-stone-700 block mb-1.5 flex items-center gap-1">
-                  <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                  Nội dung chi tiết công việc:
-                </label>
-                {viewingTask.description ? (
-                  <div className="bg-stone-50 border border-stone-200 rounded-xl p-3 text-stone-800 text-xs sm:text-[13px] leading-relaxed whitespace-pre-wrap break-words select-text">
-                    {viewingTask.description}
-                  </div>
-                ) : (
-                  <div className="bg-stone-50 border border-dashed border-stone-200 rounded-xl p-3 text-stone-400 text-xs italic">
-                    Không có phần mô tả thêm cho công việc này.
-                  </div>
-                )}
-              </div>
-
-              {/* Admin Note / Reject Reason (if any) */}
-              {(viewingTask.adminNote || viewingTask.rejectReason) && (
-                <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 space-y-1">
-                  <span className="text-[11px] font-bold text-rose-800 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                    Yêu cầu / Ghi chú từ Quản trị viên:
-                  </span>
-                  <p className="text-xs text-rose-900 whitespace-pre-wrap">
-                    {viewingTask.adminNote || viewingTask.rejectReason}
-                  </p>
-                </div>
-              )}
-
-              {/* Submitted Evidence & Note (if staff submitted before) */}
-              {(viewingTask.evidenceLink || viewingTask.evidenceNote || viewingTask.notes) && (
-                <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 space-y-1.5 text-xs">
-                  <span className="font-bold text-indigo-900 block text-[11px]">
-                    Báo cáo kết quả đã gửi:
-                  </span>
-                  {viewingTask.evidenceLink && (
-                    <div className="text-indigo-700 break-all">
-                      <span className="text-stone-500 font-medium">Link: </span>
-                      <a
-                        href={viewingTask.evidenceLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline font-semibold hover:text-indigo-900 inline-flex items-center gap-1"
-                      >
-                        {viewingTask.evidenceLink}
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  )}
-                  {(viewingTask.evidenceNote || viewingTask.notes) && (
-                    <p className="text-stone-700 whitespace-pre-wrap">
-                      <span className="text-stone-500 font-medium">Ghi chú: </span>
-                      {viewingTask.evidenceNote || viewingTask.notes}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Modal Actions */}
-            <div className="pt-2 border-t border-stone-100 flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setViewingTask(null)}
-                className="flex-1 h-9 text-xs font-bold border-stone-200 text-stone-700 hover:bg-stone-50 cursor-pointer"
-              >
-                Đóng
-              </Button>
-              {viewingTask.status === "TODO" && (
-                <Button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => {
-                    const id = viewingTask.id;
-                    setViewingTask(null);
-                    handleStartTask(id);
-                  }}
-                  className="flex-1 h-9 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
-                >
-                  <Play className="w-3 h-3 mr-1" /> Bắt đầu làm
-                </Button>
-              )}
-              {(viewingTask.status === "DOING" || viewingTask.status === "REJECTED") && (
-                <Button
-                  type="button"
-                  disabled={isProcessing}
-                  onClick={() => {
-                    const taskToFinish = viewingTask;
-                    setViewingTask(null);
-                    setFinishingTask(taskToFinish);
-                    setEvidenceLink(taskToFinish.evidenceLink || "");
-                    setNote(taskToFinish.notes || taskToFinish.evidenceNote || "");
-                  }}
-                  className="flex-1 h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
-                >
-                  <Send className="w-3 h-3 mr-1" /> Báo hoàn thành
-                </Button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <TaskDetailModal
+        task={viewingTask}
+        isProcessing={isProcessing}
+        onClose={closeDetailModal}
+        onStartTask={handleStartTask}
+        onSubmitTask={openSubmitModal}
+      />
 
       {/* FINISH TASK MODAL */}
-      {finishingTask && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 max-w-sm sm:max-w-lg w-full space-y-4 shadow-xl border border-stone-200 animate-in fade-in zoom-in-95 duration-200">
-            <div>
-              <h2 className="text-sm font-bold text-stone-900">
-                Báo cáo hoàn thành: {finishingTask.title || (finishingTask as any).name || "Công việc"}
-              </h2>
-              <p className="text-xs text-stone-500 mt-0.5">
-                Nhập link bằng chứng hình ảnh hoặc ghi chú kết quả công việc
-              </p>
-            </div>
-
-            <form onSubmit={handleFinishSubmit} className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
-                  Link bằng chứng kết quả (Google Drive / Ảnh)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://drive.google.com/..."
-                  value={evidenceLink}
-                  onChange={(e) => setEvidenceLink(e.target.value)}
-                  className="w-full h-9 px-3 rounded-lg border border-stone-200 text-sm focus:outline-indigo-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
-                  Ghi chú kết quả thực hiện
-                </label>
-                <textarea
-                  rows={3}
-                  placeholder="Mô tả kết quả đã làm..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="w-full p-2.5 rounded-lg border border-stone-200 text-xs focus:outline-indigo-500"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isProcessing}
-                  onClick={() => setFinishingTask(null)}
-                  className="flex-1 h-9 text-xs font-bold cursor-pointer"
-                >
-                  Hủy
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isProcessing}
-                  className="flex-1 h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer"
-                >
-                  {isProcessing ? "Đang gửi..." : "Gửi kết quả"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <TaskSubmitModal
+        task={finishingTask}
+        evidenceLink={evidenceLink}
+        note={note}
+        isProcessing={isProcessing}
+        onEvidenceLinkChange={setEvidenceLink}
+        onNoteChange={setNote}
+        onSubmit={handleFinishSubmit}
+        onClose={closeSubmitModal}
+      />
     </div>
   );
 };

@@ -1,72 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, Clock, Trash2, RefreshCw } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, RefreshCw } from "lucide-react";
 import { useRouter } from "@/lib/router";
 import { toast } from "sonner";
 import { authFetch } from "@/lib/api-client";
-
-function getMonday(d: Date): Date {
-  const date = new Date(d);
-  const day = date.getDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  date.setDate(date.getDate() + diff);
-  date.setHours(0, 0, 0, 0);
-  return date;
-}
-
-const DAY_NAMES = [
-  { short: "T2", full: "Thứ Hai", color: "bg-blue-600 text-white shadow-blue-500/25" },
-  { short: "T3", full: "Thứ Ba", color: "bg-purple-600 text-white shadow-purple-500/25" },
-  { short: "T4", full: "Thứ Tư", color: "bg-teal-600 text-white shadow-teal-500/25" },
-  { short: "T5", full: "Thứ Năm", color: "bg-orange-500 text-white shadow-orange-500/25" },
-  { short: "T6", full: "Thứ Sáu", color: "bg-indigo-600 text-white shadow-indigo-500/25" },
-  { short: "T7", full: "Thứ Bảy", color: "bg-pink-600 text-white shadow-pink-500/25" },
-  { short: "CN", full: "Chủ Nhật", color: "bg-red-600 text-white shadow-red-500/25" },
-];
-
-const START_HOURS = Array.from({ length: 10 }, (_, i) => String(i + 8).padStart(2, "0")); // 08..17
-const END_HOURS = Array.from({ length: 11 }, (_, i) => String(i + 11).padStart(2, "0")); // 11..21
-const MINUTES = ["00", "15", "30", "45"];
-
-const MORNING_PRESETS = [
-  { label: "8h - 12h", sH: "08", sM: "00", eH: "12", eM: "00" },
-  { label: "8h - 14h", sH: "08", sM: "00", eH: "14", eM: "00" },
-  { label: "8h - 15h", sH: "08", sM: "00", eH: "15", eM: "00" },
-  { label: "9h - 14h", sH: "09", sM: "00", eH: "14", eM: "00" },
-  { label: "10h - 14h30", sH: "10", sM: "00", eH: "14", eM: "30" },
-];
-
-const AFTERNOON_PRESETS = [
-  { label: "12h - 16h30", sH: "12", sM: "00", eH: "16", eM: "30" },
-  { label: "12h - 17h", sH: "12", sM: "00", eH: "17", eM: "00" },
-  { label: "12h30 - 17h", sH: "12", sM: "30", eH: "17", eM: "00" },
-  { label: "13h - 17h", sH: "13", sM: "00", eH: "17", eM: "00" },
-];
-
-function formatShiftLabel(type?: string, start?: string, end?: string): string {
-  if (type === "MORNING") return "Sáng (8:30 - 12:00)";
-  if (type === "AFTERNOON") return "Chiều (13:30 - 17:30)";
-  if (type === "FULL") return "Cả ngày (8:30 - 17:30)";
-  if (start && end) {
-    const s = new Date(start).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-    const e = new Date(end).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
-    return `${s} - ${e}`;
-  }
-  return type || "Ca tự do";
-}
-
-function calculateDuration(s: string, e: string): string | null {
-  if (!s || !e) return null;
-  const [sH, sM] = s.split(":").map(Number);
-  const [eH, eM] = e.split(":").map(Number);
-  const totalMinutes = eH * 60 + eM - (sH * 60 + sM);
-  if (isNaN(totalMinutes) || totalMinutes <= 0) return null;
-  const h = Math.floor(totalMinutes / 60);
-  const m = totalMinutes % 60;
-  if (m === 0) return `${h} tiếng`;
-  return `${h} tiếng ${m} phút`;
-}
+import {
+  useStaffScheduleStore,
+  ShiftItem,
+} from "@/stores/useStaffScheduleStore";
+import {
+  DAY_NAMES,
+  getMonday,
+  formatShiftLabel,
+} from "./schedule-utils";
+import { ShiftDetailsModal } from "./ShiftDetailsModal";
+import { ShiftSwapModal } from "./ShiftSwapModal";
+import { ShiftRegisterModal } from "./ShiftRegisterModal";
 
 interface ScheduleClientProps {
   shifts: any[];
@@ -86,33 +36,28 @@ export default function ScheduleClient({
   isLoading = false,
 }: ScheduleClientProps) {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [startHour, setStartHour] = useState("08");
-  const [startMinute, setStartMinute] = useState("00");
-  const [endHour, setEndHour] = useState("12");
-  const [endMinute, setEndMinute] = useState("00");
-  const [activePreset, setActivePreset] = useState<string | null>("8h - 12h");
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const startTime = `${startHour}:${startMinute}`;
-  const endTime = `${endHour}:${endMinute}`;
-
-  const applyTimeRange = (sh: string, sm: string, eh: string, em: string, preset: string | null) => {
-    setStartHour(sh);
-    setStartMinute(sm);
-    setEndHour(eh);
-    setEndMinute(em);
-    setActivePreset(preset);
-  };
-
-  const [weekStart, setWeekStart] = useState<Date>(() => getMonday(viewDate || new Date()));
+  const {
+    weekStart,
+    selectedDate,
+    isSwapModalOpen,
+    swapTargetShift,
+    isRegisterModalOpen,
+    isSubmitting,
+    setWeekStart,
+    openDateDetails,
+    closeDateDetails,
+    openSwapModal,
+    closeSwapModal,
+    setIsSubmitting,
+    setShowAddForm,
+  } = useStaffScheduleStore();
 
   useEffect(() => {
     if (viewDate) {
       setWeekStart(getMonday(viewDate));
     }
-  }, [viewDate]);
+  }, [viewDate, setWeekStart]);
 
   // 7 days of the week starting from Monday (T2) down to Sunday (CN)
   const weekDays = Array.from({ length: 7 }, (_, i) => {
@@ -180,13 +125,15 @@ export default function ScheduleClient({
   };
 
   const handleOpenDate = (date: Date) => {
-    setSelectedDate(date);
-    applyTimeRange("08", "00", "12", "00", "8h - 12h");
-    setShowAddForm(false);
+    openDateDetails(date);
   };
 
   const handleRegister = async () => {
     if (!selectedDate) return;
+    const store = useStaffScheduleStore.getState();
+    const startTime = `${store.startHour}:${store.startMinute}`;
+    const endTime = `${store.endHour}:${store.endMinute}`;
+
     if (!startTime || !endTime) {
       toast.error("Vui lòng chọn giờ bắt đầu và kết thúc");
       return;
@@ -209,7 +156,7 @@ export default function ScheduleClient({
           dateStr: selectedDate.toISOString(),
           startTime,
           endTime,
-          shift: activePreset || undefined,
+          shift: store.activePreset || undefined,
         }),
       });
 
@@ -254,8 +201,7 @@ export default function ScheduleClient({
   };
 
   // Selected date shifts (only for current user)
-  const selectedMyShifts = selectedDate ? getMyShiftsForDate(selectedDate) : [];
-  const durationText = calculateDuration(startTime, endTime);
+  const selectedMyShifts: ShiftItem[] = selectedDate ? getMyShiftsForDate(selectedDate) : [];
 
   return (
     <div className="space-y-3">
@@ -447,300 +393,35 @@ export default function ScheduleClient({
       </Card>
 
       {/* Date Detail / Registration Modal */}
-      {selectedDate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden p-5 space-y-3.5 animate-in zoom-in-95 duration-150 border border-orange-100 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div>
-              <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">
-                Lịch chi tiết
-              </span>
-              <h3 className="text-sm font-bold text-stone-900">
-                {selectedDate.toLocaleDateString("vi-VN", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </h3>
-            </div>
+      <ShiftDetailsModal
+        selectedDate={selectedDate}
+        myShifts={selectedMyShifts}
+        isSubmitting={isSubmitting}
+        onClose={closeDateDetails}
+        onCancelShift={handleCancelShift}
+        onRegisterShift={handleRegister}
+        onOpenSwap={(shift) => openSwapModal(shift)}
+      />
 
-            {/* List of User's Registered Shifts on this Date */}
-            {selectedMyShifts.length > 0 && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-stone-700">
-                    Ca làm của bạn ({selectedMyShifts.length}):
-                  </span>
-                  {!showAddForm && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowAddForm(true)}
-                      className="text-[11px] h-7 px-2 text-amber-700 hover:bg-amber-50 cursor-pointer font-semibold"
-                    >
-                      + Thêm ca khác
-                    </Button>
-                  )}
-                </div>
+      {/* Shift Swap Modal */}
+      <ShiftSwapModal
+        isOpen={isSwapModalOpen}
+        shift={swapTargetShift}
+        onClose={closeSwapModal}
+        onSuccess={() => {
+          if (onRefresh) onRefresh();
+        }}
+      />
 
-                {selectedMyShifts.map((myShift) => (
-                  <div
-                    key={myShift.id}
-                    className="p-3 bg-emerald-50/80 rounded-2xl border border-emerald-200/80 space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-emerald-900">
-                        {myShift.start && myShift.end
-                          ? `${new Date(myShift.start).toLocaleTimeString("vi-VN", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })} - ${new Date(myShift.end).toLocaleTimeString("vi-VN", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}`
-                          : formatShiftLabel(myShift.shiftType || myShift.shift)}
-                      </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-800 font-semibold">
-                        Đã xếp ca
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 text-[11px] text-emerald-800">
-                      <Clock className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>
-                        {myShift.start && myShift.end
-                          ? `Thời lượng: ${
-                              calculateDuration(
-                                new Date(myShift.start).toLocaleTimeString("en-GB", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                  timeZone: "Asia/Ho_Chi_Minh",
-                                }),
-                                new Date(myShift.end).toLocaleTimeString("en-GB", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                  timeZone: "Asia/Ho_Chi_Minh",
-                                })
-                              ) || "Linh hoạt"
-                            }`
-                          : "Theo quy định ca"}
-                      </span>
-                    </div>
-
-                    <div className="pt-1 flex gap-2">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={isSubmitting}
-                        onClick={() => handleCancelShift(myShift.id)}
-                        className="flex-1 text-xs h-8 cursor-pointer rounded-xl bg-red-600 hover:bg-red-700"
-                      >
-                        <Trash2 className="w-3.5 h-3.5 mr-1" />
-                        Hủy ca này
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Flexible Time Registration Form */}
-            {(selectedMyShifts.length === 0 || showAddForm) && (
-              <div className="space-y-3 pt-1 border-t border-orange-100">
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-stone-700 font-bold">
-                    {selectedMyShifts.length > 0 ? "Đăng ký thêm giờ làm:" : "Đăng ký giờ làm tự do:"}
-                  </p>
-                  {showAddForm && selectedMyShifts.length > 0 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowAddForm(false)}
-                      className="text-[10px] h-6 px-1.5 text-stone-500"
-                    >
-                      Thu gọn
-                    </Button>
-                  )}
-                </div>
-
-                {/* Quick Presets */}
-                <div className="space-y-2.5">
-                  <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
-                    Gợi ý ca làm nhanh:
-                  </span>
-
-                  {/* Ca sáng */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
-                      ☀️ Ca sáng:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {MORNING_PRESETS.map((p) => {
-                        const isSelected = activePreset === p.label;
-                        return (
-                          <Button
-                            key={p.label}
-                            type="button"
-                            variant={isSelected ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => applyTimeRange(p.sH, p.sM, p.eH, p.eM, p.label)}
-                            className={`h-8 px-2.5 text-[11px] rounded-xl cursor-pointer ${
-                              isSelected
-                                ? "bg-amber-600 hover:bg-amber-700 text-white font-bold"
-                                : "border-stone-200 text-stone-700 hover:bg-stone-50"
-                            }`}
-                          >
-                            {p.label}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Ca chiều */}
-                  <div className="space-y-1.5">
-                    <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
-                      🌙 Ca chiều:
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {AFTERNOON_PRESETS.map((p) => {
-                        const isSelected = activePreset === p.label;
-                        return (
-                          <Button
-                            key={p.label}
-                            type="button"
-                            variant={isSelected ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => applyTimeRange(p.sH, p.sM, p.eH, p.eM, p.label)}
-                            className={`h-8 px-2.5 text-[11px] rounded-xl cursor-pointer ${
-                              isSelected
-                                ? "bg-amber-600 hover:bg-amber-700 text-white font-bold"
-                                : "border-stone-200 text-stone-700 hover:bg-stone-50"
-                            }`}
-                          >
-                            {p.label}
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Free Custom Hours Inputs */}
-                <div className="p-3 bg-stone-50/80 rounded-2xl border border-stone-200 space-y-2.5">
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-600 block mb-1">
-                        Bắt đầu (8h - 17h):
-                      </label>
-                      <div className="flex items-center gap-1">
-                        <select
-                          value={startHour}
-                          onChange={(e) => {
-                            setStartHour(e.target.value);
-                            setActivePreset(null);
-                          }}
-                          className="h-9 flex-1 text-xs font-semibold bg-white rounded-xl border border-stone-200 px-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer text-stone-800"
-                        >
-                          {START_HOURS.map((h) => (
-                            <option key={h} value={h}>
-                              {h}h
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-xs font-bold text-stone-400">:</span>
-                        <select
-                          value={startMinute}
-                          onChange={(e) => {
-                            setStartMinute(e.target.value);
-                            setActivePreset(null);
-                          }}
-                          className="h-9 flex-1 text-xs font-semibold bg-white rounded-xl border border-stone-200 px-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer text-stone-800"
-                        >
-                          {MINUTES.map((m) => (
-                            <option key={m} value={m}>
-                              {m}p
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-stone-600 block mb-1">
-                        Kết thúc (11h - 21h):
-                      </label>
-                      <div className="flex items-center gap-1">
-                        <select
-                          value={endHour}
-                          onChange={(e) => {
-                            setEndHour(e.target.value);
-                            setActivePreset(null);
-                          }}
-                          className="h-9 flex-1 text-xs font-semibold bg-white rounded-xl border border-stone-200 px-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer text-stone-800"
-                        >
-                          {END_HOURS.map((h) => (
-                            <option key={h} value={h}>
-                              {h}h
-                            </option>
-                          ))}
-                        </select>
-                        <span className="text-xs font-bold text-stone-400">:</span>
-                        <select
-                          value={endMinute}
-                          onChange={(e) => {
-                            setEndMinute(e.target.value);
-                            setActivePreset(null);
-                          }}
-                          className="h-9 flex-1 text-xs font-semibold bg-white rounded-xl border border-stone-200 px-1.5 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer text-stone-800"
-                        >
-                          {MINUTES.map((m) => (
-                            <option key={m} value={m}>
-                              {m}p
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {durationText && (
-                    <div className="text-[11px] text-amber-800 font-bold flex items-center justify-between px-1">
-                      <span>⏱️ Thời lượng:</span>
-                      <span className="bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full">
-                        {durationText}
-                      </span>
-                    </div>
-                  )}
-
-                  <Button
-                    type="button"
-                    disabled={isSubmitting}
-                    onClick={handleRegister}
-                    className="w-full h-9 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs cursor-pointer shadow-xs"
-                  >
-                    {isSubmitting ? "Đang lưu..." : "Xác nhận đăng ký giờ làm"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Close Modal Button */}
-            <div className="flex justify-end pt-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setSelectedDate(null)}
-                className="text-xs h-8 rounded-xl text-stone-600 hover:bg-stone-100 cursor-pointer"
-              >
-                Đóng
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Direct Shift Register Modal */}
+      <ShiftRegisterModal
+        isOpen={isRegisterModalOpen}
+        selectedDate={selectedDate}
+        onClose={() => useStaffScheduleStore.getState().closeRegisterModal()}
+        onSuccess={() => {
+          if (onRefresh) onRefresh();
+        }}
+      />
     </div>
   );
 }

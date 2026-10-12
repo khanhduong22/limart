@@ -841,6 +841,41 @@ describe("Admin Routes", () => {
       expect(body.success).toBe(true);
     });
 
+    it("DELETE /api/admin/schedule/user/:userId/all deletes all shifts of an employee", async () => {
+      mockWorkShiftDeleteMany.mockResolvedValue({ count: 5 });
+
+      const res = await app.request("/api/admin/schedule/user/u-test-user/all", {
+        method: "DELETE",
+        headers: { Cookie: `access_token=${adminToken}` },
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.count).toBe(5);
+      expect(body.message).toBe("Đã xóa toàn bộ ca làm việc của nhân viên");
+      expect(mockWorkShiftDeleteMany).toHaveBeenCalledWith({
+        where: { userId: "u-test-user" },
+      });
+    });
+
+    it("DELETE /api/admin/schedule/employee/:userId/all deletes all shifts (alias)", async () => {
+      mockWorkShiftDeleteMany.mockResolvedValue({ count: 3 });
+
+      const res = await app.request("/api/admin/schedule/employee/u-test-user/all", {
+        method: "DELETE",
+        headers: { Cookie: `access_token=${adminToken}` },
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.success).toBe(true);
+      expect(body.count).toBe(3);
+      expect(mockWorkShiftDeleteMany).toHaveBeenCalledWith({
+        where: { userId: "u-test-user" },
+      });
+    });
+
     it("PATCH /api/admin/schedule/:id/senior toggles senior crown", async () => {
       mockWorkShiftFindUnique.mockResolvedValue({
         id: 103,

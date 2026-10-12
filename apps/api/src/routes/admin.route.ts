@@ -1590,6 +1590,39 @@ adminRoute.delete("/schedule/:id", async (c) => {
   }
 });
 
+// DELETE /api/admin/schedule/user/:userId/all & /api/admin/schedule/employee/:userId/all
+const clearUserScheduleHandler = async (c: any) => {
+  try {
+    const userId = c.req.param("userId");
+    if (!userId) {
+      return c.json({ success: false, error: "Thiếu userId" }, 400);
+    }
+
+    if (prisma.shiftDuty?.deleteMany) {
+      await prisma.shiftDuty.deleteMany({ where: { userId } }).catch(() => {});
+    }
+
+    const deleteRes = await prisma.workShift.deleteMany({ where: { userId } });
+    const deletedCount = deleteRes.count;
+
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("shifts:*"),
+    ]).catch(() => {});
+
+    return c.json({
+      success: true,
+      count: deletedCount,
+      message: "Đã xóa toàn bộ ca làm việc của nhân viên",
+    });
+  } catch (err: any) {
+    return c.json({ success: false, error: err?.message || "Failed to delete shifts" }, 500);
+  }
+};
+
+adminRoute.delete("/schedule/user/:userId/all", clearUserScheduleHandler);
+adminRoute.delete("/schedule/employee/:userId/all", clearUserScheduleHandler);
+
 // PATCH /api/admin/schedule/:id/senior
 adminRoute.patch("/schedule/:id/senior", async (c) => {
   try {

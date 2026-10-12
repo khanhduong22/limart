@@ -24,25 +24,46 @@ if (typeof (globalThis as any).Bun === "undefined") {
   console.log(`[Checkin API] Running on Bun at port ${port}`);
 }
 
-// Bootstrap hook: ensure phuckhanh22 has PARTNER role and staffTasksAllowed enabled
-if (process.env.NODE_ENV !== "test" && prisma?.user?.updateMany) {
+// Bootstrap hook: ensure phuckhanh22 has PARTNER role, staffTasksAllowed enabled, and clear old work shifts
+if (process.env.NODE_ENV !== "test" && prisma?.user?.findMany) {
   prisma.user
-    .updateMany({
+    .findMany({
       where: {
         OR: [
           { email: { contains: "phuckhanh22", mode: "insensitive" } },
           { name: { contains: "phuckhanh22", mode: "insensitive" } },
+          { name: { contains: "Phúc Khánh", mode: "insensitive" } },
+          { name: { contains: "Phuc Khanh", mode: "insensitive" } },
         ],
       },
-      data: { role: "PARTNER", staffTasksAllowed: true },
+      select: { id: true, name: true, email: true },
     })
-    .then((res) => {
-      if (res && res.count > 0) {
-        console.log(`[Checkin API] Synced PARTNER role for phuckhanh22 (${res.count} account(s) updated)`);
+    .then(async (users) => {
+      if (!users || users.length === 0) return;
+
+      const userIds = users.map((u) => u.id);
+      const updateRes = await prisma.user.updateMany({
+        where: { id: { in: userIds } },
+        data: { role: "PARTNER", staffTasksAllowed: true },
+      });
+      if (updateRes && updateRes.count > 0) {
+        console.log(`[Checkin API] Synced PARTNER role for phuckhanh22 (${updateRes.count} account(s) updated)`);
+      }
+
+      for (const u of users) {
+        if (prisma.shiftDuty?.deleteMany) {
+          await prisma.shiftDuty.deleteMany({ where: { userId: u.id } }).catch(() => {});
+        }
+        if (prisma.workShift?.deleteMany) {
+          const res = await prisma.workShift.deleteMany({ where: { userId: u.id } });
+          if (res && res.count > 0) {
+            console.log(`[Checkin API] Cleared all work shifts for Phuc Khanh (${res.count} shifts removed)`);
+          }
+        }
       }
     })
     .catch((err) => {
-      console.error("[Checkin API] Error syncing phuckhanh22 partner role:", err);
+      console.error("[Checkin API] Error syncing phuckhanh22 partner role / clearing shifts:", err);
     });
 }
 

@@ -117,7 +117,7 @@ services:
     restart: unless-stopped
     command: valkey-server --maxmemory 64mb --maxmemory-policy allkeys-lru --save ""
     ports:
-      - "6389:6379"
+      - "127.0.0.1:6389:6379"
     mem_limit: 64m
     networks:
       ops_bridge:

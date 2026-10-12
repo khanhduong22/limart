@@ -145,11 +145,15 @@ authRoute.get("/callback/google", async (c) => {
     });
   }
 
-  // Auto-assign PARTNER role if matches cuccung123456789@gmail.com
-  if (user.email === "cuccung123456789@gmail.com" && user.role !== "PARTNER") {
+  // Auto-assign PARTNER role if matches cuccung123456789@gmail.com or phuckhanh22
+  if (
+    (user.email?.toLowerCase().includes("phuckhanh22") ||
+      user.email?.toLowerCase() === "cuccung123456789@gmail.com") &&
+    (user.role !== "PARTNER" || !user.staffTasksAllowed)
+  ) {
     user = await prisma.user.update({
       where: { id: user.id },
-      data: { role: "PARTNER" },
+      data: { role: "PARTNER", staffTasksAllowed: true },
     });
   }
 

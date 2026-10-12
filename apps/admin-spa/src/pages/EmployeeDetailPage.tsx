@@ -87,6 +87,7 @@ export function EmployeeDetailPage() {
             <h1 className="text-lg sm:text-xl md:text-2xl font-bold flex items-center gap-1.5 sm:gap-2 text-slate-900 flex-wrap">
               <span className="truncate">{user.name}</span>
               {user.role === "ADMIN" && <Badge className="bg-amber-500 text-white text-[10px]">Admin</Badge>}
+              {user.role === "PARTNER" && <Badge className="bg-purple-600 hover:bg-purple-700 text-white text-[10px]">Đối tác WFH</Badge>}
               <Badge variant="outline" className="text-[10px]">{user.employmentType === "FULL_TIME" ? "Toàn thời gian" : "Bán thời gian"}</Badge>
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5 truncate">{user.email}</p>

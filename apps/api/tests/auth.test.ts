@@ -314,6 +314,7 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
           name: "Thu Nguyen",
           role: "PARTNER",
           isActive: true,
+          staffTasksAllowed: true,
         });
 
         const res = await app.request("/api/auth/callback/google?code=valid_code");
@@ -322,7 +323,39 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
         expect(mockUpdate).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { id: "u-thu" },
-            data: { role: "PARTNER" },
+            data: { role: "PARTNER", staffTasksAllowed: true },
+          })
+        );
+      });
+
+      it("auto-assigns phuckhanh22 account to PARTNER and redirects to /tasks", async () => {
+        const fakeToken = createFakeIdToken("phuckhanh22@gmail.com");
+        vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+          new Response(JSON.stringify({ id_token: fakeToken }), { status: 200 })
+        );
+        mockFindUnique.mockResolvedValue({
+          id: "u-pk22",
+          email: "phuckhanh22@gmail.com",
+          name: "Phuc Khanh",
+          role: "USER",
+          isActive: true,
+        });
+        mockUpdate.mockResolvedValue({
+          id: "u-pk22",
+          email: "phuckhanh22@gmail.com",
+          name: "Phuc Khanh",
+          role: "PARTNER",
+          isActive: true,
+          staffTasksAllowed: true,
+        });
+
+        const res = await app.request("/api/auth/callback/google?code=valid_code");
+        expect(res.status).toBe(302);
+        expect(res.headers.get("location")).toMatch(/^\/tasks\?token=/);
+        expect(mockUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: { id: "u-pk22" },
+            data: { role: "PARTNER", staffTasksAllowed: true },
           })
         );
       });

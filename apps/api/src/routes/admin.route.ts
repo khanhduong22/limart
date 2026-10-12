@@ -504,7 +504,7 @@ const CreateUserSchema = z.object({
   employmentType: z.enum(["FULL_TIME", "PART_TIME"]).default("PART_TIME"),
   hourlyRate: z.number().default(0),
   monthlySalary: z.number().default(6000000),
-  role: z.enum(["USER", "ADMIN"]).default("USER"),
+  role: z.enum(["USER", "ADMIN", "PARTNER"]).default("USER"),
   birthday: z.string().optional(),
   startDate: z.string().optional(),
   staffTasksAllowed: z.boolean().optional(),
@@ -512,7 +512,7 @@ const CreateUserSchema = z.object({
 
 const UpdateUserSchema = z.object({
   name: z.string().optional(),
-  role: z.enum(["USER", "ADMIN"]).optional(),
+  role: z.enum(["USER", "ADMIN", "PARTNER"]).optional(),
   hourlyRate: z.number().optional(),
   monthlySalary: z.number().optional(),
   employmentType: z.enum(["FULL_TIME", "PART_TIME"]).optional(),
@@ -711,7 +711,7 @@ const handleCreateUser = async (c: any) => {
         role,
         birthday: birthday ? new Date(birthday) : null,
         startDate: startDate ? new Date(startDate) : null,
-        staffTasksAllowed: staffTasksAllowed !== undefined ? staffTasksAllowed : false,
+        staffTasksAllowed: staffTasksAllowed !== undefined ? staffTasksAllowed : (role === "PARTNER" ? true : false),
       },
     });
 
@@ -766,7 +766,12 @@ const handleUpdateUser = async (c: any) => {
     } = parseResult.data;
 
     if (name !== undefined) data.name = name;
-    if (role !== undefined) data.role = role;
+    if (role !== undefined) {
+      data.role = role;
+      if (role === "PARTNER") {
+        data.staffTasksAllowed = true;
+      }
+    }
     if (hourlyRate !== undefined) data.hourlyRate = hourlyRate;
     if (monthlySalary !== undefined) data.monthlySalary = monthlySalary;
     if (employmentType !== undefined) data.employmentType = employmentType;

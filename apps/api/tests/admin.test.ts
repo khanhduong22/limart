@@ -304,6 +304,39 @@ describe("Admin Routes", () => {
       expect(mockUserUpdate).toHaveBeenCalled();
     });
 
+    it("PUT /api/admin/employees/:id updates role to PARTNER and automatically enables staffTasksAllowed", async () => {
+      mockUserUpdate.mockResolvedValue({
+        id: "u-1",
+        name: "Partner User",
+        role: "PARTNER",
+        staffTasksAllowed: true,
+      });
+
+      const res = await app.request("/api/admin/employees/u-1", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: `access_token=${adminToken}`,
+        },
+        body: JSON.stringify({
+          role: "PARTNER",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(mockUserUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "u-1" },
+          data: expect.objectContaining({
+            role: "PARTNER",
+            staffTasksAllowed: true,
+          }),
+        })
+      );
+    });
+
     it("DELETE /api/admin/users/:id deletes user", async () => {
       mockUserDelete.mockResolvedValue({ id: "u-1" });
 

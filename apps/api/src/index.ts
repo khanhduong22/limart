@@ -24,6 +24,28 @@ if (typeof (globalThis as any).Bun === "undefined") {
   console.log(`[Checkin API] Running on Bun at port ${port}`);
 }
 
+// Bootstrap hook: ensure phuckhanh22 has PARTNER role and staffTasksAllowed enabled
+if (process.env.NODE_ENV !== "test" && prisma?.user?.updateMany) {
+  prisma.user
+    .updateMany({
+      where: {
+        OR: [
+          { email: { contains: "phuckhanh22", mode: "insensitive" } },
+          { name: { contains: "phuckhanh22", mode: "insensitive" } },
+        ],
+      },
+      data: { role: "PARTNER", staffTasksAllowed: true },
+    })
+    .then((res) => {
+      if (res && res.count > 0) {
+        console.log(`[Checkin API] Synced PARTNER role for phuckhanh22 (${res.count} account(s) updated)`);
+      }
+    })
+    .catch((err) => {
+      console.error("[Checkin API] Error syncing phuckhanh22 partner role:", err);
+    });
+}
+
 export const shutdownController = setupGracefulShutdown({
   server: () => server,
   timeoutMs: 10000,

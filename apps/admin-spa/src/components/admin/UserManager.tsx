@@ -34,6 +34,7 @@ function AddEmployeeDialog({
   const [form, setForm] = useState({
     name: "",
     email: "",
+    role: "USER" as "USER" | "ADMIN" | "PARTNER",
     employmentType: "PART_TIME" as "FULL_TIME" | "PART_TIME",
     hourlyRate: "25000",
     monthlySalary: "6000000",
@@ -58,6 +59,7 @@ function AddEmployeeDialog({
       await api.post("/api/admin/employees", {
         name: form.name.trim(),
         email: form.email.trim(),
+        role: form.role,
         employmentType: form.employmentType,
         hourlyRate: parseFloat(form.hourlyRate) || 0,
         monthlySalary: parseFloat(form.monthlySalary) || 0,
@@ -66,6 +68,7 @@ function AddEmployeeDialog({
       setForm({
         name: "",
         email: "",
+        role: "USER",
         employmentType: "PART_TIME",
         hourlyRate: "25000",
         monthlySalary: "6000000",
@@ -117,6 +120,22 @@ function AddEmployeeDialog({
               value={form.email}
               onChange={handleChange}
             />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-1.5 sm:gap-4">
+            <Label htmlFor="emp-role" className="sm:text-right">
+              Vai trò
+            </Label>
+            <select
+              id="emp-role"
+              name="role"
+              className="sm:col-span-3 border rounded-md px-3 py-2 text-base sm:text-sm h-10 sm:h-9 min-h-[38px] bg-white"
+              value={form.role}
+              onChange={handleChange}
+            >
+              <option value="USER">🏪 Nhân viên tiệm (USER)</option>
+              <option value="PARTNER">💼 Đối tác WFH (PARTNER)</option>
+              <option value="ADMIN">🛡️ Quản trị viên (ADMIN)</option>
+            </select>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-4 items-start sm:items-center gap-1.5 sm:gap-4">
             <Label htmlFor="emp-type" className="sm:text-right">
@@ -310,20 +329,33 @@ function UserItem({
     }
   };
 
-  const toggleRole = async () => {
-    const newRole = user.role === "ADMIN" ? "USER" : "ADMIN";
-    if (confirm(`Bạn có chắc muốn đổi quyền của ${user.name} thành ${newRole}?`)) {
-      setLoading(true);
-      try {
-        await api.put(`/api/admin/employees/${user.id}`, { role: newRole });
-        toast.success(`Đã cập nhật quyền ${newRole}`);
-        if (onUpdate) onUpdate({ ...user, role: newRole });
-      } catch {
-        toast.success(`Đã cập nhật quyền ${newRole}`);
-        if (onUpdate) onUpdate({ ...user, role: newRole });
-      } finally {
-        setLoading(false);
+  const handleRoleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newRole = e.target.value as "USER" | "ADMIN" | "PARTNER";
+    if (newRole === user.role) return;
+
+    const roleNameMap: Record<string, string> = {
+      USER: "Nhân viên tại tiệm (USER)",
+      PARTNER: "Đối tác WFH / Marketing (PARTNER)",
+      ADMIN: "Quản trị viên (ADMIN)",
+    };
+
+    setLoading(true);
+    try {
+      await api.put(`/api/admin/employees/${user.id}`, { role: newRole });
+      toast.success(
+        `Đã cập nhật vai trò ${user.name} thành ${roleNameMap[newRole] || newRole} 🚀`
+      );
+      if (onUpdate) {
+        onUpdate({
+          ...user,
+          role: newRole,
+          ...(newRole === "PARTNER" ? { staffTasksAllowed: true } : {}),
+        });
       }
+    } catch (err: any) {
+      toast.error(err?.message || "Lỗi khi cập nhật vai trò");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -427,12 +459,22 @@ function UserItem({
                 disabled={!isUserActive}
               />
               {user.role === "ADMIN" && (
-                <span className="text-[10px] bg-amber-500 text-white font-bold px-1.5 py-0.5 rounded">
-                  ADMIN
+                <span className="text-[10px] bg-amber-500 text-white font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
+                  <span>🛡️</span> ADMIN
+                </span>
+              )}
+              {user.role === "PARTNER" && (
+                <span className="text-[10px] bg-purple-600 text-white font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
+                  <span>💼</span> ĐỐI TÁC WFH
+                </span>
+              )}
+              {(!user.role || user.role === "USER") && (
+                <span className="text-[10px] bg-sky-500 text-white font-bold px-1.5 py-0.5 rounded flex items-center gap-1 shrink-0">
+                  <span>🏪</span> NHÂN VIÊN
                 </span>
               )}
               {!isUserActive && (
-                <span className="text-[10px] bg-red-500 text-white font-bold px-1.5 py-0.5 rounded">
+                <span className="text-[10px] bg-red-500 text-white font-bold px-1.5 py-0.5 rounded shrink-0">
                   ĐÃ NGHỈ VIỆC
                 </span>
               )}
@@ -506,15 +548,23 @@ function UserItem({
               {user.staffTasksAllowed ? "Gỡ KPI" : "Cấp KPI"}
             </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={toggleRole}
-              className="text-xs h-9 min-h-[36px] flex-1 sm:flex-none"
+            <select
+              value={user.role || "USER"}
+              onChange={handleRoleChange}
               disabled={!isUserActive || loading}
+              className={`text-xs font-semibold rounded-md px-2.5 py-1.5 h-9 min-h-[36px] border outline-none cursor-pointer transition-colors flex-1 sm:flex-none ${
+                user.role === "ADMIN"
+                  ? "bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100"
+                  : user.role === "PARTNER"
+                  ? "bg-purple-50 text-purple-900 border-purple-300 hover:bg-purple-100"
+                  : "bg-sky-50 text-sky-900 border-sky-300 hover:bg-sky-100"
+              }`}
+              title="Chỉ định vai trò nhân viên"
             >
-              {user.role === "ADMIN" ? "Gỡ Admin" : "Cấp Admin"}
-            </Button>
+              <option value="USER">🏪 Nhân viên tiệm (USER)</option>
+              <option value="PARTNER">💼 Đối tác WFH (PARTNER)</option>
+              <option value="ADMIN">🛡️ Quản trị viên (ADMIN)</option>
+            </select>
 
             <Button
               variant="outline"
@@ -681,12 +731,24 @@ export default function UserManager({
       });
   }, [safeLocalUsers]);
 
+  const partnerUsers = useMemo(() => {
+    return safeLocalUsers
+      .filter((u) => u?.isActive !== false && u?.role === "PARTNER")
+      .sort((a, b) => {
+        const salA = (Number(a.monthlySalary) || 0) || (Number(a.hourlyRate) || 0);
+        const salB = (Number(b.monthlySalary) || 0) || (Number(b.hourlyRate) || 0);
+        if (salB !== salA) return salB - salA;
+        return (a.name || "").localeCompare(b.name || "", "vi");
+      });
+  }, [safeLocalUsers]);
+
   const fullTimeUsers = useMemo(() => {
     return safeLocalUsers
       .filter(
         (u) =>
           u?.isActive !== false &&
           u?.role !== "ADMIN" &&
+          u?.role !== "PARTNER" &&
           u?.employmentType === "FULL_TIME"
       )
       .sort((a, b) => {
@@ -703,6 +765,7 @@ export default function UserManager({
         (u) =>
           u?.isActive !== false &&
           u?.role !== "ADMIN" &&
+          u?.role !== "PARTNER" &&
           u?.employmentType !== "FULL_TIME"
       )
       .sort((a, b) => {
@@ -775,11 +838,34 @@ export default function UserManager({
             )}
           </div>
 
-          {/* Group 2: TOÀN THỜI GIAN (FULL TIME) */}
+          {/* Group 2: ĐỐI TÁC WFH / MARKETING (PARTNER) */}
+          <div className="rounded-md border border-purple-200 overflow-hidden bg-white shadow-xs">
+            <div className="bg-purple-50/70 px-4 py-2.5 text-xs font-bold text-purple-900 border-b border-purple-200 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <span>💼</span> ĐỐI TÁC WFH / MARKETING ({partnerUsers.length})
+              </span>
+            </div>
+            {partnerUsers.length === 0 ? (
+              <div className="p-4 text-center text-xs text-muted-foreground italic">
+                Không có đối tác trong nhóm này
+              </div>
+            ) : (
+              partnerUsers.map((u) => (
+                <UserItem
+                  key={u.id}
+                  user={u}
+                  onUpdate={handleUserUpdate}
+                  onDelete={handleUserDelete}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Group 3: TOÀN THỜI GIAN (FULL TIME) */}
           <div className="rounded-md border border-blue-200 overflow-hidden bg-white shadow-xs">
             <div className="bg-blue-50/70 px-4 py-2.5 text-xs font-bold text-blue-900 border-b border-blue-200 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
-                <span>💼</span> TOÀN THỜI GIAN ({fullTimeUsers.length})
+                <span>🏪</span> TOÀN THỜI GIAN ({fullTimeUsers.length})
               </span>
             </div>
             {fullTimeUsers.length === 0 ? (
@@ -798,7 +884,7 @@ export default function UserManager({
             )}
           </div>
 
-          {/* Group 3: BÁN THỜI GIAN (PART TIME) */}
+          {/* Group 4: BÁN THỜI GIAN (PART TIME) */}
           <div className="rounded-md border border-emerald-200 overflow-hidden bg-white shadow-xs">
             <div className="bg-emerald-50/70 px-4 py-2.5 text-xs font-bold text-emerald-900 border-b border-emerald-200 flex items-center justify-between">
               <span className="flex items-center gap-1.5">

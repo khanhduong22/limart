@@ -75,19 +75,6 @@ limart/
 7. **CI/CD Over Manual SSH Builds**:
    - 🚫 **NEVER** run `docker compose build` or `npm run build` on the remote VPS via SSH. Manual builds consume VPS CPU/RAM and bypass test gates.
    - Deployments must always flow through Git commits to GitHub Actions. SSH is reserved strictly for read-only diagnostics and safe container restarts.
-8. **Feynman Technique & Domain Analogies (Gym / Calisthenics & Hoạ Cụ LimArt)**:
-   - Maintainer là người kinh doanh hoạ cụ và là Gymer/Calisthenics, **không phải kỹ sư phần mềm chuyên nghiệp**.
-   - Mọi giải thích, báo cáo lỗi (root cause), hoặc tư vấn kiến trúc phải áp dụng **Phương pháp Feynman**: biến những khái niệm trừu tượng (Docker, CI/CD, Cache, Race condition, Blue-green deployment, Database indexing...) thành những ẩn dụ thực tế, hóm hỉnh và dễ hiểu:
-     * *Ẩn dụ Thể hình (Gym/Calisthenics)*:
-       - **OOM / Quá tải RAM**: Như việc nâng tạ quá sức dẫn đến sập tạ hoặc rách cơ bắp. Cần giới hạn mức tạ an toàn (heap limit / memory cap).
-       - **Unit Test**: Như các bài tập khởi động và kéo giãn cơ trước buổi tập; bỏ qua khởi động thì rất dễ dính chấn thương lúc đẩy tạ nặng.
-       - **Auth Guard / RBAC**: Như đai bảo hộ lưng và cổ tay; thiếu đai mà vào tạ nặng (thao tác dữ liệu nhạy cảm) là cực kỳ nguy hiểm.
-       - **Rate Limiting / Cooldown**: Như thời gian nghỉ (rest interval) 60-90 giây giữa các hiệp squat/deadlift để cơ tim hồi phục.
-     * *Ẩn dụ Kinh doanh Hoạ cụ (LimArt / Art Supplies)*:
-       - **Valkey Cache**: Như khay pha màu hoặc quầy kệ trưng bày các tuýp màu bán chạy nhất ngay cửa tiệm để khách lấy ngay mà không cần nhân viên phải chạy vào tận đáy kho tìm.
-       - **Database Indexing**: Như việc dán nhãn phân loại mã màu (theo mã Pantone, thương hiệu Holbein/Daniel Smith/Winsor & Newton) trên từng kệ hàng để tìm trong 1 giây thay vì bới tung cả kho.
-       - **Audit Trail**: Như sổ kiểm kê hóa đơn nhập xuất tồn từng cây cọ, tuýp màu; ghi chép có đối soát chữ ký, không bao giờ được xé trang.
-       - **Blue-Green Zero-Downtime Deployment**: Như việc chuẩn bị sẵn một kệ trưng bày mới tinh ở bên cạnh, sắp xếp đầy đủ cọ và màu hoàn chỉnh rồi mới hoán đổi vị trí với kệ cũ; khách đang mua sắm không bị gián đoạn dù chỉ 1 giây.
 
 
 ================================================================================
@@ -190,7 +177,6 @@ ssh contabo "cd /opt/limart && ./scripts/pgbackrest-restore.sh --time 'YYYY-MM-D
   1. **Đang làm gì**: Tóm tắt ngắn gọn hành động cụ thể đang diễn ra.
   2. **Sắp làm gì**: Bước tiếp theo chuẩn bị thực hiện ngay sau đó.
   3. **Mức độ rủi ro**: Đánh giá rõ ràng (`Thấp` / `Trung bình` / `Cao`) kèm giải thích ngắn gọn nếu có rủi ro đến hệ thống hoặc dữ liệu.
-  4. **Minh họa trực quan (Feynman & Domain Analogy - Gym / Hoạ cụ)**: Sử dụng các hình ảnh ẩn dụ gần gũi từ thế giới **Thể hình (Gym/Calisthenics)** (mức tạ, set tập, phục hồi chấn thương, form tập chuẩn) hoặc **Kinh doanh hoạ cụ LimArt** (xếp kệ màu, cọ vẽ, toan canvas, pha màu, đóng gói kiện hàng) để giải thích bản chất kỹ thuật cho maintainer không chuyên dev dễ hiểu và an tâm 100%.
 - **Mandatory Subagent Naming**:
   ```text
   [YYYY-MM-DD HH:mm | #<issue>] <Descriptive Role>

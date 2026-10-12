@@ -23,11 +23,6 @@ description: Mandatory guardrails and guidelines when assisting a non-dev mainta
      - 🔍 **Cách kiểm tra lại**: Làm sao để biết thay đổi đã thành công?
 3. **Copy-Pasteable Commands**:
    - Always provide exact, copy-pasteable terminal commands. Do not tell the maintainer to "configure X in nginx" without giving the exact config snippet or file path.
-4. **Feynman Technique & Domain Analogies (Gym & Hoạ Cụ LimArt)**:
-   - Maintainer là người kinh doanh hoạ cụ và là Gymer/Calisthenics, không rành thuật ngữ lập trình trừu tượng.
-   - Khi giải thích kỹ thuật hoặc báo cáo trạng thái, luôn áp dụng **phương pháp Feynman**: minh họa trực quan bằng hình tượng quen thuộc:
-     - 🏋️ **Gym/Calisthenics**: Khởi động & kéo giãn (unit test), đai siết lưng (auth guard), sập tạ/rách cơ (OOM/crash do tràn bộ nhớ), hiệp nghỉ 60s giữa set tập (rate limiting cooldown).
-     - 🎨 **Hoạ cụ LimArt**: Khay pha màu (cache nhanh), phân loại nhãn màu trên kệ (database index), sổ xuất nhập kho có chữ ký (audit log), hoán đổi kệ trưng bày mới không gián đoạn khách mua sắm (blue-green zero-downtime).
 
 
 ---

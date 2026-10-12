@@ -60,4 +60,27 @@ describe("useStaffTasksStore", () => {
     useStaffTasksStore.getState().closeDetailModal();
     expect(useStaffTasksStore.getState().viewingTask).toBeNull();
   });
+
+  it("should update isProcessing state and reset all fields cleanly", () => {
+    const store = useStaffTasksStore.getState();
+    store.setIsProcessing(true);
+    store.setFilter("DONE");
+    store.setEvidenceLink("https://link.com");
+    store.setNote("Some note");
+
+    let state = useStaffTasksStore.getState();
+    expect(state.isProcessing).toBe(true);
+    expect(state.filter).toBe("DONE");
+    expect(state.evidenceLink).toBe("https://link.com");
+    expect(state.note).toBe("Some note");
+
+    store.reset();
+    state = useStaffTasksStore.getState();
+    expect(state.isProcessing).toBe(false);
+    expect(state.filter).toBe("ALL");
+    expect(state.evidenceLink).toBe("");
+    expect(state.note).toBe("");
+    expect(state.finishingTask).toBeNull();
+    expect(state.viewingTask).toBeNull();
+  });
 });

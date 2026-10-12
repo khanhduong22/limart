@@ -48,8 +48,28 @@ describe("useHomeCheckinStore", () => {
     store.tickTimer();
     expect(useHomeCheckinStore.getState().elapsedSeconds).toBe(101);
 
+    store.setTimerRunning(true);
+    expect(useHomeCheckinStore.getState().timerRunning).toBe(true);
+
     store.reset();
     expect(useHomeCheckinStore.getState().elapsedSeconds).toBe(0);
+    expect(useHomeCheckinStore.getState().timerRunning).toBe(false);
     expect(useHomeCheckinStore.getState().earlyCheckoutReason).toBe("");
+  });
+
+  it("should handle QR scanning, success modal, and uncompleted warning dialogs", () => {
+    const store = useHomeCheckinStore.getState();
+    store.setIsScanningQR(true);
+    store.setShowSuccessModal(true);
+    store.setActiveWarningModal(true);
+    store.setShowRejectedModal(true);
+    store.setUncompletedWarningOpen(true);
+
+    const state = useHomeCheckinStore.getState();
+    expect(state.isScanningQR).toBe(true);
+    expect(state.showSuccessModal).toBe(true);
+    expect(state.activeWarningModal).toBe(true);
+    expect(state.showRejectedModal).toBe(true);
+    expect(state.uncompletedWarningOpen).toBe(true);
   });
 });

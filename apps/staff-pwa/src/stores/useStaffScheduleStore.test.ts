@@ -64,4 +64,38 @@ describe("useStaffScheduleStore", () => {
     expect(useStaffScheduleStore.getState().startHour).toBe("10");
     expect(useStaffScheduleStore.getState().activePreset).toBeNull();
   });
+
+  it("should open and close register modal and reset registration form", () => {
+    const testDate = new Date("2026-10-18T00:00:00Z");
+    useStaffScheduleStore.getState().openRegisterModal(testDate);
+
+    let state = useStaffScheduleStore.getState();
+    expect(state.isRegisterModalOpen).toBe(true);
+    expect(state.showAddForm).toBe(true);
+    expect(state.selectedDate).toEqual(testDate);
+
+    useStaffScheduleStore.getState().setIsSubmitting(true);
+    expect(useStaffScheduleStore.getState().isSubmitting).toBe(true);
+
+    useStaffScheduleStore.getState().closeRegisterModal();
+    state = useStaffScheduleStore.getState();
+    expect(state.isRegisterModalOpen).toBe(false);
+    expect(state.showAddForm).toBe(false);
+
+    useStaffScheduleStore.getState().resetRegistrationForm();
+    state = useStaffScheduleStore.getState();
+    expect(state.startHour).toBe("08");
+    expect(state.startMinute).toBe("00");
+    expect(state.endHour).toBe("12");
+    expect(state.endMinute).toBe("00");
+    expect(state.isSubmitting).toBe(false);
+  });
+
+  it("should set and update selected shift", () => {
+    useStaffScheduleStore.getState().setSelectedShift(mockShift);
+    expect(useStaffScheduleStore.getState().selectedShift).toEqual(mockShift);
+
+    useStaffScheduleStore.getState().setSelectedShift(null);
+    expect(useStaffScheduleStore.getState().selectedShift).toBeNull();
+  });
 });

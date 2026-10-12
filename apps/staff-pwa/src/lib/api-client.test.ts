@@ -43,6 +43,7 @@ import {
   setAuthToken,
   removeAuthToken,
   getAuthHeaders,
+  toggleStaffTaskStatus,
 } from "./api-client";
 
 describe("Staff PWA API Client (Unified Cookie Auth)", () => {
@@ -205,6 +206,47 @@ describe("Staff PWA API Client (Unified Cookie Auth)", () => {
           }),
         })
       );
+    });
+
+    it("sends toggleStaffTaskStatus with auth header and request payload", async () => {
+      setAuthToken("task_token_abc");
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true, data: { id: "task-1", status: "DONE" } }),
+      } as any);
+      global.fetch = mockFetch;
+
+      const res = await toggleStaffTaskStatus("task-1", {
+        status: "DONE",
+        evidenceLink: "https://photos.app.goo.gl/evidence",
+        note: "Hoàn tất kiểm kho",
+      });
+
+      expect(res.success).toBe(true);
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/staff/staff-tasks/task-1/toggle",
+        expect.objectContaining({
+          method: "POST",
+          headers: expect.objectContaining({
+            "Content-Type": "application/json",
+            Authorization: "Bearer task_token_abc",
+          }),
+          body: JSON.stringify({
+            status: "DONE",
+            evidenceLink: "https://photos.app.goo.gl/evidence",
+            note: "Hoàn tất kiểm kho",
+          }),
+        })
+      );
+    });
+
+    it("handles network failure in toggleStaffTaskStatus gracefully", async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error("Network disconnect"));
+
+      const res = await toggleStaffTaskStatus("task-1", { status: "DOING" });
+      expect(res.success).toBe(false);
+      expect(res.error).toBe("Network disconnect");
     });
   });
 });

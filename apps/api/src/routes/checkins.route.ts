@@ -58,8 +58,48 @@ checkinsRoute.get("/today", authMiddleware, async (c) => {
   }
 });
 
-// POST /api/checkins
-checkinsRoute.post("/", authMiddleware, async (c) => {
+// GET /api/checkins/status
+checkinsRoute.get("/status", authMiddleware, async (c) => {
+  try {
+    const user = c.get("user");
+    const { startOfDay, endOfDay } = getVietnamDayRange();
+
+    const checkins = await prisma.checkIn.findMany({
+      where: {
+        userId: user.sub,
+        timestamp: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      orderBy: { timestamp: "desc" },
+    });
+
+    const lastCheckin = checkins[0] || null;
+    const isWorking = lastCheckin?.type === "checkin";
+
+    return c.json({
+      success: true,
+      data: {
+        isWorking,
+        isCheckedIn: isWorking,
+        lastCheckin,
+        todayCheckins: checkins,
+      },
+      isWorking,
+      isCheckedIn: isWorking,
+      lastCheckin,
+      todayCheckins: checkins,
+    });
+  } catch (err: any) {
+    return c.json(
+      { success: false, error: err?.message || "Failed to fetch checkin status" },
+      500
+    );
+  }
+});
+
+async function handleCheckinPost(c: any, forcedType?: "checkin" | "checkout") {
   const user = c.get("user");
   const lock = await acquireLock(`lock:checkin:${user.sub}`, 5000);
   if (!lock.acquired) {
@@ -74,7 +114,8 @@ checkinsRoute.post("/", authMiddleware, async (c) => {
   }
 
   try {
-    const body = await c.req.json().catch(() => ({}));
+    const rawBody = await c.req.json().catch(() => ({}));
+    const body = forcedType && !rawBody.type ? { ...rawBody, type: forcedType } : (forcedType ? { ...rawBody, type: forcedType } : rawBody);
     const parseResult = CheckinRequestSchema.safeParse(body);
 
     if (!parseResult.success) {
@@ -245,7 +286,17 @@ checkinsRoute.post("/", authMiddleware, async (c) => {
   } finally {
     await lock.release();
   }
-});
+}
+
+// POST /api/checkins
+checkinsRoute.post("/", authMiddleware, async (c) => handleCheckinPost(c));
+
+// POST /api/checkins/in
+checkinsRoute.post("/in", authMiddleware, async (c) => handleCheckinPost(c, "checkin"));
+
+// POST /api/checkins/out
+checkinsRoute.post("/out", authMiddleware, async (c) => handleCheckinPost(c, "checkout"));
+
 
 
 // POST /api/checkins/sync-offline

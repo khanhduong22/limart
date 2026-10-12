@@ -109,9 +109,9 @@ export function StaffTasksPage() {
     }
   }, [apiTasks]);
 
-  // Only users who are active and granted KPI permissions (staffTasksAllowed === true)
+  // Only users who are active and granted KPI permissions (staffTasksAllowed === true or role === "PARTNER")
   const allowedUsers = useMemo(() => {
-    return apiUsers.filter((u) => u.staffTasksAllowed);
+    return apiUsers.filter((u) => u.staffTasksAllowed || u.role === "PARTNER");
   }, [apiUsers]);
   const assignableUsers = allowedUsers;
 

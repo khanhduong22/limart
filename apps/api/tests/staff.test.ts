@@ -17,6 +17,7 @@ const {
   mockPayrollPeriodFindUnique,
   mockShiftDutyFindUnique,
   mockShiftDutyUpdate,
+  mockShiftDutyFindMany,
   mockLuckyWheelPrizeFindMany,
   mockLuckyWheelPrizeUpdate,
   mockLuckyWheelHistoryFindFirst,
@@ -63,6 +64,7 @@ const {
   mockPayrollPeriodFindUnique: vi.fn(),
   mockShiftDutyFindUnique: vi.fn(),
   mockShiftDutyUpdate: vi.fn(),
+  mockShiftDutyFindMany: vi.fn(),
   mockLuckyWheelPrizeFindMany: vi.fn(),
   mockLuckyWheelPrizeUpdate: vi.fn(),
   mockLuckyWheelHistoryFindFirst: vi.fn(),
@@ -136,7 +138,7 @@ vi.mock("@checkin/db", () => ({
     shiftDuty: {
       findUnique: mockShiftDutyFindUnique,
       update: mockShiftDutyUpdate,
-      findMany: vi.fn().mockResolvedValue([]),
+      findMany: mockShiftDutyFindMany,
     },
     staffTask: {
       findMany: mockStaffTaskFindMany,
@@ -203,6 +205,7 @@ describe("Staff Routes", () => {
     mockCheckInFindMany.mockResolvedValue([]);
     mockWorkShiftFindMany.mockResolvedValue([]);
     mockRequestFindMany.mockResolvedValue([]);
+    mockShiftDutyFindMany.mockResolvedValue([]);
     mockUserFindMany.mockResolvedValue([]);
     mockHolidayFindMany.mockResolvedValue([]);
     mockAnnouncementFindMany.mockResolvedValue([]);
@@ -311,6 +314,87 @@ describe("Staff Routes", () => {
       expect(data.data.announcements).toHaveLength(1);
       expect(typeof data.data.streak).toBe("number");
       expect(data.data.ipStatus).toBeDefined();
+    });
+
+    it("returns only active users with assigned duties today in activeUsers", async () => {
+      mockUserFindUnique.mockResolvedValue({
+        id: "staff-1",
+        name: "Staff One",
+        email: "staff@example.com",
+        role: "USER",
+        isActive: true,
+        employmentType: "PART_TIME",
+        hourlyRate: 35000,
+        monthlySalary: 6000000,
+        birthday: new Date("2000-01-15"),
+        startDate: new Date("2024-03-01"),
+        luckyWheelAllowed: true,
+        achievements: [],
+        adjustments: [],
+        payslips: [],
+      });
+
+      mockShiftDutyFindMany.mockResolvedValue([
+        {
+          id: "duty-1",
+          userId: "staff-1",
+          createdById: "admin-1",
+          date: new Date(),
+          title: "Kiểm tra màu nước Holbein",
+          description: "Đếm số lượng tuýp 15ml",
+          isCompleted: false,
+          completedAt: null,
+          createdAt: new Date(),
+          user: {
+            id: "staff-1",
+            name: "Staff One",
+            email: "staff@example.com",
+            image: null,
+            role: "USER",
+            isActive: true,
+          },
+        },
+        {
+          id: "duty-2",
+          userId: "staff-2",
+          createdById: "admin-1",
+          date: new Date(),
+          title: "Vệ sinh quầy cọ vẽ",
+          description: "Lau sạch bụi kệ cọ tỉa",
+          isCompleted: true,
+          completedAt: new Date(),
+          createdAt: new Date(),
+          user: {
+            id: "staff-2",
+            name: "Staff Two",
+            email: "staff2@example.com",
+            image: null,
+            role: "USER",
+            isActive: true,
+          },
+        },
+      ]);
+
+      const res = await app.request("/api/staff/home-data", {
+        headers: { Cookie: `access_token=${authToken}` },
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+
+      // Current user's duties
+      expect(json.data.todayDuties).toHaveLength(1);
+      expect(json.data.todayDuties[0].id).toBe("duty-1");
+
+      // Active users with duties today (both staff-1 and staff-2)
+      expect(json.data.activeUsers).toHaveLength(2);
+      expect(json.data.activeUsers[0].name).toBe("Staff One");
+      expect(json.data.activeUsers[0].duties).toHaveLength(1);
+      expect(json.data.activeUsers[1].name).toBe("Staff Two");
+      expect(json.data.activeUsers[1].duties).toHaveLength(1);
+      expect(json.data.activeUsers[1].duties[0].title).toBe("Vệ sinh quầy cọ vẽ");
+      expect(json.data.teammatesWithDuties).toHaveLength(2);
     });
 
     it("returns rejected tasks details and count when user has rejected tasks", async () => {
@@ -1168,19 +1252,51 @@ describe("Staff Routes", () => {
       expect(json.data).toHaveProperty("stats");
     });
 
-    it("POST /api/staff/staff-tasks/:id/toggle advances task status", async () => {
+    it("GET /api/staff/staff-tasks returns tasks and stats when user role is PARTNER even if staffTasksAllowed is false", async () => {
+      mockUserFindUnique.mockResolvedValue({
+        id: "staff-1",
+        role: "PARTNER",
+        staffTasksAllowed: false,
+      });
+      mockStaffTaskFindMany.mockResolvedValue([
+        {
+          id: "st-partner-1",
+          assigneeId: "staff-1",
+          title: "Thiết kế poster màu nước",
+          status: "TODO",
+          createdAt: new Date(),
+        },
+      ]);
+
+      const res = await app.request("/api/staff/staff-tasks", {
+        headers: { Cookie: `access_token=${authToken}` },
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.data.tasks).toHaveLength(1);
+      expect(json.data.tasks[0].id).toBe("st-partner-1");
+    });
+
+    it("POST /api/staff/staff-tasks/:id/toggle advances task status for PARTNER role", async () => {
+      mockUserFindUnique.mockResolvedValue({
+        id: "staff-1",
+        role: "PARTNER",
+        staffTasksAllowed: false,
+      });
       mockStaffTaskFindUnique.mockResolvedValue({
-        id: "st-1",
+        id: "st-partner-1",
         assigneeId: "staff-1",
         status: "TODO",
       });
       mockStaffTaskUpdate.mockResolvedValue({
-        id: "st-1",
+        id: "st-partner-1",
         assigneeId: "staff-1",
         status: "DOING",
       });
 
-      const res = await app.request("/api/staff/staff-tasks/st-1/toggle", {
+      const res = await app.request("/api/staff/staff-tasks/st-partner-1/toggle", {
         method: "POST",
         headers: {
           Cookie: `access_token=${authToken}`,

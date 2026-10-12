@@ -99,8 +99,7 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
       recentLeaves,
       ipStatus,
       stats,
-      todayDuties,
-      activeUsers,
+      allTodayDuties,
       swapCount,
       rejectedStaffTasks,
       rejectedUserTasks,
@@ -138,7 +137,6 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
       calculateUserMonthlyStats(userId, targetDate),
       prisma.shiftDuty.findMany({
         where: {
-          userId,
           OR: [
             { date: { gte: startOfDay, lte: endOfDay } },
             { shift: { start: { gte: startOfDay, lte: endOfDay } } },
@@ -147,13 +145,18 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
         include: {
           shift: true,
           createdBy: { select: { id: true, name: true } },
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+              role: true,
+              isActive: true,
+            },
+          },
         },
         orderBy: { createdAt: "asc" },
-      }),
-      prisma.user.findMany({
-        where: { isActive: true },
-        select: { id: true, name: true, email: true, image: true, role: true },
-        orderBy: { name: "asc" },
       }),
       prisma.workShift.count({
         where: {
@@ -196,6 +199,66 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
     const streak = calculateStreak(recentCheckins, recentLeaves);
     const hasCheckedInToday = todayCheckins.some((ch) => ch.type === "checkin");
     const todayShift = todayShifts[0] || null;
+
+    const todayDuties = allTodayDuties.filter((d) => d.userId === userId);
+
+    const userDutiesMap = new Map<
+      string,
+      {
+        id: string;
+        name: string | null;
+        email: string | null;
+        image: string | null;
+        role: string;
+        duties: Array<{
+          id: string;
+          shiftId: number | null;
+          userId: string;
+          createdById: string;
+          date: Date;
+          title: string;
+          description: string | null;
+          isCompleted: boolean;
+          completedAt: Date | null;
+          createdAt: Date;
+          shift?: any;
+          createdBy?: { id: string; name: string | null } | null;
+        }>;
+      }
+    >();
+
+    for (const duty of allTodayDuties) {
+      if (!duty.user || (duty.user as any).isActive === false) continue;
+      const u = duty.user;
+      if (!userDutiesMap.has(u.id)) {
+        userDutiesMap.set(u.id, {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          image: u.image,
+          role: u.role,
+          duties: [],
+        });
+      }
+      userDutiesMap.get(u.id)!.duties.push({
+        id: duty.id,
+        shiftId: duty.shiftId,
+        userId: duty.userId,
+        createdById: duty.createdById,
+        date: duty.date,
+        title: duty.title,
+        description: duty.description,
+        isCompleted: duty.isCompleted,
+        completedAt: duty.completedAt,
+        createdAt: duty.createdAt,
+        shift: duty.shift,
+        createdBy: duty.createdBy,
+      });
+    }
+
+    const activeUsers = Array.from(userDutiesMap.values()).sort((a, b) =>
+      (a.name || "").localeCompare(b.name || "")
+    );
 
     const rejectedTasks = [
       ...rejectedStaffTasks.map((t) => ({
@@ -260,6 +323,7 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
         todayCheckins,
         todayDuties,
         activeUsers,
+        teammatesWithDuties: activeUsers,
         announcements: announcementsWithReadStatus,
         specialDays,
         specialUsers: specialDays,
@@ -1856,8 +1920,10 @@ staffRoute.get("/staff-tasks", authMiddleware, async (c) => {
 
     if (!user) return c.json({ success: false, error: "User not found" }, 404);
 
-    const isAdmin = role === "ADMIN";
-    if (!isAdmin && !user.staffTasksAllowed) {
+    const isAdmin = role === "ADMIN" || user.role === "ADMIN";
+    const isPartner = role === "PARTNER" || user.role === "PARTNER";
+    const isAllowed = isAdmin || isPartner || user.staffTasksAllowed;
+    if (!isAllowed) {
       return c.json(
         {
           success: false,
@@ -1960,7 +2026,9 @@ staffRoute.post("/staff-tasks/:id/toggle", authMiddleware, async (c) => {
     if (!user) return c.json({ success: false, error: "User not found" }, 404);
 
     const isAdmin = role === "ADMIN" || user.role === "ADMIN";
-    if (!isAdmin && !user.staffTasksAllowed) {
+    const isPartner = role === "PARTNER" || user.role === "PARTNER";
+    const isAllowed = isAdmin || isPartner || user.staffTasksAllowed;
+    if (!isAllowed) {
       return c.json({ success: false, error: "Bạn không có quyền truy cập Công việc và KPI" }, 403);
     }
 

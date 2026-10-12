@@ -377,15 +377,7 @@ export const HomeCheckinView: React.FC = () => {
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-2">
-                <Link to="/tasks" className="block w-full">
-                  <Button
-                    variant="default"
-                    className="w-full text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-1 cursor-pointer"
-                  >
-                    💼 Job WFH
-                  </Button>
-                </Link>
+              <div className="grid grid-cols-2 gap-2.5">
                 <Link to="/packing" className="block w-full">
                   <Button
                     variant="default"

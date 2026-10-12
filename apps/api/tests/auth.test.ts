@@ -278,7 +278,7 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
         expect(res.headers.get("location")).toMatch(/^\/admin\?token=/);
       });
 
-      it("redirects PARTNER user to /tasks upon successful login", async () => {
+      it("redirects PARTNER user to /staff-tasks upon successful login", async () => {
         const fakeToken = createFakeIdToken("partner@limart.vn");
         vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
           new Response(JSON.stringify({ id_token: fakeToken }), { status: 200 })
@@ -293,10 +293,10 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
 
         const res = await app.request("/api/auth/callback/google?code=valid_code");
         expect(res.status).toBe(302);
-        expect(res.headers.get("location")).toMatch(/^\/tasks\?token=/);
+        expect(res.headers.get("location")).toMatch(/^\/staff-tasks\?token=/);
       });
 
-      it("auto-assigns cuccung123456789@gmail.com to PARTNER and redirects to /tasks", async () => {
+      it("auto-assigns cuccung123456789@gmail.com to PARTNER and redirects to /staff-tasks", async () => {
         const fakeToken = createFakeIdToken("cuccung123456789@gmail.com");
         vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
           new Response(JSON.stringify({ id_token: fakeToken }), { status: 200 })
@@ -319,7 +319,7 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
 
         const res = await app.request("/api/auth/callback/google?code=valid_code");
         expect(res.status).toBe(302);
-        expect(res.headers.get("location")).toMatch(/^\/tasks\?token=/);
+        expect(res.headers.get("location")).toMatch(/^\/staff-tasks\?token=/);
         expect(mockUpdate).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { id: "u-thu" },
@@ -328,7 +328,7 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
         );
       });
 
-      it("auto-assigns phuckhanh22 account to PARTNER and redirects to /tasks", async () => {
+      it("auto-assigns phuckhanh22 account to PARTNER and redirects to /staff-tasks", async () => {
         const fakeToken = createFakeIdToken("phuckhanh22@gmail.com");
         vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
           new Response(JSON.stringify({ id_token: fakeToken }), { status: 200 })
@@ -351,7 +351,7 @@ describe("Auth System (30-Day Cookie & Google OAuth)", () => {
 
         const res = await app.request("/api/auth/callback/google?code=valid_code");
         expect(res.status).toBe(302);
-        expect(res.headers.get("location")).toMatch(/^\/tasks\?token=/);
+        expect(res.headers.get("location")).toMatch(/^\/staff-tasks\?token=/);
         expect(mockUpdate).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { id: "u-pk22" },

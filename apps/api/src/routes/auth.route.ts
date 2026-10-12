@@ -187,7 +187,7 @@ authRoute.get("/callback/google", async (c) => {
   });
 
   const targetBase =
-    user.role === "ADMIN" ? "/admin" : user.role === "PARTNER" ? "/tasks" : "/";
+    user.role === "ADMIN" ? "/admin" : user.role === "PARTNER" ? "/staff-tasks" : "/";
   const redirectUrl = `${targetBase}?token=${encodeURIComponent(accessToken)}`;
   return c.redirect(redirectUrl);
 });

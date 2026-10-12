@@ -84,9 +84,15 @@ function AppContent() {
             gachaTickets: 1,
             achievements: data.user.achievements || [],
           });
-          // If on login view, navigate to home
-          if (pathname === "/login") {
-            router.push("/");
+          // If on login view, navigate based on role
+          if (data.user.role === "PARTNER") {
+            if (pathname === "/login" || pathname === "/" || pathname === "/tasks") {
+              router.push("/staff-tasks");
+            }
+          } else {
+            if (pathname === "/login") {
+              router.push("/");
+            }
           }
         } else {
           if (pathname !== "/login") {
@@ -137,6 +143,17 @@ function AppContent() {
     }
   }, [liveUser]);
 
+  const isPartner = profile.role === "PARTNER";
+  const isStaffTasksView = pathname.startsWith("/staff-tasks");
+  const isWide = isPartner || isStaffTasksView;
+
+  // Partner redirect guard: If role is PARTNER and on root `/` or `/tasks`, redirect immediately to `/staff-tasks`
+  useEffect(() => {
+    if (hasCheckedSession && isPartner && (pathname === "/" || pathname === "/tasks")) {
+      router.push("/staff-tasks");
+    }
+  }, [hasCheckedSession, isPartner, pathname, router]);
+
   // Offline queue with silent background sync (no technical badges/banners)
   const { isOnline, pendingCount, isSyncing, syncNow } = useOfflineQueue();
 
@@ -152,9 +169,12 @@ function AppContent() {
 
   // Map pathname to BottomNav tab
   const getTabFromPath = (path: string): NavTab => {
+    if (isPartner) {
+      if (path.startsWith("/payroll")) return "payroll";
+      if (path.startsWith("/profile")) return "profile";
+      return "staff-tasks";
+    }
     if (path.startsWith("/schedule")) return "schedule";
-    if (path.startsWith("/tasks") || path.startsWith("/packing") || path.startsWith("/carrying") || path.startsWith("/staff-tasks"))
-      return "tasks";
     if (path.startsWith("/payroll")) return "payroll";
     if (path.startsWith("/profile")) return "profile";
     return "home";
@@ -163,7 +183,14 @@ function AppContent() {
   const currentTab = getTabFromPath(pathname);
 
   const handleTabChange = (tab: NavTab) => {
+    if (isPartner) {
+      if (tab === "staff-tasks" || tab === "home" || tab === "tasks") {
+        router.push("/staff-tasks");
+        return;
+      }
+    }
     if (tab === "home") router.push("/");
+    else if (tab === "staff-tasks") router.push("/staff-tasks");
     else router.push(`/${tab}`);
   };
 
@@ -215,8 +242,14 @@ function AppContent() {
       {/* Toast Notifications */}
       <Toaster position="top-center" richColors theme="light" closeButton />
 
-      {/* Centered Mobile Shell Frame (Warm LimArt Tone) */}
-      <div className="w-full max-w-md mx-auto min-h-screen bg-[#faf6f0]/95 shadow-2xl border-x border-orange-100/60 flex flex-col relative backdrop-blur-xs">
+      {/* Responsive Shell Frame: Expands on iPad / Desktop for PARTNER or Staff Tasks */}
+      <div
+        className={`w-full mx-auto min-h-screen bg-[#faf6f0]/95 shadow-2xl border-x border-orange-100/60 flex flex-col relative backdrop-blur-xs transition-all duration-200 ${
+          isWide
+            ? "max-w-4xl lg:max-w-5xl xl:max-w-6xl px-2 sm:px-6 md:px-8"
+            : "max-w-md"
+        }`}
+      >
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col">
           <ErrorBoundary>
@@ -240,6 +273,7 @@ function AppContent() {
           currentTab={currentTab}
           onChangeTab={handleTabChange}
           userRole={profile.role}
+          isWide={isWide}
         />
       </div>
 

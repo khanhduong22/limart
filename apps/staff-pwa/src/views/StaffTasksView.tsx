@@ -180,23 +180,23 @@ export const StaffTasksView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-3 pb-24 max-w-md mx-auto px-3 sm:px-4 pt-2 select-none">
+    <div className="space-y-4 pb-28 w-full mx-auto px-1 sm:px-3 md:px-4 pt-2 select-none">
       {/* Top Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => router.push("/")}
-            className="h-8 w-8 rounded-full hover:bg-indigo-100 text-stone-700 cursor-pointer"
+            className="h-8 w-8 md:h-9 md:w-9 rounded-full hover:bg-indigo-100 text-stone-700 cursor-pointer"
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeft className="h-4 w-4 md:h-5 md:w-5" />
           </Button>
           <div>
-            <h1 className="text-base font-bold text-stone-900 tracking-tight flex items-center gap-1.5">
+            <h1 className="text-base md:text-xl font-bold text-stone-900 tracking-tight flex items-center gap-1.5">
               <span>🎯</span> Công Việc & KPI
             </h1>
-            <p className="text-[10px] text-stone-500">
+            <p className="text-[10px] md:text-xs text-stone-500">
               Chỉ tiêu công việc và đánh giá hoàn thành nhiệm vụ
             </p>
           </div>
@@ -204,57 +204,73 @@ export const StaffTasksView: React.FC = () => {
       </div>
 
       {/* Monthly KPI Overview Card */}
-      <div className="rounded-2xl bg-gradient-to-br from-indigo-900 to-violet-950 p-4 text-white shadow-md relative overflow-hidden">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-amber-300">
-              <TrendingUp className="w-5 h-5" />
+      <div className="rounded-2xl md:rounded-3xl bg-gradient-to-br from-indigo-900 via-indigo-950 to-violet-950 p-4 md:p-6 text-white shadow-lg relative overflow-hidden">
+        {/* Ambient subtle glow for desktop */}
+        <div className="absolute -right-8 -bottom-8 w-44 h-44 bg-violet-500/20 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -left-8 -top-8 w-44 h-44 bg-indigo-500/20 rounded-full blur-2xl pointer-events-none" />
+
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 md:w-13 md:h-13 rounded-2xl bg-white/10 flex items-center justify-center text-amber-300 shadow-inner shrink-0">
+              <TrendingUp className="w-5 h-5 md:w-6 md:h-6" />
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-indigo-200">Hiệu Suất Tháng</p>
-              <h2 className="text-xl font-black font-mono tracking-tight text-white">
-                {monthlyRatePct}%
-              </h2>
+              <p className="text-[11px] md:text-xs font-semibold text-indigo-200">Hiệu Suất Tháng</p>
+              <div className="flex items-baseline gap-2">
+                <h2 className="text-xl md:text-3xl font-black font-mono tracking-tight text-white">
+                  {monthlyRatePct}%
+                </h2>
+                <span className="text-[11px] md:text-xs text-indigo-300 font-medium">hoàn thành</span>
+              </div>
             </div>
           </div>
-          <div className="text-right">
-            <span className="text-[11px] font-bold bg-white/15 px-2.5 py-1 rounded-full text-indigo-100 font-mono">
+          <div className="self-start sm:self-auto">
+            <span className="text-[11px] md:text-xs font-bold bg-white/15 px-3 py-1.5 rounded-full text-indigo-100 font-mono shadow-xs inline-flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400" />
               {monthlyKPI?.approved || 0} / {monthlyKPI?.total || 0} Việc
             </span>
           </div>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full bg-white/20 rounded-full h-2 mt-3 overflow-hidden">
+        <div className="w-full bg-white/15 rounded-full h-2 md:h-2.5 mt-3 md:mt-4 overflow-hidden relative z-10">
           <div
-            className="bg-gradient-to-r from-emerald-400 to-teal-300 h-2 rounded-full transition-all duration-500"
+            className="bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 h-full rounded-full transition-all duration-500 shadow-sm"
             style={{ width: `${monthlyRatePct}%` }}
           />
         </div>
 
-        {/* KPI Mini Stats */}
-        <div className="grid grid-cols-4 gap-1.5 mt-3 pt-3 border-t border-white/10 text-center">
-          <div className="bg-white/5 rounded-xl p-1.5">
-            <p className="text-[9px] text-indigo-200 font-medium">Đang làm</p>
-            <p className="text-xs font-bold text-amber-300 font-mono">{monthlyKPI?.doing || 0}</p>
+        {/* KPI 4-Column Metric Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 md:gap-3.5 mt-3 md:mt-4 pt-3 md:pt-4 border-t border-white/10 text-center relative z-10">
+          <div className="bg-white/10 hover:bg-white/15 transition-colors rounded-xl md:rounded-2xl p-2.5 md:p-3.5 border border-white/5">
+            <p className="text-[10px] md:text-xs text-amber-200 font-medium flex items-center justify-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> Đang làm
+            </p>
+            <p className="text-base md:text-2xl font-bold md:font-black text-amber-300 font-mono mt-0.5">{monthlyKPI?.doing || 0}</p>
           </div>
-          <div className="bg-white/5 rounded-xl p-1.5">
-            <p className="text-[9px] text-indigo-200 font-medium">Chờ duyệt</p>
-            <p className="text-xs font-bold text-sky-300 font-mono">{monthlyKPI?.pendingReview || 0}</p>
+          <div className="bg-white/10 hover:bg-white/15 transition-colors rounded-xl md:rounded-2xl p-2.5 md:p-3.5 border border-white/5">
+            <p className="text-[10px] md:text-xs text-sky-200 font-medium flex items-center justify-center gap-1">
+              <Clock className="w-3 h-3 text-sky-300" /> Chờ duyệt
+            </p>
+            <p className="text-base md:text-2xl font-bold md:font-black text-sky-300 font-mono mt-0.5">{monthlyKPI?.pendingReview || 0}</p>
           </div>
-          <div className="bg-white/5 rounded-xl p-1.5">
-            <p className="text-[9px] text-indigo-200 font-medium">Đã duyệt</p>
-            <p className="text-xs font-bold text-emerald-300 font-mono">{monthlyKPI?.approved || 0}</p>
+          <div className="bg-white/10 hover:bg-white/15 transition-colors rounded-xl md:rounded-2xl p-2.5 md:p-3.5 border border-white/5">
+            <p className="text-[10px] md:text-xs text-emerald-200 font-medium flex items-center justify-center gap-1">
+              <CheckCircle2 className="w-3 h-3 text-emerald-300" /> Đã duyệt
+            </p>
+            <p className="text-base md:text-2xl font-bold md:font-black text-emerald-300 font-mono mt-0.5">{monthlyKPI?.approved || 0}</p>
           </div>
-          <div className="bg-white/5 rounded-xl p-1.5">
-            <p className="text-[9px] text-indigo-200 font-medium">Trễ hạn</p>
-            <p className="text-xs font-bold text-rose-300 font-mono">{monthlyKPI?.overdue || 0}</p>
+          <div className="bg-white/10 hover:bg-white/15 transition-colors rounded-xl md:rounded-2xl p-2.5 md:p-3.5 border border-white/5">
+            <p className="text-[10px] md:text-xs text-rose-200 font-medium flex items-center justify-center gap-1">
+              <AlertCircle className="w-3 h-3 text-rose-300" /> Trễ hạn
+            </p>
+            <p className="text-base md:text-2xl font-bold md:font-black text-rose-300 font-mono mt-0.5">{monthlyKPI?.overdue || 0}</p>
           </div>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex gap-1.5 overflow-x-auto py-1 text-xs no-scrollbar">
+      <div className="flex gap-1.5 md:gap-2 overflow-x-auto py-1 text-xs no-scrollbar">
         {[
           { key: "ALL", label: `Tất cả (${tasks.length})` },
           { key: "TODO", label: "Cần làm" },
@@ -266,9 +282,9 @@ export const StaffTasksView: React.FC = () => {
             key={tab.key}
             type="button"
             onClick={() => setFilter(tab.key as any)}
-            className={`px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3.5 py-1.5 md:px-4 md:py-2 rounded-full whitespace-nowrap text-xs md:text-sm font-bold transition-all cursor-pointer ${
               filter === tab.key
-                ? "bg-indigo-700 text-white shadow-xs"
+                ? "bg-indigo-700 text-white shadow-xs ring-2 ring-indigo-200"
                 : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
             }`}
           >
@@ -278,146 +294,156 @@ export const StaffTasksView: React.FC = () => {
       </div>
 
       {/* Task List */}
-      <div className="space-y-2.5">
+      <div>
         {isLoading ? (
-          <div className="p-8 text-center text-xs text-stone-400">Đang tải danh sách công việc...</div>
+          <div className="p-12 text-center text-xs md:text-sm text-stone-400">Đang tải danh sách công việc...</div>
         ) : filteredTasks.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-stone-200 bg-white/60 p-8 text-center space-y-1">
-            <span className="text-2xl">🎯</span>
-            <p className="text-xs font-bold text-stone-700">Không có công việc nào trong danh mục này</p>
+          <div className="rounded-2xl md:rounded-3xl border border-dashed border-stone-200 bg-white/60 p-12 text-center space-y-1">
+            <span className="text-3xl">🎯</span>
+            <p className="text-sm font-bold text-stone-700">Không có công việc nào trong danh mục này</p>
+            <p className="text-xs text-stone-400">Bạn đã hoàn thành hết hoặc chưa có công việc mới được giao.</p>
           </div>
         ) : (
-          (filteredTasks || []).map((t) => {
-            const title = t.title || (t as any).name || t.taskDefinition?.name || t.taskDefinition?.title || "Công việc";
-            const isOverdue = t.deadline && new Date(t.deadline) < new Date() && t.status !== "APPROVED";
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {(filteredTasks || []).map((t) => {
+              const title = t.title || (t as any).name || t.taskDefinition?.name || t.taskDefinition?.title || "Công việc";
+              const isOverdue = t.deadline && new Date(t.deadline) < new Date() && t.status !== "APPROVED";
 
-            return (
-              <div
-                key={t.id}
-                onClick={() => setViewingTask(t)}
-                className={`rounded-2xl border p-3.5 shadow-xs space-y-2.5 cursor-pointer hover:border-indigo-300 hover:shadow-sm transition-all active:scale-[0.99] ${
-                  t.status === "APPROVED"
-                    ? "bg-emerald-50/40 border-emerald-200"
-                    : t.status === "REJECTED"
-                    ? "bg-rose-50/50 border-rose-200"
-                    : t.status === "DONE"
-                    ? "bg-sky-50/40 border-sky-200"
-                    : "bg-white border-stone-200"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-1 flex-1 min-w-0">
-                    <h3 className="text-xs font-bold text-stone-900 leading-snug">{title}</h3>
-                    {t.description && (
-                      <p className="text-[11px] text-stone-500 line-clamp-2">{t.description}</p>
+              return (
+                <div
+                  key={t.id}
+                  onClick={() => setViewingTask(t)}
+                  className={`rounded-2xl border p-4 shadow-xs flex flex-col justify-between cursor-pointer hover:border-indigo-400 hover:shadow-md transition-all active:scale-[0.99] group ${
+                    t.status === "APPROVED"
+                      ? "bg-emerald-50/40 border-emerald-200"
+                      : t.status === "REJECTED"
+                      ? "bg-rose-50/50 border-rose-200"
+                      : t.status === "DONE"
+                      ? "bg-sky-50/40 border-sky-200"
+                      : "bg-white border-stone-200"
+                  }`}
+                >
+                  <div className="space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="space-y-1 flex-1 min-w-0">
+                        <h3 className="text-xs md:text-sm font-bold text-stone-900 leading-snug group-hover:text-indigo-900 transition-colors">
+                          {title}
+                        </h3>
+                        {t.description && (
+                          <p className="text-[11px] text-stone-500 line-clamp-2 leading-relaxed">{t.description}</p>
+                        )}
+                      </div>
+                      {/* Status Badge */}
+                      <div className="shrink-0">
+                        {t.status === "APPROVED" && (
+                          <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Đã duyệt
+                          </span>
+                        )}
+                        {t.status === "DONE" && (
+                          <span className="text-[10px] font-bold text-sky-800 bg-sky-100 border border-sky-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <Clock className="w-3 h-3" /> Chờ duyệt
+                          </span>
+                        )}
+                        {t.status === "DOING" && (
+                          <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
+                            Đang làm
+                          </span>
+                        )}
+                        {t.status === "TODO" && (
+                          <span className="text-[10px] font-bold text-stone-700 bg-stone-100 border border-stone-300 px-2 py-0.5 rounded-full">
+                            Cần làm
+                          </span>
+                        )}
+                        {t.status === "REJECTED" && (
+                          <span className="text-[10px] font-bold text-rose-800 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" /> Cần sửa
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Priority & Deadline details */}
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] text-stone-500 pt-1 border-t border-stone-100">
+                      {t.priority === "URGENT" && (
+                        <span className="font-extrabold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
+                          ⚡ Khẩn cấp
+                        </span>
+                      )}
+                      {t.frequency && (
+                        <span className="text-stone-600 bg-stone-100 px-1.5 py-0.5 rounded">
+                          🔄 {t.frequency}
+                        </span>
+                      )}
+                      {t.deadline && (
+                        <span
+                          className={`inline-flex items-center gap-1 ${
+                            isOverdue ? "text-rose-600 font-bold" : "text-stone-500"
+                          }`}
+                        >
+                          <Calendar className="w-3 h-3" /> Hạn: {new Date(t.deadline).toLocaleDateString("vi-VN")}
+                          {isOverdue && " (Quá hạn)"}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Evidence link & note */}
+                    {t.evidenceLink && (
+                      <div className="text-[11px] text-indigo-700 truncate">
+                        🔗 <a
+                          href={t.evidenceLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="underline hover:text-indigo-900"
+                        >
+                          {t.evidenceLink}
+                        </a>
+                      </div>
                     )}
+                  </div>
+
+                  {/* Card Bottom Area: View details trigger + Action button */}
+                  <div className="flex items-center justify-between pt-3 mt-2 border-t border-stone-100/80">
                     <span className="text-[10px] text-indigo-600 font-semibold inline-flex items-center gap-0.5 hover:underline">
-                      Xem toàn bộ chi tiết &rarr;
+                      Chi tiết &rarr;
                     </span>
-                  </div>
-                  {/* Status Badge */}
-                  <div>
-                    {t.status === "APPROVED" && (
-                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Đã duyệt
-                      </span>
-                    )}
-                    {t.status === "DONE" && (
-                      <span className="text-[10px] font-bold text-sky-800 bg-sky-100 border border-sky-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                        <Clock className="w-3 h-3" /> Chờ duyệt
-                      </span>
-                    )}
-                    {t.status === "DOING" && (
-                      <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
-                        Đang làm
-                      </span>
-                    )}
-                    {t.status === "TODO" && (
-                      <span className="text-[10px] font-bold text-stone-700 bg-stone-100 border border-stone-300 px-2 py-0.5 rounded-full">
-                        Cần làm
-                      </span>
-                    )}
-                    {t.status === "REJECTED" && (
-                      <span className="text-[10px] font-bold text-rose-800 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                        <AlertCircle className="w-3 h-3" /> Cần sửa
-                      </span>
-                    )}
+
+                    <div className="flex items-center gap-1.5">
+                      {t.status === "TODO" && (
+                        <Button
+                          size="sm"
+                          disabled={isProcessing}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleStartTask(t.id);
+                          }}
+                          className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 rounded-lg cursor-pointer"
+                        >
+                          <Play className="w-3 h-3 mr-1" /> Bắt đầu làm
+                        </Button>
+                      )}
+                      {(t.status === "DOING" || t.status === "REJECTED") && (
+                        <Button
+                          size="sm"
+                          disabled={isProcessing}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFinishingTask(t);
+                            setEvidenceLink(t.evidenceLink || "");
+                            setNote(t.notes || t.evidenceNote || "");
+                          }}
+                          className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 rounded-lg cursor-pointer"
+                        >
+                          <Send className="w-3 h-3 mr-1" /> Báo hoàn thành
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                {/* Priority & Deadline details */}
-                <div className="flex flex-wrap items-center gap-2 text-[10px] text-stone-500 pt-1 border-t border-stone-100">
-                  {t.priority === "URGENT" && (
-                    <span className="font-extrabold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded">
-                      ⚡ Khẩn cấp
-                    </span>
-                  )}
-                  {t.frequency && (
-                    <span className="text-stone-600 bg-stone-100 px-1.5 py-0.5 rounded">
-                      🔄 {t.frequency}
-                    </span>
-                  )}
-                  {t.deadline && (
-                    <span
-                      className={`inline-flex items-center gap-1 ${
-                        isOverdue ? "text-rose-600 font-bold" : "text-stone-500"
-                      }`}
-                    >
-                      <Calendar className="w-3 h-3" /> Hạn: {new Date(t.deadline).toLocaleDateString("vi-VN")}
-                      {isOverdue && " (Quá hạn)"}
-                    </span>
-                  )}
-                </div>
-
-                {/* Evidence link & note */}
-                {t.evidenceLink && (
-                  <div className="text-[11px] text-indigo-700 truncate">
-                    🔗 <a
-                      href={t.evidenceLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="underline hover:text-indigo-900"
-                    >
-                      {t.evidenceLink}
-                    </a>
-                  </div>
-                )}
-
-                {/* Action buttons */}
-                <div className="flex justify-end pt-1">
-                  {t.status === "TODO" && (
-                    <Button
-                      size="sm"
-                      disabled={isProcessing}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStartTask(t.id);
-                      }}
-                      className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 rounded-lg cursor-pointer"
-                    >
-                      <Play className="w-3 h-3 mr-1" /> Bắt đầu làm
-                    </Button>
-                  )}
-                  {(t.status === "DOING" || t.status === "REJECTED") && (
-                    <Button
-                      size="sm"
-                      disabled={isProcessing}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setFinishingTask(t);
-                        setEvidenceLink(t.evidenceLink || "");
-                        setNote(t.notes || t.evidenceNote || "");
-                      }}
-                      className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 rounded-lg cursor-pointer"
-                    >
-                      <Send className="w-3 h-3 mr-1" /> Báo hoàn thành
-                    </Button>
-                  )}
-                </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
 
@@ -428,7 +454,7 @@ export const StaffTasksView: React.FC = () => {
           onClick={() => setViewingTask(null)}
         >
           <div
-            className="bg-white rounded-3xl p-5 max-w-md w-full space-y-4 shadow-2xl border border-stone-200 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
+            className="bg-white rounded-3xl p-5 md:p-6 max-w-md sm:max-w-lg md:max-w-xl w-full space-y-4 shadow-2xl border border-stone-200 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header with Title and Close Button */}
@@ -626,7 +652,7 @@ export const StaffTasksView: React.FC = () => {
       {/* FINISH TASK MODAL */}
       {finishingTask && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-stone-200 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl md:rounded-3xl p-5 md:p-6 max-w-sm sm:max-w-lg w-full space-y-4 shadow-xl border border-stone-200 animate-in fade-in zoom-in-95 duration-200">
             <div>
               <h2 className="text-sm font-bold text-stone-900">
                 Báo cáo hoàn thành: {finishingTask.title || (finishingTask as any).name || "Công việc"}

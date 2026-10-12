@@ -194,7 +194,22 @@ export interface StaffHomeData {
     ip: string;
   };
   specialUsers: SpecialEvent[];
-  activeUsers?: Array<{ id: string; name: string | null; email: string | null }>;
+  activeUsers?: Array<{
+    id: string;
+    name: string | null;
+    email: string | null;
+    image?: string | null;
+    role?: string;
+    duties?: ShiftDutyItem[];
+  }>;
+  teammatesWithDuties?: Array<{
+    id: string;
+    name: string | null;
+    email: string | null;
+    image?: string | null;
+    role?: string;
+    duties?: ShiftDutyItem[];
+  }>;
   isViewAsMode?: boolean;
   viewAsUser?: any;
 }

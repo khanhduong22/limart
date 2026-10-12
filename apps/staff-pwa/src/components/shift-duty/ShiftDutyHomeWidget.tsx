@@ -17,7 +17,14 @@ interface ShiftDutyHomeWidgetProps {
   currentUserId?: string;
   isAdmin?: boolean;
   duties?: ShiftDutyItem[];
-  activeUsers?: { id: string; name: string | null; email: string | null; duties?: ShiftDutyItem[] }[];
+  activeUsers?: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    image?: string | null;
+    role?: string;
+    duties?: ShiftDutyItem[];
+  }[];
 }
 
 export default function ShiftDutyHomeWidget({
@@ -52,10 +59,19 @@ export default function ShiftDutyHomeWidget({
   };
 
   const completedCount = (localDuties || []).filter((d) => d.isCompleted).length;
-  const totalTeamDuties = (activeUsers || []).reduce(
-    (acc, c) => acc + (c.duties?.length || 0),
-    0
-  );
+
+  const otherDutyUsers = React.useMemo(() => {
+    return (activeUsers || []).filter(
+      (u) => (!currentUserId || u.id !== currentUserId) && (u.duties?.length || 0) > 0
+    );
+  }, [activeUsers, currentUserId]);
+
+  const totalTeamDuties = React.useMemo(() => {
+    return otherDutyUsers.reduce(
+      (acc, c) => acc + (c.duties?.length || 0),
+      0
+    );
+  }, [otherDutyUsers]);
 
   const handleOpenModal = () => {
     const shouldDefaultToTeammates = (localDuties || []).length === 0 && totalTeamDuties > 0;
@@ -168,11 +184,11 @@ export default function ShiftDutyHomeWidget({
               )}
             >
               <Users className="w-3.5 h-3.5" />
-              <span>Cả ca làm ({(activeUsers || []).length})</span>
+              <span>Cả ca làm ({otherDutyUsers.length})</span>
             </button>
           </div>
 
-          <div className="space-y-2 py-2 max-h-64 overflow-y-auto">
+          <div className="space-y-2.5 py-2 max-h-80 overflow-y-auto pr-0.5">
             {activeTab === "MY_DUTIES" ? (
               (localDuties || []).length === 0 ? (
                 <div className="space-y-3">
@@ -236,29 +252,94 @@ export default function ShiftDutyHomeWidget({
                 ))
               )
             ) : (
-              (activeUsers || []).length === 0 ? (
-                <div className="text-center py-6 text-xs text-stone-400">
-                  Chưa có nhân viên nào khác trong ca này.
+              otherDutyUsers.length === 0 ? (
+                <div className="text-center py-8 px-4 text-xs text-stone-500 bg-stone-50/50 rounded-xl border border-dashed border-stone-200">
+                  <div className="text-2xl mb-1.5">☕</div>
+                  <p className="font-medium text-stone-600">
+                    Hôm nay chưa có đồng nghiệp nào được giao nhiệm vụ ca trực.
+                  </p>
                 </div>
               ) : (
-                (activeUsers || []).map((u) => (
-                  <div
-                    key={u.id}
-                    className="p-2.5 rounded-xl border border-stone-200 bg-white flex items-center justify-between text-xs"
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs">
-                        {(u.name || "U")[0]}
+                otherDutyUsers.map((u) => {
+                  const userDuties = u.duties || [];
+                  const completedUserDuties = userDuties.filter((d) => d.isCompleted).length;
+
+                  return (
+                    <div
+                      key={u.id}
+                      className="p-3 rounded-xl border border-stone-200 bg-white shadow-2xs space-y-2.5"
+                    >
+                      {/* Colleague Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs shrink-0">
+                            {(u.name || "U")[0].toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-semibold text-xs text-stone-900 block truncate">
+                              {u.name || u.email || "Đồng nghiệp"}
+                            </span>
+                            <span className="text-[10px] text-stone-400 block truncate">
+                              {completedUserDuties}/{userDuties.length} hoàn thành
+                            </span>
+                          </div>
+                        </div>
+
+                        <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-stone-100 text-stone-600 shrink-0">
+                          {userDuties.length} nhiệm vụ
+                        </span>
                       </div>
-                      <span className="font-semibold text-stone-900">{u.name || u.email || "Nhân viên"}</span>
+
+                      {/* Duties list for this colleague */}
+                      <div className="space-y-1.5 pt-1 border-t border-stone-100">
+                        {userDuties.map((d) => (
+                          <div
+                            key={d.id}
+                            className={cn(
+                              "p-2 rounded-lg text-xs flex items-start gap-2 transition-colors",
+                              d.isCompleted
+                                ? "bg-emerald-50/50 text-slate-500"
+                                : "bg-stone-50/70 text-slate-800"
+                            )}
+                          >
+                            <div className="mt-0.5 shrink-0">
+                              {d.isCompleted ? (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              ) : (
+                                <Circle className="w-3.5 h-3.5 text-amber-500" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className={cn(
+                                  "text-xs leading-snug",
+                                  d.isCompleted ? "line-through text-slate-400" : "font-medium text-slate-800"
+                                )}
+                              >
+                                {d.title}
+                              </p>
+                              {d.description && (
+                                <p className="text-[10px] text-slate-400 mt-0.5 whitespace-pre-line truncate">
+                                  {d.description}
+                                </p>
+                              )}
+                            </div>
+                            <span
+                              className={cn(
+                                "text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0",
+                                d.isCompleted
+                                  ? "bg-emerald-100/60 text-emerald-700"
+                                  : "bg-amber-100/60 text-amber-700"
+                              )}
+                            >
+                              {d.isCompleted ? "Đã xong" : "Đang chờ"}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    {u.id === currentUserId && (
-                      <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-bold">
-                        Bạn
-                      </span>
-                    )}
-                  </div>
-                ))
+                  );
+                })
               )
             )}
           </div>

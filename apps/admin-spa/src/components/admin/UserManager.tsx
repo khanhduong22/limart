@@ -312,23 +312,6 @@ function UserItem({
     }
   };
 
-  const handleToggleStaffTasksAllowed = async () => {
-    setLoading(true);
-    const nextAllowed = !user.staffTasksAllowed;
-    try {
-      await api.put(`/api/admin/employees/${user.id}`, {
-        staffTasksAllowed: nextAllowed,
-      });
-      toast.success("Đã cập nhật quyền KPI");
-      if (onUpdate) onUpdate({ ...user, staffTasksAllowed: nextAllowed });
-    } catch {
-      toast.success("Đã cập nhật quyền KPI");
-      if (onUpdate) onUpdate({ ...user, staffTasksAllowed: nextAllowed });
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleRoleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newRole = e.target.value as "USER" | "ADMIN" | "PARTNER";
     if (newRole === user.role) return;
@@ -339,9 +322,17 @@ function UserItem({
       ADMIN: "Quản trị viên (ADMIN)",
     };
 
+    const nextStaffTasksAllowed =
+      newRole === "PARTNER" ? true : newRole === "USER" ? false : undefined;
+
     setLoading(true);
     try {
-      await api.put(`/api/admin/employees/${user.id}`, { role: newRole });
+      await api.put(`/api/admin/employees/${user.id}`, {
+        role: newRole,
+        ...(nextStaffTasksAllowed !== undefined
+          ? { staffTasksAllowed: nextStaffTasksAllowed }
+          : {}),
+      });
       toast.success(
         `Đã cập nhật vai trò ${user.name} thành ${roleNameMap[newRole] || newRole} 🚀`
       );
@@ -349,7 +340,9 @@ function UserItem({
         onUpdate({
           ...user,
           role: newRole,
-          ...(newRole === "PARTNER" ? { staffTasksAllowed: true } : {}),
+          ...(nextStaffTasksAllowed !== undefined
+            ? { staffTasksAllowed: nextStaffTasksAllowed }
+            : {}),
         });
       }
     } catch (err: any) {
@@ -534,20 +527,6 @@ function UserItem({
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
-            <Button
-              variant={user.staffTasksAllowed ? "default" : "outline"}
-              size="sm"
-              onClick={handleToggleStaffTasksAllowed}
-              className={`text-xs h-9 min-h-[36px] flex-1 sm:flex-none ${
-                user.staffTasksAllowed
-                  ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                  : "border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-              }`}
-              disabled={!isUserActive || loading}
-            >
-              {user.staffTasksAllowed ? "Gỡ KPI" : "Cấp KPI"}
-            </Button>
-
             <select
               value={user.role || "USER"}
               onChange={handleRoleChange}

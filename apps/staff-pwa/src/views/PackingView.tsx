@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import useSWR from "swr";
+import { useAppQuery } from "@/lib/api-query";
 import {
   Package,
   ChevronLeft,
@@ -15,7 +15,6 @@ import { toast } from "sonner";
 import { useRouter } from "@/lib/router";
 import { Button } from "@/components/ui/button";
 import {
-  fetcher,
   submitPackingTask,
 } from "@/lib/api-client";
 
@@ -81,10 +80,10 @@ export const PackingView: React.FC = () => {
     }
   }, []);
 
-  const { data: res, mutate, isLoading } = useSWR<{
+  const { data: res, mutate, isLoading } = useAppQuery<{
     success: boolean;
     data: PackingSummaryData;
-  }>("/api/staff/tasks/packing-summary", fetcher, { revalidateOnFocus: true });
+  }>("/api/staff/tasks/packing-summary", { revalidateOnFocus: true });
 
   const summary = res?.data;
   const totalPoints = summary?.totalPoints || 0;

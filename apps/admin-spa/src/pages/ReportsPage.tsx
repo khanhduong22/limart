@@ -1,10 +1,9 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import useSWR from "swr";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { swrFetcher } from "@/lib/api";
 
 const EMPTY_REPORT = {
   totalPayrollCost: 0,
@@ -23,9 +22,8 @@ export function ReportsPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
 
-  const { data } = useSWR<typeof EMPTY_REPORT>(
+  const { data } = useAdminQuery<typeof EMPTY_REPORT>(
     `/api/admin/reports?month=${month}&year=${year}`,
-    swrFetcher,
     { fallbackData: EMPTY_REPORT, revalidateOnFocus: false }
   );
 

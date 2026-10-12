@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import useSWR from "swr";
+import { useAppQuery } from "@/lib/api-query";
 import {
   ChevronLeft,
   ChevronRight,
@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { useRouter, Link } from "@/lib/router";
 import { Button } from "@/components/ui/button";
-import { fetcher } from "@/lib/api-client";
 
 interface LeaderboardUser {
   id: string;
@@ -49,12 +48,11 @@ export const RewardsView: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
-  const { data: res, isLoading } = useSWR<{
+  const { data: res, isLoading } = useAppQuery<{
     success: boolean;
     data: LeaderboardData;
   }>(
     `/api/staff/rewards/leaderboard?month=${selectedMonth}&year=${selectedYear}`,
-    fetcher,
     { revalidateOnFocus: true }
   );
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import useSWR from "swr";
+import { useAppQuery } from "@/lib/api-query";
 import {
   ChevronLeft,
   Clock,
@@ -12,7 +12,6 @@ import { toast } from "sonner";
 import { useRouter } from "@/lib/router";
 import { Button } from "@/components/ui/button";
 import {
-  fetcher,
   submitCarryingTask,
 } from "@/lib/api-client";
 
@@ -78,10 +77,10 @@ export const CarryingView: React.FC = () => {
     }
   }, []);
 
-  const { data: res, mutate, isLoading } = useSWR<{
+  const { data: res, mutate, isLoading } = useAppQuery<{
     success: boolean;
     data: CarryingSummaryData;
-  }>("/api/staff/tasks/carrying-summary", fetcher, { revalidateOnFocus: true });
+  }>("/api/staff/tasks/carrying-summary", { revalidateOnFocus: true });
 
   const summary = res?.data;
   const totalPoints = summary?.totalPoints || 0;

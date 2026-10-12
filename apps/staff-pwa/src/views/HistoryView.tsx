@@ -1,6 +1,5 @@
 import React from "react";
-import useSWR from "swr";
-import { fetcher } from "@/lib/api-client";
+import { useAppQuery } from "@/lib/api-query";
 import HistoryGantt from "@/components/HistoryGantt";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,10 +8,10 @@ import { Link } from "@/lib/router";
 import { checkTimeStatus } from "@/lib/utils";
 
 export const HistoryView: React.FC = () => {
-  const { data: response, isLoading } = useSWR<{
+  const { data: response, isLoading } = useAppQuery<{
     success: boolean;
     data: any[];
-  }>("/api/staff/history", fetcher);
+  }>("/api/staff/history");
 
   const history = Array.isArray(response?.data) ? response.data : [];
 

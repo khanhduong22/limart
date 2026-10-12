@@ -1,13 +1,12 @@
 import React from "react";
-import useSWR from "swr";
-import { fetcher } from "@/lib/api-client";
+import { useAppQuery } from "@/lib/api-query";
 import RequestListClient from "@/components/requests/RequestListClient";
 
 export const RequestsView: React.FC = () => {
-  const { data: response, mutate } = useSWR<{
+  const { data: response, mutate } = useAppQuery<{
     success: boolean;
     data: any[];
-  }>("/api/staff/requests", fetcher);
+  }>("/api/staff/requests");
 
   const requests = response?.data || [];
 

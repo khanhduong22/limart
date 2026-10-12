@@ -1,7 +1,6 @@
 import React from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
-import useSWR from "swr";
-import { swrFetcher } from "@/lib/api";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,10 +21,10 @@ export function EmployeePayrollPage() {
   const month = searchParams.get("month") ? parseInt(searchParams.get("month")!, 10) : currentMonth;
   const year = searchParams.get("year") ? parseInt(searchParams.get("year")!, 10) : currentYear;
 
-  const { data, error, isLoading, mutate } = useSWR<{
+  const { data, error, isLoading, mutate } = useAdminQuery<{
     success: boolean;
     data: { user: any; period: any; payslip: any; stats: any; isClosed: boolean };
-  }>(`/api/admin/payroll/${userId}?month=${month}&year=${year}`, swrFetcher);
+  }>(`/api/admin/payroll/${userId}?month=${month}&year=${year}`);
 
   const formatVND = (n: number) =>
     new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);

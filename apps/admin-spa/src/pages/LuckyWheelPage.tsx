@@ -1,6 +1,5 @@
 import React from "react";
-import useSWR from "swr";
-import { swrFetcher } from "@/lib/api";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -19,9 +18,8 @@ import { useEmployees } from "@/hooks/useAdminData";
 
 export function LuckyWheelPage() {
   const { employees } = useEmployees();
-  const { data, mutate } = useSWR<{ prizes: any[]; history: any[] }>(
-    "/api/admin/lucky-wheel",
-    swrFetcher
+  const { data, mutate } = useAdminQuery<{ prizes: any[]; history: any[] }>(
+    "/api/admin/lucky-wheel"
   );
 
   const prizes = data?.prizes || [];

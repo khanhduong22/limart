@@ -1,4 +1,4 @@
-import useSWR from "swr";
+import { useAdminQuery } from "./useAdminQuery";
 import { useState, useCallback, useMemo } from "react";
 import { api, swrFetcher } from "@/lib/api";
 import { toast } from "sonner";
@@ -42,12 +42,12 @@ const SEED_SETTINGS: SettingsConfig = {
   autoApproveCheckout: true,
 };
 
-// SWR hooks with optimistic state management
+// TanStack Query hooks with optimistic state management
+export { useAdminQuery } from "./useAdminQuery";
 
 export function useDashboardStats() {
-  const { data, error, mutate, isLoading } = useSWR<any>(
+  const { data, error, mutate, isLoading } = useAdminQuery<any>(
     "/api/admin/dashboard-stats",
-    swrFetcher,
     {
       fallbackData: SEED_STATS,
       revalidateOnFocus: true,
@@ -89,9 +89,8 @@ export function useDashboardStats() {
 }
 
 export function useAttendanceFeed() {
-  const { data, error, mutate, isLoading } = useSWR<any>(
+  const { data, error, mutate, isLoading } = useAdminQuery<any>(
     "/api/checkins/today",
-    swrFetcher,
     {
       fallbackData: SEED_ATTENDANCE,
       revalidateOnFocus: true,
@@ -116,9 +115,8 @@ export function useAttendanceFeed() {
 export function useRequests() {
   const [localRequests, setLocalRequests] = useState<RequestItem[]>(SEED_REQUESTS);
 
-  const { data, error, mutate, isLoading } = useSWR<any>(
+  const { data, error, mutate, isLoading } = useAdminQuery<any>(
     "/api/admin/requests",
-    swrFetcher,
     {
       fallbackData: localRequests,
       revalidateOnFocus: true,
@@ -205,9 +203,8 @@ export function usePayroll(selectedMonth?: number, selectedYear?: number) {
 
   const [localPayroll, setLocalPayroll] = useState<PayrollItem[]>(SEED_PAYROLL);
 
-  const { data, error, mutate, isLoading } = useSWR<any>(
+  const { data, error, mutate, isLoading } = useAdminQuery<any>(
     `/api/admin/payroll?month=${month}&year=${year}`,
-    swrFetcher,
     {
       fallbackData: localPayroll,
       revalidateOnFocus: true,
@@ -269,9 +266,8 @@ export function usePayroll(selectedMonth?: number, selectedYear?: number) {
 export function useTasks() {
   const [localTasks, setLocalTasks] = useState<AdminTaskItem[]>(SEED_TASKS);
 
-  const { data, error, mutate, isLoading } = useSWR<AdminTaskItem[]>(
+  const { data, error, mutate, isLoading } = useAdminQuery<AdminTaskItem[]>(
     "/api/admin/tasks",
-    swrFetcher,
     {
       fallbackData: localTasks,
       revalidateOnFocus: true,
@@ -409,9 +405,8 @@ export function useTasks() {
 }
 
 export function useTaskDefinitions() {
-  const { data, error, mutate, isLoading } = useSWR<any>(
+  const { data, error, mutate, isLoading } = useAdminQuery<any>(
     "/api/admin/tasks/definitions",
-    swrFetcher,
     {
       revalidateOnFocus: true,
     }
@@ -513,7 +508,7 @@ export function useTaskDefinitions() {
 }
 
 export function useTaskItems() {
-  const { data, error, mutate, isLoading } = useSWR<any>(
+  const { data, error, mutate, isLoading } = useAdminQuery<any>(
     "/api/admin/tasks/items",
     async (url: string) => {
       try {
@@ -633,9 +628,8 @@ export function useTaskItems() {
 export function useEmployees() {
   const [employees, setEmployees] = useState<User[]>(SEED_EMPLOYEES);
 
-  const { data, error, mutate, isLoading } = useSWR<any>(
+  const { data, error, mutate, isLoading } = useAdminQuery<any>(
     "/api/admin/users",
-    swrFetcher,
     {
       fallbackData: SEED_EMPLOYEES,
       revalidateOnFocus: true,
@@ -679,9 +673,8 @@ export function useEmployees() {
 export function useSettings() {
   const [settings, setSettings] = useState<SettingsConfig>(SEED_SETTINGS);
 
-  const { data, error, mutate, isLoading } = useSWR<any>(
+  const { data, error, mutate, isLoading } = useAdminQuery<any>(
     "/api/admin/ip-settings",
-    swrFetcher,
     {
       revalidateOnFocus: true,
       onSuccess: (remoteData) => {

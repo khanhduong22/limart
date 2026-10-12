@@ -1,5 +1,4 @@
 import React from "react";
-import useSWR from "swr";
 import {
   RefreshCw,
   Calendar,
@@ -18,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { swrFetcher } from "@/lib/api";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { useManagerTasksStore } from "@/stores/useManagerTasksStore";
 import { StatsHistoryData, DailyDetailItem } from "@/types/manager-tasks";
 
@@ -34,16 +33,15 @@ export function HistoryTab() {
     setIsHistoryDetailOpen,
   } = useManagerTasksStore();
 
-  // SWR: Stats History
+  // Stats History
   const {
     data: rawHistory,
     isLoading: historyLoading,
     mutate: mutateHistory,
-  } = useSWR<any>(
+  } = useAdminQuery<any>(
     selectedUserId
       ? `/api/manager-tasks/stats-history?userId=${selectedUserId}&date=${selectedDate}`
-      : null,
-    swrFetcher
+      : null
   );
   const historyStats: StatsHistoryData | null =
     rawHistory?.data || rawHistory || null;

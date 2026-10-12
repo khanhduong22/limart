@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import useSWR from "swr";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 
-import { api, swrFetcher } from "@/lib/api";
+import { api } from "@/lib/api";
 import {
   type StaffTask,
   type StaffPerformanceStats,
@@ -38,7 +38,7 @@ export function StaffTasksPage() {
     data: staffTasksResponse,
     isValidating: isTasksValidating,
     mutate: mutateTasks,
-  } = useSWR<any>("/api/staff-tasks", swrFetcher, {
+  } = useAdminQuery<any>("/api/staff-tasks", {
     revalidateOnFocus: true,
     dedupingInterval: 4000,
   });
@@ -47,7 +47,7 @@ export function StaffTasksPage() {
   const {
     data: statsResponse,
     mutate: mutateStats,
-  } = useSWR<any>("/api/staff-tasks/stats", swrFetcher, {
+  } = useAdminQuery<any>("/api/staff-tasks/stats", {
     revalidateOnFocus: true,
     dedupingInterval: 4000,
   });

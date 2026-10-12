@@ -23,12 +23,12 @@ vi.mock("sonner", () => ({
   },
 }));
 
-// SWR mock
+// Query mock
 const mockMutate = vi.fn();
 let mockSwrResponse: any;
 
-vi.mock("swr", () => ({
-  default: () => ({
+vi.mock("@/lib/api-query", () => ({
+  useAppQuery: () => ({
     data: mockSwrResponse?.data,
     error: mockSwrResponse?.error,
     mutate: mockMutate,

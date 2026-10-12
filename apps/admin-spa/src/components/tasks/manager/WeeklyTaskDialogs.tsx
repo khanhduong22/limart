@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSWRConfig } from "swr";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,7 +37,7 @@ export function WeeklyTaskDialogs({ onSuccess }: WeeklyTaskDialogsProps) {
     setIsWeeklyEditOpen,
     setIsWeeklyCarryOverOpen,
   } = useManagerTasksStore();
-  const { mutate } = useSWRConfig();
+  const queryClient = useQueryClient();
 
   // Local Form states
   const [weeklyTaskTitle, setWeeklyTaskTitle] = useState("");
@@ -85,9 +85,11 @@ export function WeeklyTaskDialogs({ onSuccess }: WeeklyTaskDialogsProps) {
       closeWeeklyCreateDialog();
       setWeeklyTaskTitle("");
       setWeeklyTaskDesc("");
-      await mutate(
-        (key) => typeof key === "string" && key.startsWith("/api/manager-tasks/weekly")
-      );
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].startsWith("/api/manager-tasks/weekly"),
+      });
       onSuccess?.();
     } catch (e: any) {
       toast.error(e?.message || "Gặp lỗi tạo nhiệm vụ tuần");
@@ -110,9 +112,11 @@ export function WeeklyTaskDialogs({ onSuccess }: WeeklyTaskDialogsProps) {
       closeWeeklyEditDialog();
       setWeeklyTaskTitle("");
       setWeeklyTaskDesc("");
-      await mutate(
-        (key) => typeof key === "string" && key.startsWith("/api/manager-tasks/weekly")
-      );
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].startsWith("/api/manager-tasks/weekly"),
+      });
       onSuccess?.();
     } catch (e: any) {
       toast.error(e?.message || "Gặp lỗi cập nhật");
@@ -136,9 +140,11 @@ export function WeeklyTaskDialogs({ onSuccess }: WeeklyTaskDialogsProps) {
       toast.success("Đã nộp giải trình và chuyển việc sang tuần sau!");
       closeWeeklyCarryOverDialog();
       setCarryOverExplanation("");
-      await mutate(
-        (key) => typeof key === "string" && key.startsWith("/api/manager-tasks/weekly")
-      );
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].startsWith("/api/manager-tasks/weekly"),
+      });
       onSuccess?.();
     } catch (e: any) {
       toast.error(e?.message || "Gặp lỗi nộp giải trình");

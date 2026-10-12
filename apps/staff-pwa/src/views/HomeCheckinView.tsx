@@ -1,7 +1,6 @@
 import React from "react";
-import useSWR from "swr";
+import { useAppQuery } from "@/lib/api-query";
 import {
-  fetcher,
   DEFAULT_HOME_DATA,
   StaffHomeData,
 } from "@/lib/api-client";
@@ -36,9 +35,8 @@ export const HomeCheckinView: React.FC = () => {
     ? `/api/staff/home-data?viewAsUserId=${encodeURIComponent(viewAsUserId)}`
     : "/api/staff/home-data";
 
-  const { data: response, mutate } = useSWR<{ success: boolean; data: StaffHomeData }>(
+  const { data: response, mutate } = useAppQuery<{ success: boolean; data: StaffHomeData }>(
     homeDataUrl,
-    fetcher,
     { revalidateOnFocus: true, revalidateIfStale: true }
   );
 

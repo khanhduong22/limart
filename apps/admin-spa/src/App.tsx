@@ -1,7 +1,7 @@
 import React, { Suspense } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SWRConfig } from "swr";
-import { swrFetcher } from "@/lib/api";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { AdminPageLoadingSkeleton } from "@/components/ui/AdminPageLoadingSkeleton";
 import { useAppVersionGuard, VersionGuardBanner } from "@checkin/spa-version-guard";
@@ -73,14 +73,7 @@ export default function App() {
   const { isUpdating } = useAppVersionGuard();
 
   return (
-    <SWRConfig
-      value={{
-        fetcher: swrFetcher,
-        revalidateOnFocus: true,
-        revalidateOnReconnect: true,
-        shouldRetryOnError: false,
-      }}
-    >
+    <QueryClientProvider client={queryClient}>
       <VersionGuardBanner isUpdating={isUpdating} />
       <BrowserRouter basename="/admin">
         <Suspense fallback={<AdminPageLoadingSkeleton />}>
@@ -113,6 +106,6 @@ export default function App() {
           </Routes>
         </Suspense>
       </BrowserRouter>
-    </SWRConfig>
+    </QueryClientProvider>
   );
 }

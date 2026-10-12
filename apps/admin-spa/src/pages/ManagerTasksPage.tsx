@@ -1,5 +1,4 @@
 import React, { useEffect } from "react";
-import useSWR from "swr";
 import {
   User as UserIcon,
   Calendar,
@@ -7,7 +6,7 @@ import {
   Settings,
   History,
 } from "lucide-react";
-import { swrFetcher } from "@/lib/api";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { useManagerTasksStore } from "@/stores/useManagerTasksStore";
 import { UserItem } from "@/types/manager-tasks";
 import {
@@ -28,8 +27,8 @@ export function ManagerTasksPage() {
     setSelectedDate,
   } = useManagerTasksStore();
 
-  // SWR: Fetch users for manager tasks
-  const { data: rawUsers } = useSWR<any>("/api/manager-tasks/users", swrFetcher);
+  // Fetch users for manager tasks
+  const { data: rawUsers } = useAdminQuery<any>("/api/manager-tasks/users");
   const users: UserItem[] = Array.isArray(rawUsers)
     ? rawUsers
     : rawUsers?.data || [];

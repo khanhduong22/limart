@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import useSWR from "swr";
-import { fetcher } from "@/lib/api-client";
+import { useAppQuery } from "@/lib/api-query";
 import ScheduleClient from "@/components/schedule/ScheduleClient";
 
 export const ScheduleView: React.FC = () => {
@@ -8,11 +7,11 @@ export const ScheduleView: React.FC = () => {
   const month = currentDate.getMonth() + 1;
   const year = currentDate.getFullYear();
 
-  const { data: response, mutate, isLoading } = useSWR<{
+  const { data: response, mutate, isLoading } = useAppQuery<{
     success: boolean;
     data: any[];
     currentUserId?: string;
-  }>(`/api/staff/schedule?month=${month}&year=${year}`, fetcher, {
+  }>(`/api/staff/schedule?month=${month}&year=${year}`, {
     revalidateOnFocus: true,
   });
 

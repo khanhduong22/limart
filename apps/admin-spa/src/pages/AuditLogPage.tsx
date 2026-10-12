@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import useSWR from "swr";
-import { swrFetcher } from "@/lib/api";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import {
   ShieldAlert,
   Clock,
@@ -50,10 +49,10 @@ export function AuditLogPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("ALL");
 
-  const { data, isValidating, mutate } = useSWR<{
+  const { data, isValidating, mutate } = useAdminQuery<{
     success: boolean;
     logs: AuditLog[];
-  }>("/api/auth/audit-logs", swrFetcher, {
+  }>("/api/auth/audit-logs", {
     fallbackData: {
       success: true,
       logs: [],

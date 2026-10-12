@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
-import useSWR from "swr";
-import { swrFetcher } from "@/lib/api";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,9 +19,8 @@ export function EmployeeDetailPage() {
   const month = searchParams.get("month") ? parseInt(searchParams.get("month")!, 10) : currentDefaultMonth;
   const year = searchParams.get("year") ? parseInt(searchParams.get("year")!, 10) : currentDefaultYear;
 
-  const { data, error, isLoading, mutate } = useSWR<{ success: boolean; data: { user: any; stats: any } }>(
-    `/api/admin/employees/${id}?month=${month}&year=${year}`,
-    swrFetcher
+  const { data, error, isLoading, mutate } = useAdminQuery<{ success: boolean; data: { user: any; stats: any } }>(
+    `/api/admin/employees/${id}?month=${month}&year=${year}`
   );
 
   const formatVND = (n: number) =>

@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import useSWR from "swr";
-import { fetcher } from "@/lib/api-client";
+import { useAppQuery } from "@/lib/api-query";
 import PayrollDetailView from "@/components/PayrollDetailView";
 import PayrollMonthSelector from "@/components/PayrollMonthSelector";
 import PayrollExplanationModal from "@/components/PayrollExplanationModal";
@@ -13,7 +12,7 @@ export const PayrollView: React.FC = () => {
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
-  const { data: response, isLoading } = useSWR<{
+  const { data: response, isLoading } = useAppQuery<{
     success: boolean;
     data: {
       stats: any;
@@ -21,7 +20,7 @@ export const PayrollView: React.FC = () => {
       month: number;
       year: number;
     };
-  }>(`/api/staff/payroll?month=${selectedMonth}&year=${selectedYear}`, fetcher);
+  }>(`/api/staff/payroll?month=${selectedMonth}&year=${selectedYear}`);
 
   const monthOptions = [];
   for (let i = 0; i < 6; i++) {

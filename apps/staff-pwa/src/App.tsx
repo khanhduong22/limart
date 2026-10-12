@@ -14,7 +14,9 @@ import { PackingView } from "./views/PackingView";
 import { CarryingView } from "./views/CarryingView";
 import { StaffTasksView } from "./views/StaffTasksView";
 import { RewardsView } from "./views/RewardsView";
-import useSWR from "swr";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "./lib/queryClient";
+import { useAppQuery } from "./lib/api-query";
 import {
   getCachedProfile,
   saveCachedProfile,
@@ -116,9 +118,8 @@ function AppContent() {
       });
   }, []);
 
-  const { data: homeRes } = useSWR<{ success: boolean; data: any }>(
-    hasCheckedSession && pathname !== "/login" ? "/api/staff/home-data" : null,
-    fetcher
+  const { data: homeRes } = useAppQuery<{ success: boolean; data: any }>(
+    hasCheckedSession && pathname !== "/login" ? "/api/staff/home-data" : null
   );
   const liveUser = homeRes?.data?.user;
 
@@ -294,9 +295,11 @@ export const App: React.FC = () => {
   return (
     <ErrorBoundary>
       <VersionGuardBanner isUpdating={isUpdating} />
-      <RouterProvider>
-        <AppContent />
-      </RouterProvider>
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider>
+          <AppContent />
+        </RouterProvider>
+      </QueryClientProvider>
     </ErrorBoundary>
   );
 };

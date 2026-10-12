@@ -1,5 +1,5 @@
 import React from "react";
-import useSWR, { useSWRConfig } from "swr";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   Plus,
@@ -15,23 +15,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { api, swrFetcher } from "@/lib/api";
+import { api } from "@/lib/api";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { useManagerTasksStore } from "@/stores/useManagerTasksStore";
 import { ChecklistItem } from "@/types/manager-tasks";
 
 export function TemplatesTab() {
   const { selectedUserId, openCreateDialog, openEditDialog } =
     useManagerTasksStore();
-  const { mutate: globalMutate } = useSWRConfig();
+  const queryClient = useQueryClient();
 
-  // SWR: Templates
+  // Templates
   const {
     data: rawTemplates,
     isLoading: templatesLoading,
     mutate: mutateTemplates,
-  } = useSWR<any>(
-    selectedUserId ? `/api/manager-tasks/templates?userId=${selectedUserId}` : null,
-    swrFetcher
+  } = useAdminQuery<any>(
+    selectedUserId ? `/api/manager-tasks/templates?userId=${selectedUserId}` : null
   );
   const templates: ChecklistItem[] = Array.isArray(rawTemplates)
     ? rawTemplates
@@ -47,9 +47,11 @@ export function TemplatesTab() {
         nextActive ? "Đã kích hoạt nhiệm vụ mẫu" : "Đã tạm dừng nhiệm vụ mẫu"
       );
       mutateTemplates();
-      globalMutate(
-        (key) => typeof key === "string" && key.startsWith("/api/manager-tasks/checklist")
-      );
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].startsWith("/api/manager-tasks/checklist"),
+      });
     } catch (e: any) {
       toast.error(e?.message || "Lỗi cập nhật trạng thái");
     }
@@ -67,9 +69,11 @@ export function TemplatesTab() {
       await api.delete(`/api/manager-tasks/checklist/${taskId}`);
       toast.success("Đã xóa nhiệm vụ mẫu!");
       mutateTemplates();
-      globalMutate(
-        (key) => typeof key === "string" && key.startsWith("/api/manager-tasks/checklist")
-      );
+      queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].startsWith("/api/manager-tasks/checklist"),
+      });
     } catch (e: any) {
       toast.error(e?.message || "Lỗi xóa nhiệm vụ");
     }

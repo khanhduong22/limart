@@ -1,5 +1,5 @@
 import React from "react";
-import useSWR from "swr";
+import { useAppQuery } from "@/lib/api-query";
 import {
   ChevronLeft,
   Clock,
@@ -11,7 +11,7 @@ import {
 import { toast } from "sonner";
 import { useRouter } from "@/lib/router";
 import { Button } from "@/components/ui/button";
-import { fetcher, toggleStaffTaskStatus } from "@/lib/api-client";
+import { toggleStaffTaskStatus } from "@/lib/api-client";
 import {
   useStaffTasksStore,
   StaffTask,
@@ -55,12 +55,12 @@ export const StaffTasksView: React.FC = () => {
     closeDetailModal,
   } = useStaffTasksStore();
 
-  const { data: res, error, mutate, isLoading } = useSWR<{
+  const { data: res, error, mutate, isLoading } = useAppQuery<{
     success: boolean;
     allowed?: boolean;
     data: StaffTasksResponse["data"];
     error?: string;
-  }>("/api/staff/staff-tasks", fetcher, { revalidateOnFocus: true });
+  }>("/api/staff/staff-tasks", { revalidateOnFocus: true });
 
   // Check 403 / forbidden permission
   if (!isLoading && (error?.status === 403 || res?.allowed === false || res?.success === false)) {

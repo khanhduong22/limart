@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
-import useSWR from "swr";
+import { useAppQuery } from "@/lib/api-query";
 import { ChevronLeft } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "@/lib/router";
 import { Button } from "@/components/ui/button";
 import {
-  fetcher,
   claimMarketTask,
   startWfhTask,
   submitWfhTask,
@@ -43,20 +42,20 @@ export const TasksView: React.FC = () => {
     }
   }, []);
 
-  const { data: marketRes, mutate: mutateMarket, isLoading: loadingMarket } = useSWR<{
+  const { data: marketRes, mutate: mutateMarket, isLoading: loadingMarket } = useAppQuery<{
     success: boolean;
     data: MarketItem[];
-  }>("/api/staff/tasks/market", fetcher, { revalidateOnFocus: true });
+  }>("/api/staff/tasks/market", { revalidateOnFocus: true });
 
-  const { data: availableRes, mutate: mutateAvailable, isLoading: loadingAvailable } = useSWR<{
+  const { data: availableRes, mutate: mutateAvailable, isLoading: loadingAvailable } = useAppQuery<{
     success: boolean;
     data: TaskDefItem[];
-  }>("/api/staff/tasks/available", fetcher, { revalidateOnFocus: true });
+  }>("/api/staff/tasks/available", { revalidateOnFocus: true });
 
-  const { data: myTasksRes, mutate: mutateMyTasks, isLoading: loadingMyTasks } = useSWR<{
+  const { data: myTasksRes, mutate: mutateMyTasks, isLoading: loadingMyTasks } = useAppQuery<{
     success: boolean;
     data: UserTaskRecord[];
-  }>("/api/staff/tasks/my", fetcher, { revalidateOnFocus: true });
+  }>("/api/staff/tasks/my", { revalidateOnFocus: true });
 
   const marketItems = Array.isArray(marketRes?.data) ? marketRes.data : [];
   const generalTasks = (Array.isArray(availableRes?.data) ? availableRes.data : []).filter(

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import useSWR from "swr";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -41,7 +41,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
-import { api, swrFetcher } from "@/lib/api";
+import { api } from "@/lib/api";
 
 interface DocumentItem {
   id: string;
@@ -95,10 +95,9 @@ function getDocCategory(path: string): string {
 }
 
 export function HelpPage() {
-  // SWR: Fetch dynamic documents from /documents (normalized to /api/documents)
-  const { data, error, isLoading, mutate } = useSWR<any>(
+  // Fetch dynamic documents from /documents (normalized to /api/documents)
+  const { data, error, isLoading, mutate } = useAdminQuery<any>(
     "/documents",
-    swrFetcher,
     {
       revalidateOnFocus: true,
       dedupingInterval: 5000,

@@ -1,12 +1,11 @@
 import React from "react";
-import useSWR from "swr";
 import {
   Calendar as CalendarIcon,
   Columns3,
   CalendarRange,
 } from "lucide-react";
 import { useEmployees } from "@/hooks/useAdminData";
-import { swrFetcher } from "@/lib/api";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import ScheduleCalendar from "@/components/schedule/ScheduleCalendar";
 import UploadScheduleButton from "@/components/schedule/UploadScheduleButton";
 import ShiftHistoryDialog from "@/components/admin/ShiftHistoryDialog";
@@ -22,13 +21,12 @@ export function SchedulePage() {
   const { employees } = useEmployees();
 
   // Fetch all shifts
-  const { data: scheduleData, mutate } = useSWR<any>(
+  const { data: scheduleData, mutate } = useAdminQuery<any>(
     "/api/admin/schedule",
-    swrFetcher,
     { revalidateOnFocus: true }
   );
 
-  const { data: meData } = useSWR<any>("/api/me", swrFetcher);
+  const { data: meData } = useAdminQuery<any>("/api/me");
   const currentUser = meData?.data || meData;
 
   const events = Array.isArray(scheduleData)

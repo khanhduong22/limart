@@ -1,6 +1,5 @@
 import React from "react";
-import useSWR from "swr";
-import { swrFetcher } from "@/lib/api";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { AdminPageLoadingSkeleton } from "@/components/ui/AdminPageLoadingSkeleton";
 import { ShieldAlert, ArrowLeft } from "lucide-react";
 
@@ -9,7 +8,7 @@ interface AdminGuardProps {
 }
 
 export function AdminGuard({ children }: AdminGuardProps) {
-  const { data, error, isLoading } = useSWR<any>("/api/me", swrFetcher, {
+  const { data, error, isLoading } = useAdminQuery<any>("/api/me", {
     revalidateOnFocus: true,
     shouldRetryOnError: false,
   });

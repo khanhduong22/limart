@@ -1,15 +1,13 @@
 import React from "react";
-import useSWR from "swr";
-import { fetcher } from "@/lib/api-client";
+import { useAppQuery } from "@/lib/api-query";
 import LuckyWheelGame from "@/components/LuckyWheelGame";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Sparkles } from "lucide-react";
 import { Link } from "@/lib/router";
 
 export const LuckyWheelView: React.FC = () => {
-  const { data: response } = useSWR<{ success: boolean; prizes: any[] }>(
-    "/api/staff/lucky-wheel",
-    fetcher
+  const { data: response } = useAppQuery<{ success: boolean; prizes: any[] }>(
+    "/api/staff/lucky-wheel"
   );
 
   const prizes = response?.prizes || [];

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useSWRConfig } from "swr";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ interface EditChecklistDialogProps {
 export function EditChecklistDialog({ onSuccess }: EditChecklistDialogProps) {
   const { isEditOpen, closeEditDialog, setIsEditOpen, editingItem } =
     useManagerTasksStore();
-  const { mutate } = useSWRConfig();
+  const queryClient = useQueryClient();
 
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
@@ -58,13 +58,17 @@ export function EditChecklistDialog({ onSuccess }: EditChecklistDialogProps) {
       toast.success("Cập nhật nhiệm vụ thành công!");
       closeEditDialog();
 
-      // Invalidate SWR caches for checklist and templates
-      await mutate(
-        (key) => typeof key === "string" && key.startsWith("/api/manager-tasks/checklist")
-      );
-      await mutate(
-        (key) => typeof key === "string" && key.startsWith("/api/manager-tasks/templates")
-      );
+      // Invalidate caches for checklist and templates
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].startsWith("/api/manager-tasks/checklist"),
+      });
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].startsWith("/api/manager-tasks/templates"),
+      });
 
       onSuccess?.();
     } catch (e: any) {

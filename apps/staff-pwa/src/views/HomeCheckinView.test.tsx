@@ -9,8 +9,8 @@ import { StaffHomeData } from "@/lib/api-client";
 const mockMutate = vi.fn();
 let mockSwrData: { success: boolean; data: StaffHomeData } | undefined;
 
-vi.mock("swr", () => ({
-  default: () => ({
+vi.mock("@/lib/api-query", () => ({
+  useAppQuery: () => ({
     data: mockSwrData,
     mutate: mockMutate,
     isLoading: false,

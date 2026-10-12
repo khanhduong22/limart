@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useSWRConfig } from "swr";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,7 @@ interface CreateChecklistDialogProps {
 export function CreateChecklistDialog({ onSuccess }: CreateChecklistDialogProps) {
   const { isCreateOpen, closeCreateDialog, setIsCreateOpen, selectedUserId } =
     useManagerTasksStore();
-  const { mutate } = useSWRConfig();
+  const queryClient = useQueryClient();
 
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
@@ -54,13 +54,17 @@ export function CreateChecklistDialog({ onSuccess }: CreateChecklistDialogProps)
       setTaskDesc("");
       setTaskTargetDate("");
 
-      // Invalidate SWR caches for checklist and templates
-      await mutate(
-        (key) => typeof key === "string" && key.startsWith("/api/manager-tasks/checklist")
-      );
-      await mutate(
-        (key) => typeof key === "string" && key.startsWith("/api/manager-tasks/templates")
-      );
+      // Invalidate caches for checklist and templates
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].startsWith("/api/manager-tasks/checklist"),
+      });
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          typeof query.queryKey[0] === "string" &&
+          query.queryKey[0].startsWith("/api/manager-tasks/templates"),
+      });
 
       onSuccess?.();
     } catch (e: any) {

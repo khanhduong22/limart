@@ -1,5 +1,4 @@
 import React from "react";
-import useSWR from "swr";
 import { toast } from "sonner";
 import {
   CheckCircle2,
@@ -13,7 +12,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { api, swrFetcher } from "@/lib/api";
+import { api } from "@/lib/api";
+import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { useManagerTasksStore } from "@/stores/useManagerTasksStore";
 import {
   ChecklistItem,
@@ -32,31 +32,29 @@ export function DailyChecklistTab() {
     openWeeklyCarryOverDialog,
   } = useManagerTasksStore();
 
-  // SWR: Daily Checklist
+  // Daily Checklist
   const {
     data: rawChecklist,
     isLoading: checklistLoading,
     mutate: mutateChecklist,
-  } = useSWR<any>(
+  } = useAdminQuery<any>(
     selectedUserId
       ? `/api/manager-tasks/checklist?userId=${selectedUserId}&date=${selectedDate}`
-      : null,
-    swrFetcher
+      : null
   );
   const checklist: ChecklistItem[] = Array.isArray(rawChecklist)
     ? rawChecklist
     : rawChecklist?.data || [];
 
-  // SWR: Weekly Tasks
+  // Weekly Tasks
   const {
     data: rawWeekly,
     isLoading: weeklyLoading,
     mutate: mutateWeekly,
-  } = useSWR<any>(
+  } = useAdminQuery<any>(
     selectedUserId
       ? `/api/manager-tasks/weekly?userId=${selectedUserId}&date=${selectedDate}`
-      : null,
-    swrFetcher
+      : null
   );
   const weeklyTasks: WeeklyTaskItem[] = Array.isArray(rawWeekly)
     ? rawWeekly

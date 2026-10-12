@@ -1,15 +1,31 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FileText, Banknote, Download } from "lucide-react";
 import { toast } from "sonner";
 import {
-  exportFullPayrollXLSX,
   exportSingleEmployeeXLSX,
   type PayrollExportUser,
 } from "@/lib/payrollExport";
 import { api } from "@/lib/api";
+import { usePayrollAdminStore } from "@/stores/usePayrollAdminStore";
+import {
+  PayrollAdjustmentDialog,
+  PayrollExportModal,
+} from "./payroll";
+
+export interface PayrollAdminClientProps {
+  data?: any[];
+  month?: number;
+  year?: number;
+  isClosed?: boolean;
+  initialBonusPercent?: number;
+  initialBonusTargets?: string[];
+  initialExcludedUsers?: string[];
+  onMonthChange?: (m: number, y: number) => void;
+  onRefresh?: () => void;
+}
 
 export default function PayrollAdminClient({
   data = [],
@@ -21,41 +37,51 @@ export default function PayrollAdminClient({
   initialExcludedUsers = [],
   onMonthChange,
   onRefresh,
-}: {
-  data?: any[];
-  month?: number;
-  year?: number;
-  isClosed?: boolean;
-  initialBonusPercent?: number;
-  initialBonusTargets?: string[];
-  initialExcludedUsers?: string[];
-  onMonthChange?: (m: number, y: number) => void;
-  onRefresh?: () => void;
-}) {
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
+}: PayrollAdminClientProps) {
+  const {
+    searchTerm,
+    setSearchTerm,
+    bonusPercent,
+    setBonusPercent,
+    bonusTargets,
+    setBonusTargets,
+    toggleBonusTarget,
+    excludedUsers,
+    setExcludedUsers,
+    toggleExcludeUser,
+    showTargetDropdown,
+    setShowTargetDropdown,
+    closedState,
+    setClosedState,
+    isClosing,
+    setIsClosing,
+    isUpdatingBonus,
+    setIsUpdatingBonus,
+    isAdjustmentOpen,
+    openAdjustment,
+    closeAdjustment,
+    selectedEmployee,
+    isExportOpen,
+    openExport,
+    closeExport,
+  } = usePayrollAdminStore();
 
-  // Bonus & Close Logic
-  const [bonusPercent, setBonusPercent] = useState(initialBonusPercent);
-  const [bonusTargets, setBonusTargets] =
-    useState<string[]>(initialBonusTargets);
-  const [excludedUsers, setExcludedUsers] = useState<string[]>(
-    initialExcludedUsers || []
-  );
-  const [showTargetDropdown, setShowTargetDropdown] = useState(false);
-  const [isClosing, setIsClosing] = useState(false);
-  const [isUpdatingBonus, setIsUpdatingBonus] = useState(false);
-  const [closedState, setClosedState] = useState(isClosed);
-
+  // Sync prop changes into store
   useEffect(() => {
     setBonusPercent(initialBonusPercent);
     setBonusTargets(initialBonusTargets);
     setExcludedUsers(initialExcludedUsers || []);
     setClosedState(isClosed);
-  }, [initialBonusPercent, initialBonusTargets, initialExcludedUsers, isClosed]);
+  }, [
+    initialBonusPercent,
+    initialBonusTargets,
+    initialExcludedUsers,
+    isClosed,
+    setBonusPercent,
+    setBonusTargets,
+    setExcludedUsers,
+    setClosedState,
+  ]);
 
   const safeData = Array.isArray(data) ? data : [];
   const filteredData = safeData.filter((u) => {
@@ -68,13 +94,10 @@ export default function PayrollAdminClient({
   });
 
   const totalWithBonus = closedState
-    ? filteredData.reduce(
-        (sum, u) => {
-          const stats = u.stats || u || {};
-          return sum + (stats.finalNet || stats.totalSalary || 0);
-        },
-        0
-      )
+    ? filteredData.reduce((sum, u) => {
+        const stats = u.stats || u || {};
+        return sum + (stats.finalNet || stats.totalSalary || 0);
+      }, 0)
     : filteredData.reduce((sum, u) => {
         const stats = u.stats || u || {};
         const userName = u.name || u.userName || "";
@@ -92,22 +115,6 @@ export default function PayrollAdminClient({
         return sum + (stats.totalSalary || 0) + bonus;
       }, 0);
 
-  const handleDownloadXLSX = () => {
-    try {
-      exportFullPayrollXLSX(
-        filteredData as PayrollExportUser[],
-        month,
-        year,
-        closedState,
-        bonusPercent,
-        bonusTargets
-      );
-      toast.success("Đã xuất file Excel bảng lương!");
-    } catch (err: any) {
-      toast.error("Lỗi khi xuất file Excel: " + (err?.message || ""));
-    }
-  };
-
   const handleDownloadSingleXLSX = (user: any) => {
     try {
       exportSingleEmployeeXLSX(
@@ -121,41 +128,6 @@ export default function PayrollAdminClient({
       toast.success(`Đã xuất phiếu lương cho ${user.name}!`);
     } catch (err: any) {
       toast.error("Lỗi xuất phiếu lương: " + (err?.message || ""));
-    }
-  };
-
-  const handleAddAdjustment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedUser) return;
-
-    const parsedAmount = parseInt(amount, 10);
-    if (isNaN(parsedAmount)) {
-      toast.error("Số tiền không hợp lệ.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await api.post("/api/admin/adjustments", {
-        userId: selectedUser.id,
-        amount: parsedAmount,
-        reason,
-        month,
-        year,
-      });
-      toast.success("Đã lưu điều chỉnh lương!");
-      setAmount("");
-      setReason("");
-      setSelectedUser(null);
-      if (onRefresh) onRefresh();
-    } catch {
-      toast.success("Đã lưu điều chỉnh lương (Ghi nhận tức thì)!");
-      setAmount("");
-      setReason("");
-      setSelectedUser(null);
-      if (onRefresh) onRefresh();
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -256,7 +228,8 @@ export default function PayrollAdminClient({
               value={`${year}-${month}`}
               onChange={(e) => {
                 const [yStr, mStr] = e.target.value.split("-");
-                if (onMonthChange) onMonthChange(parseInt(mStr), parseInt(yStr));
+                if (onMonthChange)
+                  onMonthChange(parseInt(mStr), parseInt(yStr));
               }}
               className="flex h-10 sm:h-9 w-full rounded-md border border-input bg-white px-3 py-1 text-base sm:text-sm shadow-sm"
             >
@@ -324,14 +297,7 @@ export default function PayrollAdminClient({
                       <input
                         type="checkbox"
                         checked={bonusTargets.includes("PART_TIME")}
-                        onChange={(e) => {
-                          if (e.target.checked)
-                            setBonusTargets([...bonusTargets, "PART_TIME"]);
-                          else
-                            setBonusTargets(
-                              bonusTargets.filter((t) => t !== "PART_TIME")
-                            );
-                        }}
+                        onChange={() => toggleBonusTarget("PART_TIME")}
                         className="rounded border-gray-300"
                       />
                       <span className="text-sm">Part-time</span>
@@ -340,14 +306,7 @@ export default function PayrollAdminClient({
                       <input
                         type="checkbox"
                         checked={bonusTargets.includes("FULL_TIME")}
-                        onChange={(e) => {
-                          if (e.target.checked)
-                            setBonusTargets([...bonusTargets, "FULL_TIME"]);
-                          else
-                            setBonusTargets(
-                              bonusTargets.filter((t) => t !== "FULL_TIME")
-                            );
-                        }}
+                        onChange={() => toggleBonusTarget("FULL_TIME")}
                         className="rounded border-gray-300"
                       />
                       <span className="text-sm">Full-time</span>
@@ -373,7 +332,7 @@ export default function PayrollAdminClient({
           <Button
             id="payroll-export-btn"
             variant="outline"
-            onClick={handleDownloadXLSX}
+            onClick={openExport}
             className="flex-1 sm:flex-initial min-h-[38px] text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-xs sm:text-sm"
           >
             <FileText className="h-4 w-4 mr-1.5" />
@@ -412,7 +371,10 @@ export default function PayrollAdminClient({
         />
       </div>
 
-      <div id="payroll-table-container" className="rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div
+        id="payroll-table-container"
+        className="rounded-xl border bg-white shadow-sm overflow-hidden"
+      >
         <div className="relative w-full overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch]">
           <table className="w-full caption-bottom text-sm text-left min-w-[780px]">
             <thead className="[&_tr]:border-b bg-gray-50/70">
@@ -452,7 +414,11 @@ export default function PayrollAdminClient({
                   totalSalary: user.totalSalary || 0,
                   baseSalary: user.baseSalary || 0,
                   totalHours: user.totalHours || user.actualHours || 0,
-                  employmentType: user.employmentType || (user.department === "Toàn thời gian" ? "FULL_TIME" : "PART_TIME"),
+                  employmentType:
+                    user.employmentType ||
+                    (user.department === "Toàn thời gian"
+                      ? "FULL_TIME"
+                      : "PART_TIME"),
                   totalAdjustments: user.allowance || 0,
                 };
                 const isThuKpiSalary =
@@ -505,7 +471,8 @@ export default function PayrollAdminClient({
                               {(Number(stats.totalHours) || 0).toFixed(1)}h
                             </span>
                             <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground font-sans">
-                              {stats.daysWorked || 22}/{stats.standardDays || 26} công
+                              {stats.daysWorked || 22}/
+                              {stats.standardDays || 26} công
                             </span>
                           </div>
                           {stats.leaveCount > 0 && (
@@ -526,22 +493,13 @@ export default function PayrollAdminClient({
                     <td className="p-4 align-middle text-center w-8">
                       {!closedState &&
                         (bonusTargets.includes(stats.employmentType) ||
-                          (isThuKpiSalary && bonusTargets.includes("PART_TIME"))) && (
+                          (isThuKpiSalary &&
+                            bonusTargets.includes("PART_TIME"))) && (
                           <input
                             type="checkbox"
                             className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                             checked={!excludedUsers.includes(userId)}
-                            onChange={(e) => {
-                              if (e.target.checked)
-                                setExcludedUsers(
-                                  excludedUsers.filter((id) => id !== userId)
-                                );
-                              else
-                                setExcludedUsers([
-                                  ...excludedUsers,
-                                  userId,
-                                ]);
-                            }}
+                            onChange={() => toggleExcludeUser(userId)}
                             title="Tích để nhận thưởng, bỏ tích để loại khỏi thưởng"
                           />
                         )}
@@ -583,7 +541,7 @@ export default function PayrollAdminClient({
                           variant="outline"
                           size="sm"
                           className="h-9 min-h-[36px] min-w-[36px] px-2.5 font-bold"
-                          onClick={() => setSelectedUser(user)}
+                          onClick={() => openAdjustment(user)}
                           title="Thưởng/Phạt"
                           disabled={closedState}
                         >
@@ -628,75 +586,26 @@ export default function PayrollAdminClient({
         </div>
       </div>
 
-      {/* Modal */}
-      {selectedUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-in fade-in zoom-in-95">
-            <h3 className="text-lg font-bold mb-1">Điều chỉnh lương</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Nhân viên: <b>{selectedUser.name}</b>
-            </p>
+      {/* Modular Modals */}
+      <PayrollAdjustmentDialog
+        open={isAdjustmentOpen}
+        employee={selectedEmployee}
+        month={month}
+        year={year}
+        onClose={closeAdjustment}
+        onSuccess={onRefresh}
+      />
 
-            <form onSubmit={handleAddAdjustment} className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">
-                  Số tiền (+ Thưởng, - Phạt)
-                </label>
-                <Input
-                  type="number"
-                  placeholder="VD: 50000 hoặc -20000"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                  autoFocus
-                />
-                <div className="flex gap-2 text-xs">
-                  <span
-                    className="cursor-pointer text-blue-600 underline"
-                    onClick={() => {
-                      setAmount("50000");
-                      setReason("Thưởng Streak tuần");
-                    }}
-                  >
-                    +50k (Streak)
-                  </span>
-                  <span
-                    className="cursor-pointer text-red-600 underline"
-                    onClick={() => {
-                      setAmount("-50000");
-                      setReason("Đi muộn > 15p");
-                    }}
-                  >
-                    -50k (Muộn)
-                  </span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Lý do</label>
-                <Input
-                  placeholder="VD: Thưởng doanh số..."
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => setSelectedUser(null)}
-                >
-                  Hủy
-                </Button>
-                <Button type="submit" disabled={isSubmitting}>
-                  Lưu
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <PayrollExportModal
+        open={isExportOpen}
+        data={filteredData}
+        month={month}
+        year={year}
+        closedState={closedState}
+        bonusPercent={bonusPercent}
+        bonusTargets={bonusTargets}
+        onClose={closeExport}
+      />
     </div>
   );
 }

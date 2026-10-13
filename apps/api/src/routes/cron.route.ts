@@ -37,6 +37,10 @@ cronRoute.use("*", async (c, next) => {
 cronRoute.get("/auto-schedule", async (c) => {
   try {
     const result = await autoScheduleAdminNa(12);
+    await Promise.all([
+      invalidateCachePattern("shifts:*"),
+      invalidateCachePattern("admin:schedule:*"),
+    ]).catch(() => {});
     return c.json({
       success: true,
       result,
@@ -219,6 +223,8 @@ cronRoute.get("/all", async (c) => {
     invalidatePayrollCache(),
     invalidateCachePattern("staff:payroll:*"),
     invalidateCachePattern("stats:*"),
+    invalidateCachePattern("shifts:*"),
+    invalidateCachePattern("admin:schedule:*"),
   ]).catch(() => {});
 
   return c.json({

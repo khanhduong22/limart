@@ -14,12 +14,19 @@ import type {
 } from "@/types";
 import {
   ReviewPendingTab,
-  TaskHistoryTab,
-  TaskDefinitionsTab,
-  MarketplaceTab,
   computeOverduePenalty,
   filterReviewedTasks,
 } from "@/components/tasks/wfh";
+
+const TaskHistoryTab = React.lazy(() =>
+  import("@/components/tasks/wfh").then((m) => ({ default: m.TaskHistoryTab }))
+);
+const TaskDefinitionsTab = React.lazy(() =>
+  import("@/components/tasks/wfh").then((m) => ({ default: m.TaskDefinitionsTab }))
+);
+const MarketplaceTab = React.lazy(() =>
+  import("@/components/tasks/wfh").then((m) => ({ default: m.MarketplaceTab }))
+);
 
 const ReviewSubmissionDialog = React.lazy(
   () => import("@/components/tasks/wfh/ReviewSubmissionDialog")
@@ -284,44 +291,68 @@ export function TasksPage() {
 
         {/* 2. HISTORY TAB */}
         <TabsContent value="history">
-          <TaskHistoryTab
-            reviewedTasks={reviewedTasks}
-            historyMonth={historyMonth}
-            onHistoryMonthChange={setHistoryMonth}
-          />
+          <React.Suspense
+            fallback={
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                Đang tải...
+              </div>
+            }
+          >
+            <TaskHistoryTab
+              reviewedTasks={reviewedTasks}
+              historyMonth={historyMonth}
+              onHistoryMonthChange={setHistoryMonth}
+            />
+          </React.Suspense>
         </TabsContent>
 
         {/* 3. TASK DEFINITIONS TAB */}
         <TabsContent value="definitions">
-          <TaskDefinitionsTab
-            definitions={definitions}
-            isLoadingDefs={isLoadingDefs}
-            defSearch={defSearch}
-            onDefSearchChange={setDefSearch}
-            defStatusFilter={defStatusFilter}
-            onDefStatusFilterChange={setDefStatusFilter}
-            onOpenCreate={() => setIsCreateOpen(true)}
-            onOpenEdit={openEditDef}
-            onToggleActive={toggleActive}
-            onDeleteDef={handleDeleteDef}
-          />
+          <React.Suspense
+            fallback={
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                Đang tải...
+              </div>
+            }
+          >
+            <TaskDefinitionsTab
+              definitions={definitions}
+              isLoadingDefs={isLoadingDefs}
+              defSearch={defSearch}
+              onDefSearchChange={setDefSearch}
+              defStatusFilter={defStatusFilter}
+              onDefStatusFilterChange={setDefStatusFilter}
+              onOpenCreate={() => setIsCreateOpen(true)}
+              onOpenEdit={openEditDef}
+              onToggleActive={toggleActive}
+              onDeleteDef={handleDeleteDef}
+            />
+          </React.Suspense>
         </TabsContent>
 
         {/* 4. MARKETPLACE TAB */}
         <TabsContent value="items">
-          <MarketplaceTab
-            taskItems={taskItems}
-            isLoadingItems={isLoadingItems}
-            itemSearch={itemSearch}
-            onItemSearchChange={setItemSearch}
-            itemStatusFilter={itemStatusFilter}
-            onItemStatusFilterChange={setItemStatusFilter}
-            onOpenCreateItem={() => setIsCreateItemOpen(true)}
-            onViewItem={setViewingItem}
-            onCloseItem={closeTaskItem}
-            onResetItem={resetTaskItem}
-            onDeleteItem={deleteTaskItem}
-          />
+          <React.Suspense
+            fallback={
+              <div className="p-8 text-center text-xs text-muted-foreground">
+                Đang tải...
+              </div>
+            }
+          >
+            <MarketplaceTab
+              taskItems={taskItems}
+              isLoadingItems={isLoadingItems}
+              itemSearch={itemSearch}
+              onItemSearchChange={setItemSearch}
+              itemStatusFilter={itemStatusFilter}
+              onItemStatusFilterChange={setItemStatusFilter}
+              onOpenCreateItem={() => setIsCreateItemOpen(true)}
+              onViewItem={setViewingItem}
+              onCloseItem={closeTaskItem}
+              onResetItem={resetTaskItem}
+              onDeleteItem={deleteTaskItem}
+            />
+          </React.Suspense>
         </TabsContent>
       </Tabs>
 

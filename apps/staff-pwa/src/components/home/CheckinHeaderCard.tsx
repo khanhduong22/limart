@@ -87,6 +87,7 @@ export const CheckinHeaderCard: React.FC<CheckinHeaderCardProps> = ({
               decoding="async"
               className="h-full w-full object-cover"
               onError={(e) => {
+                e.currentTarget.onerror = null;
                 const target = e.currentTarget;
                 if (!target.src.endsWith("/capybara_mascot.webp")) {
                   target.src = "/capybara_mascot.webp";
@@ -166,6 +167,7 @@ export const CheckinHeaderCard: React.FC<CheckinHeaderCardProps> = ({
             decoding="async"
             className="h-full w-full object-cover"
             onError={(e) => {
+              e.currentTarget.onerror = null;
               const target = e.currentTarget;
               if (!target.src.endsWith("/icon-192.png")) {
                 target.src = "/icon-192.png";

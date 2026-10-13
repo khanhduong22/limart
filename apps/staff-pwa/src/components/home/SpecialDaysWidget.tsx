@@ -185,6 +185,7 @@ export default function SpecialDaysWidget({
                     decoding="async"
                     className="w-full h-full rounded-full object-cover"
                     onError={(e) => {
+                      e.currentTarget.onerror = null;
                       const target = e.currentTarget;
                       if (!target.src.endsWith("/capybara_mascot.webp")) {
                         target.src = "/capybara_mascot.webp";

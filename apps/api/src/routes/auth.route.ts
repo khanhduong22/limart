@@ -255,34 +255,32 @@ authRoute.get("/audit-logs", authMiddleware, adminMiddleware, async (c) => {
     ];
   }
 
-  const [total, logs] = await Promise.all([
-    prisma.sessionAuditLog.count({ where }),
-    prisma.sessionAuditLog.findMany({
-      where,
-      take: limit,
-      skip: (page - 1) * limit,
-      orderBy: { createdAt: "desc" },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-            role: true,
+  const cacheKey = `auth:audit-logs:${page}:${limit}:${action || "ALL"}:${status || "ALL"}:${userId || "ALL"}:${search || "NONE"}`;
+  const result = await getOrSetCache(cacheKey, 30, async () => {
+    const [total, logs] = await Promise.all([
+      prisma.sessionAuditLog.count({ where }),
+      prisma.sessionAuditLog.findMany({
+        where,
+        take: limit,
+        skip: (page - 1) * limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, image: true, role: true },
           },
         },
-      },
-    }),
-  ]);
+      }),
+    ]);
+    return { total, logs, totalPages: Math.ceil(total / limit) };
+  });
 
   return c.json({
     success: true,
-    total,
+    total: result.total,
     page,
     limit,
-    totalPages: Math.ceil(total / limit),
-    logs,
+    totalPages: result.totalPages,
+    logs: result.logs,
   });
 });
 

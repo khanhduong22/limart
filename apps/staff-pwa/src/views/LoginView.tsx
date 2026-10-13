@@ -105,7 +105,11 @@ export const LoginView: React.FC = () => {
               fetchPriority="high"
               className="w-full h-full object-cover"
               onError={(e) => {
-                (e.target as any).src = "/logo.png";
+                e.currentTarget.onerror = null;
+                const target = e.currentTarget;
+                if (!target.src.endsWith("/logo.png")) {
+                  target.src = "/logo.png";
+                }
               }}
             />
           </div>

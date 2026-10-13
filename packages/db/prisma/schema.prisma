@@ -146,6 +146,7 @@ model Request {
   @@index([userId, createdAt])
   @@index([date])
   @@index([userId, status])
+  @@index([status, createdAt])
   @@index([createdAt])
 }
 
@@ -360,6 +361,7 @@ model UserTask {
   @@index([taskDefId])
   @@index([taskItemId])
   @@index([status, updatedAt])
+  @@index([status, submittedAt])
 }
 
 model PayrollPeriod {
@@ -574,6 +576,7 @@ model SessionAuditLog {
   @@index([userId, createdAt])
   @@index([action, createdAt])
   @@index([status, createdAt])
+  @@index([action, status, createdAt])
   @@index([createdAt])
 }
 

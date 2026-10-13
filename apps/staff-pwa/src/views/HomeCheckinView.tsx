@@ -5,8 +5,8 @@ import {
   StaffHomeData,
 } from "@/lib/api-client";
 import CheckInButtons from "@/components/CheckInButtons";
-import HomeAnnouncements from "@/components/HomeAnnouncements";
 import PrivacyStats from "@/components/PrivacyStats";
+const HomeAnnouncements = lazy(() => import("@/components/HomeAnnouncements"));
 const AnnouncementBar = lazy(() => import("@/components/AnnouncementBar"));
 const ShiftDutyHomeWidget = lazy(() => import("@/components/shift-duty/ShiftDutyHomeWidget"));
 const GachaButton = lazy(() => import("@/components/GachaButton"));
@@ -177,7 +177,9 @@ export const HomeCheckinView: React.FC = () => {
 
             {/* Internal Announcements List */}
             <div id="home-announcements-list">
-              <HomeAnnouncements announcements={announcements || []} />
+              <Suspense fallback={null}>
+                <HomeAnnouncements announcements={announcements || []} />
+              </Suspense>
             </div>
 
             {/* Shift Duties Widget */}

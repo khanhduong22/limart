@@ -2023,70 +2023,75 @@ staffRoute.get("/staff-tasks", authMiddleware, async (c) => {
     }
 
     const targetUserId = isAdmin && c.req.query("userId") ? c.req.query("userId") : (!isAdmin ? userId : undefined);
-    const whereClause: any = {};
-    if (targetUserId) {
-      whereClause.assigneeId = targetUserId;
-    }
+    const cacheKey = `staff:staff-tasks:${targetUserId || "all"}`;
+    const data = await getOrSetCache(cacheKey, 60, async () => {
+      const whereClause: any = {};
+      if (targetUserId) {
+        whereClause.assigneeId = targetUserId;
+      }
 
-    const tasks = await prisma.staffTask.findMany({
-      where: whereClause,
-      include: {
-        assignee: { select: { id: true, name: true, email: true, image: true } },
-        createdBy: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+      const tasks = await prisma.staffTask.findMany({
+        where: whereClause,
+        include: {
+          assignee: { select: { id: true, name: true, email: true, image: true } },
+          createdBy: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      });
 
-    const effectiveStatsUserId = targetUserId || userId;
-    const { startDate: monthStart, endDate: monthEnd } = getVietnamMonthRange();
+      const effectiveStatsUserId = targetUserId || userId;
+      const { startDate: monthStart, endDate: monthEnd } = getVietnamMonthRange();
 
-    const now = new Date();
-    const vnNow = new Date(now.getTime() + VN_OFFSET_MS);
-    const currentDay = vnNow.getUTCDay();
-    const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
-    const weekStartLocal = new Date(vnNow);
-    weekStartLocal.setUTCDate(vnNow.getUTCDate() + diffToMonday);
-    weekStartLocal.setUTCHours(0, 0, 0, 0);
-    const weekStart = new Date(weekStartLocal.getTime() - VN_OFFSET_MS);
-    const weekEndLocal = new Date(weekStartLocal);
-    weekEndLocal.setUTCDate(weekStartLocal.getUTCDate() + 6);
-    weekEndLocal.setUTCHours(23, 59, 59, 999);
-    const weekEnd = new Date(weekEndLocal.getTime() - VN_OFFSET_MS);
+      const now = new Date();
+      const vnNow = new Date(now.getTime() + VN_OFFSET_MS);
+      const currentDay = vnNow.getUTCDay();
+      const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay;
+      const weekStartLocal = new Date(vnNow);
+      weekStartLocal.setUTCDate(vnNow.getUTCDate() + diffToMonday);
+      weekStartLocal.setUTCHours(0, 0, 0, 0);
+      const weekStart = new Date(weekStartLocal.getTime() - VN_OFFSET_MS);
+      const weekEndLocal = new Date(weekStartLocal);
+      weekEndLocal.setUTCDate(weekStartLocal.getUTCDate() + 6);
+      weekEndLocal.setUTCHours(23, 59, 59, 999);
+      const weekEnd = new Date(weekEndLocal.getTime() - VN_OFFSET_MS);
 
-    const userTasksForStats = tasks.filter((t) => t.assigneeId === effectiveStatsUserId);
+      const userTasksForStats = tasks.filter((t) => t.assigneeId === effectiveStatsUserId);
 
-    const calcStats = (taskList: typeof tasks) => {
-      const total = taskList.length;
-      const approved = taskList.filter((t) => t.status === "APPROVED").length;
-      const doing = taskList.filter((t) => t.status === "DOING").length;
-      const pendingReview = taskList.filter((t) => t.status === "DONE").length;
-      const overdue = taskList.filter(
-        (t) => t.deadline && new Date(t.deadline) < now && t.status !== "APPROVED"
-      ).length;
-      const completionRate = total > 0 ? approved / total : 0;
-      return { total, approved, doing, pendingReview, overdue, completionRate };
-    };
+      const calcStats = (taskList: typeof tasks) => {
+        const total = taskList.length;
+        const approved = taskList.filter((t) => t.status === "APPROVED").length;
+        const doing = taskList.filter((t) => t.status === "DOING").length;
+        const pendingReview = taskList.filter((t) => t.status === "DONE").length;
+        const overdue = taskList.filter(
+          (t) => t.deadline && new Date(t.deadline) < now && t.status !== "APPROVED"
+        ).length;
+        const completionRate = total > 0 ? approved / total : 0;
+        return { total, approved, doing, pendingReview, overdue, completionRate };
+      };
 
-    const monthlyTasks = userTasksForStats.filter((t) => {
-      const d = t.startDate ? new Date(t.startDate) : new Date(t.createdAt);
-      return d >= monthStart && d <= monthEnd;
-    });
+      const monthlyTasks = userTasksForStats.filter((t) => {
+        const d = t.startDate ? new Date(t.startDate) : new Date(t.createdAt);
+        return d >= monthStart && d <= monthEnd;
+      });
 
-    const weeklyTasks = userTasksForStats.filter((t) => {
-      const d = t.startDate ? new Date(t.startDate) : new Date(t.createdAt);
-      return d >= weekStart && d <= weekEnd;
-    });
+      const weeklyTasks = userTasksForStats.filter((t) => {
+        const d = t.startDate ? new Date(t.startDate) : new Date(t.createdAt);
+        return d >= weekStart && d <= weekEnd;
+      });
 
-    return c.json({
-      success: true,
-      allowed: true,
-      data: {
+      return {
         tasks,
         stats: {
           monthly: calcStats(monthlyTasks),
           weekly: calcStats(weeklyTasks),
         },
-      },
+      };
+    });
+
+    return c.json({
+      success: true,
+      allowed: true,
+      data,
     });
   } catch (err: any) {
     return c.json(
@@ -2165,13 +2170,105 @@ staffRoute.post("/staff-tasks/:id/toggle", authMiddleware, async (c) => {
       },
     });
 
-    await invalidateCachePattern("payroll:*");
-    await invalidateCachePattern("staff-tasks:stats:*");
+    await Promise.all([
+      invalidateCachePattern("staff:staff-tasks:*"),
+      invalidateCachePattern("tasks:staff-tasks:*"),
+      invalidateCachePattern("staff-tasks:stats:*"),
+      invalidateCachePattern("payroll:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
       message: "Cập nhật tiến độ thành công!",
       data: updated,
+      task: updated,
+    });
+  } catch (err: any) {
+    return c.json(
+      { success: false, error: err?.message || "Lỗi cập nhật công việc" },
+      500
+    );
+  }
+});
+
+// POST /api/staff/staff-tasks/:id/status
+staffRoute.post("/staff-tasks/:id/status", authMiddleware, async (c) => {
+  try {
+    const tokenPayload = c.get("user");
+    const userId = tokenPayload.sub;
+    const role = tokenPayload.role;
+    const taskId = c.req.param("id");
+    if (!taskId) {
+      return c.json({ success: false, error: "Thiếu mã công việc" }, 400);
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, staffTasksAllowed: true },
+    });
+    if (!user) return c.json({ success: false, error: "User not found" }, 404);
+
+    const isAdmin = role === "ADMIN" || user.role === "ADMIN";
+    const isPartner = role === "PARTNER" || user.role === "PARTNER";
+    const isAllowed = isAdmin || isPartner || user.staffTasksAllowed;
+    if (!isAllowed) {
+      return c.json({ success: false, error: "Bạn không có quyền truy cập Công việc và KPI" }, 403);
+    }
+
+    const task = await prisma.staffTask.findUnique({ where: { id: taskId } });
+    if (!task) {
+      return c.json({ success: false, error: "Không tìm thấy công việc" }, 404);
+    }
+
+    if (!isAdmin && task.assigneeId !== userId) {
+      return c.json({ success: false, error: "Bạn không có quyền chỉnh sửa công việc này" }, 403);
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    const nextStatus = body.status;
+
+    if (!nextStatus) {
+      return c.json({ success: false, error: "Thiếu trạng thái cập nhật" }, 400);
+    }
+
+    if (!isAdmin && !["TODO", "DOING", "DONE"].includes(nextStatus)) {
+      return c.json({ success: false, error: "Trạng thái không hợp lệ cho nhân viên" }, 400);
+    }
+
+    const updateData: any = {
+      status: nextStatus,
+    };
+
+    if (nextStatus === "DONE") {
+      updateData.submittedAt = new Date();
+      if (body.evidenceLink !== undefined) updateData.evidenceLink = body.evidenceLink;
+      const noteVal = body.evidenceNote !== undefined ? body.evidenceNote : body.note;
+      if (noteVal !== undefined) updateData.evidenceNote = noteVal;
+    } else if (nextStatus === "APPROVED") {
+      updateData.completedAt = new Date();
+    }
+
+    const updated = await prisma.staffTask.update({
+      where: { id: taskId },
+      data: updateData,
+      include: {
+        assignee: { select: { id: true, name: true, email: true, image: true } },
+        createdBy: { select: { id: true, name: true } },
+      },
+    });
+
+    await Promise.all([
+      invalidateCachePattern("staff:staff-tasks:*"),
+      invalidateCachePattern("tasks:staff-tasks:*"),
+      invalidateCachePattern("staff-tasks:stats:*"),
+      invalidateCachePattern("payroll:*"),
+    ]).catch(() => {});
+
+    return c.json({
+      success: true,
+      message: "Cập nhật tiến độ thành công!",
+      data: updated,
+      task: updated,
     });
   } catch (err: any) {
     return c.json(

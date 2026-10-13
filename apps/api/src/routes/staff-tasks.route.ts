@@ -375,6 +375,7 @@ staffTasksRoute.post("/", authMiddleware, async (c) => {
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
     await invalidateCachePattern("tasks:staff-tasks:*");
+    await invalidateCachePattern("staff:staff-tasks:*");
 
     return c.json({ success: true, data: task, task }, 201);
   } catch (err: any) {
@@ -489,6 +490,7 @@ async function handleUpdateTask(c: any) {
       await invalidateCachePattern("stats:*");
       await invalidateCachePattern("staff-tasks:stats:*");
       await invalidateCachePattern("tasks:staff-tasks:*");
+    await invalidateCachePattern("staff:staff-tasks:*");
 
       return c.json({ success: true, data: updated, task: updated });
     }
@@ -558,6 +560,7 @@ async function handleUpdateTask(c: any) {
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
     await invalidateCachePattern("tasks:staff-tasks:*");
+    await invalidateCachePattern("staff:staff-tasks:*");
 
     return c.json({ success: true, data: updated, task: updated });
   } catch (err: any) {
@@ -656,6 +659,7 @@ staffTasksRoute.patch("/:id/status", authMiddleware, async (c) => {
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
     await invalidateCachePattern("tasks:staff-tasks:*");
+    await invalidateCachePattern("staff:staff-tasks:*");
 
     return c.json({ success: true, data: updated, task: updated });
   } catch (err: any) {
@@ -703,6 +707,7 @@ staffTasksRoute.post("/bulk-status", authMiddleware, async (c) => {
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
     await invalidateCachePattern("tasks:staff-tasks:*");
+    await invalidateCachePattern("staff:staff-tasks:*");
 
     return c.json({
       success: true,
@@ -764,6 +769,7 @@ staffTasksRoute.post("/:id/approve", authMiddleware, async (c) => {
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
     await invalidateCachePattern("tasks:staff-tasks:*");
+    await invalidateCachePattern("staff:staff-tasks:*");
 
     return c.json({ success: true, message: "Đã duyệt nhiệm vụ thành công", data: updated, task: updated });
   } catch (err: any) {
@@ -821,6 +827,7 @@ staffTasksRoute.post("/:id/reject", authMiddleware, async (c) => {
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
     await invalidateCachePattern("tasks:staff-tasks:*");
+    await invalidateCachePattern("staff:staff-tasks:*");
 
     return c.json({ success: true, message: "Đã từ chối nhiệm vụ", data: updated, task: updated });
   } catch (err: any) {
@@ -859,6 +866,7 @@ staffTasksRoute.delete("/:id", authMiddleware, async (c) => {
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
     await invalidateCachePattern("tasks:staff-tasks:*");
+    await invalidateCachePattern("staff:staff-tasks:*");
 
     return c.json({ success: true, message: "Đã xóa nhiệm vụ thành công!" });
   } catch (err: any) {

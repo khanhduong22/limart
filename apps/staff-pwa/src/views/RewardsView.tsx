@@ -135,6 +135,7 @@ export const RewardsView: React.FC = () => {
                           loading="lazy"
                           decoding="async"
                           onError={(e) => {
+                            e.currentTarget.onerror = null;
                             const target = e.currentTarget;
                             if (!target.src.endsWith("/capybara_mascot.webp")) {
                               target.src = "/capybara_mascot.webp";

@@ -1,5 +1,5 @@
 import { prisma } from "@checkin/db";
-import { getRedisClient } from "./cache";
+import { getRedisClient, invalidateCachePattern } from "./cache";
 import {
   GENESIS_HASH,
   computeEntryHash,
@@ -150,12 +150,16 @@ export async function recordSecureAuditLog(params: RecordSecureAuditLogParams) {
       await redis.set("audit:latest_hash", hash, "EX", 86400).catch(() => null);
     }
 
+    await invalidateCachePattern("auth:audit-logs:*").catch(() => null);
+
     return createdLog;
   } catch (err: any) {
     console.warn("[Audit Warning] Failed to record secure audit log:", err);
     return null;
   }
 }
+
+export const logSessionAudit = recordSecureAuditLog;
 
 /**
  * Converts a database SessionAuditLog or mock into an AuditEntry for chain verification.

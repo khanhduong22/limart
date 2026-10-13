@@ -11,10 +11,14 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import DeletePrizeButton from "@/components/admin/DeletePrizeButton";
-import AllowedUsersManagerClient from "@/components/admin/AllowedUsersManagerClient";
-import LuckyWheelHistoryClient from "@/components/admin/LuckyWheelHistoryClient";
 import { useEmployees } from "@/hooks/useAdminData";
 
+const AllowedUsersManagerClient = React.lazy(
+  () => import("@/components/admin/AllowedUsersManagerClient")
+);
+const LuckyWheelHistoryClient = React.lazy(
+  () => import("@/components/admin/LuckyWheelHistoryClient")
+);
 const PrizeDialog = React.lazy(
   () => import("@/components/admin/PrizeDialog")
 );
@@ -128,14 +132,16 @@ export function LuckyWheelPage() {
       </div>
 
       {/* Allowed Users Manager */}
-      <AllowedUsersManagerClient
-        users={employees.map((e) => ({
-          id: e.id,
-          name: e.name,
-          email: e.email,
-          luckyWheelAllowed: true,
-        }))}
-      />
+      <React.Suspense fallback={null}>
+        <AllowedUsersManagerClient
+          users={employees.map((e) => ({
+            id: e.id,
+            name: e.name,
+            email: e.email,
+            luckyWheelAllowed: true,
+          }))}
+        />
+      </React.Suspense>
 
       {/* Prizes Table */}
       <Card id="lucky-wheel-prizes-list" className="bg-white">
@@ -217,7 +223,9 @@ export function LuckyWheelPage() {
       </Card>
 
       {/* Lucky Wheel History */}
-      <LuckyWheelHistoryClient initialHistory={history} />
+      <React.Suspense fallback={null}>
+        <LuckyWheelHistoryClient initialHistory={history} />
+      </React.Suspense>
     </div>
   );
 }

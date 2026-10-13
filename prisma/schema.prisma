@@ -310,6 +310,8 @@ model TaskItem {
 
   @@index([taskDefId])
   @@index([assigneeId])
+  @@index([status, createdAt])
+  @@index([createdAt])
 }
 
 model UserTask {
@@ -338,6 +340,7 @@ model UserTask {
   @@index([userId])
   @@index([userId, status])
   @@index([userId, createdAt])
+  @@index([userId, updatedAt])
   @@index([createdAt])
   @@index([taskDefId])
   @@index([taskItemId])
@@ -484,6 +487,7 @@ model ManagerChecklistCompletion {
   task ManagerChecklistTask @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, date])
+  @@index([taskId])
   @@index([date, completed])
 }
 

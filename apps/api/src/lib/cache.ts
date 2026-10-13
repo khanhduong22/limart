@@ -227,6 +227,7 @@ export async function invalidateScheduleCache(): Promise<void> {
 export async function invalidatePayrollCache(): Promise<void> {
   try {
     await invalidateCachePattern("payroll:*");
+    await invalidateCachePattern("staff:payroll:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("stats:monthly:*");
     await invalidateCachePattern("admin:dashboard*");

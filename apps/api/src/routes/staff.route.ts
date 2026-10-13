@@ -837,19 +837,19 @@ staffRoute.get("/payroll", authMiddleware, async (c) => {
     const month = monthQuery ? parseInt(monthQuery, 10) : now.getMonth() + 1;
     const year = yearQuery ? parseInt(yearQuery, 10) : now.getFullYear();
 
-    const targetDate = new Date(year, month - 1, 15);
-    const [stats, period] = await Promise.all([
-      calculateUserMonthlyStats(userId, targetDate),
-      prisma.payrollPeriod.findUnique({
-        where: { month_year: { month, year } },
-      }),
-    ]);
+    const cacheKey = "staff:payroll:" + userId + ":" + month + ":" + year;
+    const payload = await getOrSetCache(cacheKey, 120, async () => {
+      const targetDate = new Date(year, month - 1, 15);
+      const [stats, period] = await Promise.all([
+        calculateUserMonthlyStats(userId, targetDate),
+        prisma.payrollPeriod.findUnique({
+          where: { month_year: { month, year } },
+        }),
+      ]);
 
-    const isClosed = period?.status === "CLOSED" || period?.status === "LOCKED";
+      const isClosed = period?.status === "CLOSED" || period?.status === "LOCKED";
 
-    return c.json({
-      success: true,
-      data: {
+      return {
         stats: stats || {
           totalHours: 0,
           totalSalary: 0,
@@ -864,7 +864,12 @@ staffRoute.get("/payroll", authMiddleware, async (c) => {
         isClosed,
         month,
         year,
-      },
+      };
+    });
+
+    return c.json({
+      success: true,
+      data: payload,
     });
   } catch (err: any) {
     return c.json(
@@ -880,10 +885,13 @@ staffRoute.get("/history", authMiddleware, async (c) => {
     const tokenPayload = c.get("user");
     const userId = tokenPayload.sub;
 
-    const history = await prisma.checkIn.findMany({
-      where: { userId },
-      orderBy: { timestamp: "desc" },
-      take: 100,
+    const cacheKey = "staff:history:" + userId;
+    const history = await getOrSetCache(cacheKey, 60, async () => {
+      return prisma.checkIn.findMany({
+        where: { userId },
+        orderBy: { timestamp: "desc" },
+        take: 100,
+      });
     });
 
     return c.json({
@@ -904,9 +912,12 @@ staffRoute.get("/requests", authMiddleware, async (c) => {
     const tokenPayload = c.get("user");
     const userId = tokenPayload.sub;
 
-    const requests = await prisma.request.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
+    const cacheKey = "user:requests:" + userId;
+    const requests = await getOrSetCache(cacheKey, 60, async () => {
+      return prisma.request.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+      });
     });
 
     return c.json({
@@ -1229,10 +1240,12 @@ staffRoute.post("/duties/:id/toggle", authMiddleware, async (c) => {
 // GET /api/staff/tasks/market
 staffRoute.get("/tasks/market", authMiddleware, async (c) => {
   try {
-    const items = await prisma.taskItem.findMany({
-      where: { status: "OPEN" },
-      include: { taskDefinition: true },
-      orderBy: { createdAt: "desc" },
+    const items = await getOrSetCache("tasks:market:open", 60, async () => {
+      return prisma.taskItem.findMany({
+        where: { status: "OPEN" },
+        include: { taskDefinition: true },
+        orderBy: { createdAt: "desc" },
+      });
     });
     return c.json({ success: true, data: items });
   } catch (err: any) {
@@ -1243,12 +1256,14 @@ staffRoute.get("/tasks/market", authMiddleware, async (c) => {
 // GET /api/staff/tasks/available
 staffRoute.get("/tasks/available", authMiddleware, async (c) => {
   try {
-    const tasks = await prisma.taskDefinition.findMany({
-      where: {
-        active: true,
-        unit: { notIn: ["điểm", "điểm-bưng"] },
-      },
-      orderBy: { name: "asc" },
+    const tasks = await getOrSetCache("meta:task-definitions:available", 600, async () => {
+      return prisma.taskDefinition.findMany({
+        where: {
+          active: true,
+          unit: { notIn: ["điểm", "điểm-bưng"] },
+        },
+        orderBy: { name: "asc" },
+      });
     });
     return c.json({ success: true, data: tasks });
   } catch (err: any) {
@@ -1261,10 +1276,13 @@ staffRoute.get("/tasks/my", authMiddleware, async (c) => {
   try {
     const tokenPayload = c.get("user");
     const userId = tokenPayload.sub;
-    const tasks = await prisma.userTask.findMany({
-      where: { userId },
-      include: { taskDefinition: true, taskItem: true },
-      orderBy: { updatedAt: "desc" },
+    const cacheKey = "user:tasks:my:" + userId;
+    const tasks = await getOrSetCache(cacheKey, 60, async () => {
+      return prisma.userTask.findMany({
+        where: { userId },
+        include: { taskDefinition: true, taskItem: true },
+        orderBy: { updatedAt: "desc" },
+      });
     });
     return c.json({ success: true, data: tasks });
   } catch (err: any) {
@@ -1309,6 +1327,12 @@ staffRoute.post("/tasks/claim", authMiddleware, async (c) => {
       },
       include: { taskDefinition: true, taskItem: true },
     });
+
+    await Promise.all([
+      invalidateCachePattern("tasks:market:*"),
+      invalidateCachePattern("user:tasks:my:" + userId + "*"),
+      invalidateCachePattern("admin:tasks:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, message: "Nhận việc thành công!", data: userTask });
   } catch (err: any) {
@@ -1360,6 +1384,12 @@ staffRoute.post("/tasks/start", authMiddleware, async (c) => {
       include: { taskDefinition: true },
     });
 
+    await Promise.all([
+      invalidateCachePattern("tasks:market:*"),
+      invalidateCachePattern("user:tasks:my:" + userId + "*"),
+      invalidateCachePattern("admin:tasks:*"),
+    ]).catch(() => {});
+
     return c.json({ success: true, message: "Bắt đầu nhiệm vụ thành công!", data: userTask });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Lỗi khi bắt đầu nhiệm vụ" }, 500);
@@ -1399,7 +1429,12 @@ staffRoute.post("/tasks/submit", authMiddleware, async (c) => {
         include: { taskDefinition: true, taskItem: true },
       });
 
-      await invalidateCachePattern("admin:tasks:*").catch(() => {});
+      await Promise.all([
+        invalidateCachePattern("tasks:market:*"),
+        invalidateCachePattern("user:tasks:my:" + userId + "*"),
+        invalidateCachePattern("admin:tasks:*"),
+      ]).catch(() => {});
+
       return c.json({ success: true, message: "Nộp kết quả thành công!", data: updated });
     }
 
@@ -1430,7 +1465,11 @@ staffRoute.post("/tasks/submit", authMiddleware, async (c) => {
       include: { taskDefinition: true },
     });
 
-    await invalidateCachePattern("admin:tasks:*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("tasks:market:*"),
+      invalidateCachePattern("user:tasks:my:" + userId + "*"),
+      invalidateCachePattern("admin:tasks:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, message: "Nộp kết quả thành công!", data: userTask });
   } catch (error: any) {
@@ -1589,6 +1628,12 @@ staffRoute.post("/tasks/submit-packing", authMiddleware, async (c) => {
       include: { taskDefinition: true },
     });
 
+    await Promise.all([
+      invalidateCachePattern("tasks:market:*"),
+      invalidateCachePattern("user:tasks:my:" + userId + "*"),
+      invalidateCachePattern("admin:tasks:*"),
+    ]).catch(() => {});
+
     return c.json({
       success: true,
       message: "Khai báo đóng gói thành công!",
@@ -1637,6 +1682,12 @@ staffRoute.post("/tasks/submit-carrying", authMiddleware, async (c) => {
       },
       include: { taskDefinition: true },
     });
+
+    await Promise.all([
+      invalidateCachePattern("tasks:market:*"),
+      invalidateCachePattern("user:tasks:my:" + userId + "*"),
+      invalidateCachePattern("admin:tasks:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,

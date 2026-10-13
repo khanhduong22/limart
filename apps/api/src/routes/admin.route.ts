@@ -1212,6 +1212,8 @@ adminRoute.post("/manual-checkin", async (c) => {
       invalidateCachePattern(`checkin:today:${userId}:*`),
       invalidateCachePattern("checkin:today:all:*"),
       invalidateCachePattern("checkin:status:*"),
+      invalidateCachePattern("staff:history:*"),
+      invalidateCachePattern("staff:payroll:*"),
     ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
 
     return c.json({
@@ -2209,6 +2211,8 @@ adminRoute.post("/close-all-shifts", async (c) => {
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("checkin:status:*"),
       invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("staff:history:*"),
+      invalidateCachePattern("staff:payroll:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -2690,6 +2694,8 @@ adminRoute.post("/tasks/:id/approve", async (c) => {
       invalidatePayrollCache(),
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff-tasks:stats:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("tasks:market:*"),
       invalidateCachePattern("task*"),
     ]).catch(() => {});
 
@@ -2745,6 +2751,8 @@ adminRoute.post("/tasks/:id/reject", async (c) => {
       invalidatePayrollCache(),
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff-tasks:stats:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("tasks:market:*"),
       invalidateCachePattern("task*"),
     ]).catch(() => {});
 
@@ -2808,6 +2816,8 @@ adminRoute.post("/tasks/:id/review", async (c) => {
         invalidatePayrollCache(),
         invalidateCachePattern("admin:tasks:*"),
         invalidateCachePattern("staff-tasks:stats:*"),
+        invalidateCachePattern("user:tasks:my:*"),
+        invalidateCachePattern("tasks:market:*"),
         invalidateCachePattern("task*"),
       ]).catch(() => {});
 
@@ -2844,6 +2854,8 @@ adminRoute.post("/tasks/:id/review", async (c) => {
         invalidatePayrollCache(),
         invalidateCachePattern("admin:tasks:*"),
         invalidateCachePattern("staff-tasks:stats:*"),
+        invalidateCachePattern("user:tasks:my:*"),
+        invalidateCachePattern("tasks:market:*"),
         invalidateCachePattern("task*"),
       ]).catch(() => {});
 

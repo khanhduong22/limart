@@ -6,7 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Clock, Calendar, Banknote, Star, AlertTriangle, ChevronRight, Award } from "lucide-react";
-import ManualCheckInForm from "@/components/admin/ManualCheckInForm";
+
+const ManualCheckInForm = React.lazy(
+  () => import("@/components/admin/ManualCheckInForm")
+);
 
 export function EmployeeDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -206,7 +209,9 @@ export function EmployeeDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Main Column: Work History & Manual Checkin */}
         <div className="md:col-span-2 space-y-6">
-          <ManualCheckInForm userId={user.id} onSuccess={() => mutate()} />
+          <React.Suspense fallback={null}>
+            <ManualCheckInForm userId={user.id} onSuccess={() => mutate()} />
+          </React.Suspense>
 
           <Card>
             <CardHeader className="pb-3 border-b border-slate-100">

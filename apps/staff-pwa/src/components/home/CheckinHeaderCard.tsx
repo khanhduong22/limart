@@ -162,10 +162,14 @@ export const CheckinHeaderCard: React.FC<CheckinHeaderCardProps> = ({
             alt="LimArt"
             width="40"
             height="40"
+            loading="lazy"
             decoding="async"
             className="h-full w-full object-cover"
             onError={(e) => {
-              (e.target as any).src = "/icon-192.png";
+              const target = e.currentTarget;
+              if (!target.src.endsWith("/icon-192.png")) {
+                target.src = "/icon-192.png";
+              }
             }}
           />
         </div>

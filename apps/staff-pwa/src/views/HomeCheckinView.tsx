@@ -5,11 +5,11 @@ import {
   StaffHomeData,
 } from "@/lib/api-client";
 import CheckInButtons from "@/components/CheckInButtons";
-import GachaButton from "@/components/GachaButton";
 import AnnouncementBar from "@/components/AnnouncementBar";
 import HomeAnnouncements from "@/components/HomeAnnouncements";
 import PrivacyStats from "@/components/PrivacyStats";
-import ShiftDutyHomeWidget from "@/components/shift-duty/ShiftDutyHomeWidget";
+const ShiftDutyHomeWidget = lazy(() => import("@/components/shift-duty/ShiftDutyHomeWidget"));
+const GachaButton = lazy(() => import("@/components/GachaButton"));
 const CapyAssistant = lazy(() => import("@/components/CapyAssistant"));
 import { Button } from "@/components/ui/button";
 import { Link, useRouter } from "@/lib/router";
@@ -180,12 +180,14 @@ export const HomeCheckinView: React.FC = () => {
 
             {/* Shift Duties Widget */}
             <div id="home-shift-duties" className="pt-2">
-              <ShiftDutyHomeWidget
-                currentUserId={user?.id}
-                isAdmin={user?.role === "ADMIN"}
-                duties={todayDuties || []}
-                activeUsers={activeUsers || []}
-              />
+              <Suspense fallback={null}>
+                <ShiftDutyHomeWidget
+                  currentUserId={user?.id}
+                  isAdmin={user?.role === "ADMIN"}
+                  duties={todayDuties || []}
+                  activeUsers={activeUsers || []}
+                />
+              </Suspense>
             </div>
 
             {/* Capybara Mascot AI Assistant */}
@@ -208,11 +210,13 @@ export const HomeCheckinView: React.FC = () => {
 
             {/* Gacha Game & Rewards Section */}
             <div id="home-gacha" className="pt-4 space-y-3 border-t border-dashed mt-4">
-              <GachaButton
-                userId={user?.id}
-                hasCheckedIn={hasCheckedInToday}
-                isAdmin={user?.role === "ADMIN"}
-              />
+              <Suspense fallback={null}>
+                <GachaButton
+                  userId={user?.id}
+                  hasCheckedIn={hasCheckedInToday}
+                  isAdmin={user?.role === "ADMIN"}
+                />
+              </Suspense>
               <Link to="/rewards" className="block w-full">
                 <Button
                   variant="outline"

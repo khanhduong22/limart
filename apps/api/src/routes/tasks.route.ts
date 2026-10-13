@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { prisma } from "@checkin/db";
 import { z } from "zod";
 import { authMiddleware, adminMiddleware, AppEnv } from "../middleware/auth.middleware";
-import { invalidateCachePattern } from "../lib/cache";
+import { getOrSetCache, invalidateCachePattern } from "../lib/cache";
 
 export const createTaskDefSchema = z.object({
   name: z.string().trim().min(1, "Tên định mức không được để trống"),
@@ -45,8 +45,10 @@ tasksRoute.use("*", authMiddleware, adminMiddleware);
 
 export async function getDefinitionsHandler(c: any) {
   try {
-    const definitions = await prisma.taskDefinition.findMany({
-      orderBy: { name: "asc" },
+    const definitions = await getOrSetCache("meta:task-definitions:all", 600, async () => {
+      return prisma.taskDefinition.findMany({
+        orderBy: { name: "asc" },
+      });
     });
     return c.json({ success: true, data: definitions });
   } catch (err: any) {
@@ -79,6 +81,7 @@ export async function createDefinitionHandler(c: any) {
       },
     });
 
+    await invalidateCachePattern("meta:task-definitions:*").catch(() => {});
     await invalidateCachePattern("task*").catch(() => {});
 
     return c.json(
@@ -125,6 +128,7 @@ export async function updateDefinitionHandler(c: any) {
       data: dataToUpdate,
     });
 
+    await invalidateCachePattern("meta:task-definitions:*").catch(() => {});
     await invalidateCachePattern("task*").catch(() => {});
 
     return c.json({
@@ -171,6 +175,7 @@ export async function deleteDefinitionHandler(c: any) {
       where: { id },
     });
 
+    await invalidateCachePattern("meta:task-definitions:*").catch(() => {});
     await invalidateCachePattern("task*").catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa định mức công việc" });

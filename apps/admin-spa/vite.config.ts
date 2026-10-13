@@ -4,8 +4,11 @@ import path from "path";
 import { viteVersionPlugin } from "@checkin/spa-version-guard";
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   base: "/admin/",
+  esbuild: {
+    drop: mode === "production" ? ["console", "debugger"] : [],
+  },
   plugins: [
     react(),
     viteVersionPlugin({
@@ -55,4 +58,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

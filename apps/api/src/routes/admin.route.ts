@@ -664,6 +664,7 @@ const handleUpdateUserStatus = async (c: any) => {
 
     await Promise.all([
       invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("admin:manager-tasks:*"),
       invalidateCachePattern("user:me:" + id),
       invalidateSpecialDaysCache(),
     ]).catch(() => {});
@@ -740,6 +741,7 @@ const handleCreateUser = async (c: any) => {
     await Promise.all([
       invalidatePayrollCache(),
       invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("admin:manager-tasks:*"),
       invalidateSpecialDaysCache(),
     ]).catch(() => {});
 
@@ -863,6 +865,7 @@ const handleUpdateUser = async (c: any) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(id),
       invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("admin:manager-tasks:*"),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("user:me:" + id),
       invalidateSpecialDaysCache(),
@@ -891,6 +894,7 @@ const handleDeleteUser = async (c: any) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(id),
       invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("admin:manager-tasks:*"),
       invalidateCachePattern("user:me:" + id),
       invalidateSpecialDaysCache(),
     ]).catch(() => {});
@@ -1249,7 +1253,11 @@ adminRoute.post("/requests/:id/action", async (c) => {
       data: { status: action },
     });
 
-    await Promise.all([invalidatePayrollCache(), invalidateShiftDutyCache()]).catch(() => {});
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("user:requests:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -1277,7 +1285,11 @@ adminRoute.post("/requests/:id/approve", async (c) => {
       data: { status: "APPROVED" },
     });
 
-    await Promise.all([invalidatePayrollCache(), invalidateShiftDutyCache()]).catch(() => {});
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("user:requests:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -1306,7 +1318,11 @@ adminRoute.post("/requests/:id/reject", async (c) => {
       data: { status: "REJECTED" },
     });
 
-    await Promise.all([invalidatePayrollCache(), invalidateShiftDutyCache()]).catch(() => {});
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("user:requests:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,

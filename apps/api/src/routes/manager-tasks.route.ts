@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { prisma } from "@checkin/db";
-import { invalidateCachePattern } from "../lib/cache";
+import { getOrSetCache, invalidateCachePattern } from "../lib/cache";
 import {
   toVNDateString,
   getVietnamMonthRange,
@@ -54,16 +54,18 @@ export async function ensureChecklistTemplatesSeeded(userId: string) {
  */
 managerTasksRoute.get("/users", authMiddleware, async (c) => {
   try {
-    const users = await prisma.user.findMany({
-      where: { isActive: true },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
-        role: true,
-      },
-      orderBy: { name: "asc" },
+    const users = await getOrSetCache("admin:manager-tasks:users", 300, async () => {
+      return prisma.user.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          role: true,
+        },
+        orderBy: { name: "asc" },
+      });
     });
 
     return c.json({ success: true, data: users });

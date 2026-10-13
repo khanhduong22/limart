@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { prisma } from "@checkin/db";
 import { z } from "zod";
 import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
+import { getOrSetCache, invalidateCachePattern } from "../lib/cache";
 
 export const requestsRoute = new Hono<AppEnv>();
 
@@ -17,9 +18,11 @@ requestsRoute.get("/me", authMiddleware, async (c) => {
     const tokenPayload = c.get("user");
     const userId = tokenPayload.sub;
 
-    const requests = await prisma.request.findMany({
-      where: { userId },
-      orderBy: { createdAt: "desc" },
+    const requests = await getOrSetCache("user:requests:" + userId, 60, async () => {
+      return prisma.request.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+      });
     });
 
     return c.json({
@@ -65,6 +68,8 @@ requestsRoute.post("/", authMiddleware, async (c) => {
         status: "PENDING",
       },
     });
+
+    await invalidateCachePattern("user:requests:" + userId);
 
     return c.json(
       {

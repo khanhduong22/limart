@@ -52,6 +52,9 @@ export function createApp() {
 
   // 3. Request Logger with Correlation ID
   app.use("*", async (c, next) => {
+    if (c.req.path === "/health") {
+      return next();
+    }
     const reqId = c.var.requestId || c.get("requestId");
     const start = Date.now();
     console.log(`<-- ${c.req.method} ${c.req.path} [${reqId}]`);

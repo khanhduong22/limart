@@ -151,7 +151,7 @@ deploy_dual_run() {
             ${ENV_ARG} \
             -e PORT=4000 \
             -e NODE_ENV=production \
-            -e DATABASE_URL="${DATABASE_URL:-postgresql://kido:KidoVPS2026!@limart-db:5432/checkin_db?sslmode=disable}" \
+            -e DATABASE_URL="${DATABASE_URL:-postgresql://kido:KidoVPS2026!@limart-db:5432/checkin_db?sslmode=disable&connection_limit=10&pool_timeout=15}" \
             -e REDIS_URL="${REDIS_URL:-redis://limart-valkey:6379}" \
             -e MEILISEARCH_HOST="${MEILISEARCH_HOST:-http://meilisearch:7700}" \
             -e MEILISEARCH_KEY="${MEILISEARCH_KEY:-kt_meilisearch_master_key_2026_safe}" \

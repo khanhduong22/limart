@@ -79,7 +79,7 @@ Toàn bộ biến môi trường production được quản lý tập trung tạ
 
 | Tên Secret | Mục Đích | Giá Trị Mẫu / Chú Thích |
 | :--- | :--- | :--- |
-| `DATABASE_URL` | Chuỗi kết nối PostgreSQL 17 | `postgresql://kido:...@limart-db:5432/checkin_db?sslmode=disable` |
+| `DATABASE_URL` | Chuỗi kết nối PostgreSQL 17 | `postgresql://kido:...@limart-db:5432/checkin_db?sslmode=disable&connection_limit=10&pool_timeout=15` |
 | `NEXTAUTH_SECRET` | Secret mã hoá JWT token phiên đăng nhập | Khóa ngẫu nhiên 32+ ký tự |
 | `NEXTAUTH_URL` | Domain chính thức của Production | `https://limart.khanhdp.com` |
 | `GOOGLE_CLIENT_ID` | OAuth 2.0 Client ID từ Google Cloud Console | Dùng đăng nhập Google OAuth |

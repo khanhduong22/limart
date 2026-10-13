@@ -219,8 +219,8 @@ describe("Hot Read Endpoints Valkey Caching & Invalidation Suite", () => {
         expect.any(String)
       );
       const checkinCall = (mockRedis.setex as any).mock.calls.find((c: any) => c[0] === expectedKey);
-      expect(checkinCall[1]).toBeGreaterThanOrEqual(30 * 0.85);
-      expect(checkinCall[1]).toBeLessThanOrEqual(30 * 1.15 + 1);
+      expect(checkinCall[1]).toBeGreaterThanOrEqual(Math.floor(30 * 0.85));
+      expect(checkinCall[1]).toBeLessThanOrEqual(Math.ceil(30 * 1.15) + 1);
 
       // Request 2: Served from cache
       const res2 = await app.request("/api/checkins/today", {

@@ -4,7 +4,10 @@ import { VitePWA } from "vite-plugin-pwa";
 import path from "path";
 import { viteVersionPlugin } from "@checkin/spa-version-guard";
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
+  esbuild: {
+    drop: mode === "production" ? ["console", "debugger"] : [],
+  },
   plugins: [
     react(),
     viteVersionPlugin({
@@ -148,4 +151,4 @@ export default defineConfig({
     port: 5173,
     host: true
   }
-});
+}));

@@ -18,6 +18,7 @@ export function EmployeesPage() {
         </div>
       </div>
 
+      {/* Employee list rows rendered via UserManager -> UserCard with .cv-auto-table-row */}
       <UserManager users={employees} onRefresh={mutate} />
     </div>
   );

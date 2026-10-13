@@ -44,6 +44,11 @@ import {
   removeAuthToken,
   getAuthHeaders,
   toggleStaffTaskStatus,
+  getCachedProfile,
+  saveCachedProfile,
+  getTodayCheckins,
+  recordLocalCheckin,
+  DEFAULT_STAFF,
 } from "./api-client";
 
 describe("Staff PWA API Client (Unified Cookie Auth)", () => {
@@ -247,6 +252,119 @@ describe("Staff PWA API Client (Unified Cookie Auth)", () => {
       const res = await toggleStaffTaskStatus("task-1", { status: "DOING" });
       expect(res.success).toBe(false);
       expect(res.error).toBe("Network disconnect");
+    });
+  });
+
+  describe("Cache Storage Hygiene & Offline Data Validation", () => {
+    it("returns default profile when no cached profile exists", () => {
+      const profile = getCachedProfile();
+      expect(profile).toEqual(DEFAULT_STAFF);
+    });
+
+    it("safely parses valid profile from storage and merges with defaults", () => {
+      saveCachedProfile({
+        id: "staff_123",
+        name: "Test Staff",
+        email: "test@limart.vn",
+        role: "STAFF",
+        avatarUrl: "/avatar.png",
+        employmentType: "FULL_TIME",
+        hourlyRate: 30000,
+        streakDays: 5,
+        gachaTickets: 2,
+        achievements: [],
+      });
+
+      const profile = getCachedProfile();
+      expect(profile.id).toBe("staff_123");
+      expect(profile.name).toBe("Test Staff");
+      expect(profile.hourlyRate).toBe(30000);
+    });
+
+    it("handles corrupted JSON in profile cache by cleaning up entry and returning default", () => {
+      storageMock.setItem("limart_staff_profile_cache", "INVALID_JSON_CORRUPTED{{{");
+
+      const profile = getCachedProfile();
+      expect(profile).toEqual(DEFAULT_STAFF);
+      expect(storageMock.getItem("limart_staff_profile_cache")).toBeNull();
+    });
+
+    it("handles non-object or invalid ID in profile cache by removing entry", () => {
+      storageMock.setItem("limart_staff_profile_cache", JSON.stringify({ role: "USER" }));
+
+      const profile = getCachedProfile();
+      expect(profile).toEqual(DEFAULT_STAFF);
+      expect(storageMock.getItem("limart_staff_profile_cache")).toBeNull();
+    });
+
+    it("does not save invalid or empty profile", () => {
+      saveCachedProfile(null as any);
+      expect(storageMock.getItem("limart_staff_profile_cache")).toBeNull();
+
+      saveCachedProfile({} as any);
+      expect(storageMock.getItem("limart_staff_profile_cache")).toBeNull();
+
+      saveCachedProfile({ id: "" } as any);
+      expect(storageMock.getItem("limart_staff_profile_cache")).toBeNull();
+    });
+
+    it("safely records and deduplicates local checkin records up to limit", () => {
+      recordLocalCheckin({
+        id: "chk_1",
+        type: "checkin",
+        timestamp: "2026-10-13T08:00:00.000Z",
+        locationName: "LimArt Store",
+      });
+
+      let checkins = getTodayCheckins();
+      expect(checkins.length).toBe(1);
+      expect(checkins[0].id).toBe("chk_1");
+
+      // Recording same ID replaces/deduplicates
+      recordLocalCheckin({
+        id: "chk_1",
+        type: "checkin",
+        timestamp: "2026-10-13T08:05:00.000Z",
+        locationName: "LimArt Store Updated",
+      });
+
+      checkins = getTodayCheckins();
+      expect(checkins.length).toBe(1);
+      expect(checkins[0].locationName).toBe("LimArt Store Updated");
+    });
+
+    it("cleans up corrupted local checkins storage entry safely", () => {
+      storageMock.setItem("limart_staff_today_checkins", "CORRUPTED_CHECKINS_ARRAY");
+      const checkins = getTodayCheckins();
+      expect(checkins).toEqual([]);
+      expect(storageMock.getItem("limart_staff_today_checkins")).toBeNull();
+    });
+
+    it("removes all local cached items when removeAuthToken is called", () => {
+      saveCachedProfile({
+        id: "usr_clear",
+        name: "To Clear",
+        email: "clear@limart.vn",
+        role: "STAFF",
+        avatarUrl: "/a.png",
+        employmentType: "PART_TIME",
+        hourlyRate: 25000,
+        streakDays: 1,
+        gachaTickets: 1,
+        achievements: [],
+      });
+      recordLocalCheckin({
+        id: "chk_clear",
+        type: "checkin",
+        timestamp: "2026-10-13T08:00:00.000Z",
+        locationName: "Store",
+      });
+
+      removeAuthToken();
+
+      expect(storageMock.getItem("limart_staff_profile_cache")).toBeNull();
+      expect(storageMock.getItem("limart_staff_today_checkins")).toBeNull();
+      expect(storageMock.getItem("limart_staff_home_data_cache")).toBeNull();
     });
   });
 });

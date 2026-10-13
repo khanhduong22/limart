@@ -210,6 +210,7 @@ export async function invalidatePayrollCache(): Promise<void> {
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("stats:monthly:*");
     await invalidateCachePattern("admin:dashboard:*");
+    await invalidateCachePattern("admin:reports:*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate payroll cache:", e);
   }

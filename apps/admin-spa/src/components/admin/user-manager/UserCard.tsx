@@ -179,7 +179,7 @@ export function UserCard({
 
   return (
     <div
-      className={`flex flex-col md:flex-row md:items-center justify-between p-3 sm:p-4 gap-3 border-b last:border-0 hover:bg-gray-50/50 transition-colors ${
+      className={`cv-auto-table-row flex flex-col md:flex-row md:items-center justify-between p-3 sm:p-4 gap-3 border-b last:border-0 hover:bg-gray-50/50 transition-colors ${
         !isUserActive ? "bg-gray-50/50 opacity-70" : ""
       }`}
     >

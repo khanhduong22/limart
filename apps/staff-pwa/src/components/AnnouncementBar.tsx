@@ -3,7 +3,11 @@ import { Megaphone, Info, AlertTriangle, Check, X } from "lucide-react";
 import { AnnouncementItem, markAnnouncementsAsRead } from "@/lib/api-client";
 
 // Module-level cache to remember dismissed announcement IDs across route switches & revalidations
-const sessionDismissedIds = new Set<string>();
+export const sessionDismissedIds = new Set<string>();
+
+export function clearSessionDismissedAnnouncements() {
+  sessionDismissedIds.clear();
+}
 
 interface AnnouncementBarProps {
   announcements: AnnouncementItem[];
@@ -14,64 +18,75 @@ export default function AnnouncementBar({
   announcements,
   onMarkedRead,
 }: AnnouncementBarProps) {
-  const [showPopup, setShowPopup] = useState(false);
-  const [unreadAnnouncements, setUnreadAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [dismissedVersion, setDismissedVersion] = useState(0);
+  const [isDismissed, setIsDismissed] = useState(false);
 
-  useEffect(() => {
+  // Memoize unread announcement calculation using React.useMemo to prevent re-filtering arrays on every component render
+  const unreadAnnouncements = React.useMemo<AnnouncementItem[]>(() => {
     if (!announcements || announcements.length === 0) {
-      setShowPopup(false);
-      setUnreadAnnouncements([]);
-      return;
+      return [];
     }
 
+    let readIdsSet: Set<string>;
     try {
       const readIdsStr = localStorage.getItem("read_announcement_ids");
-      const readIds: string[] = readIdsStr ? JSON.parse(readIdsStr) : [];
-
-      // Filter announcements that:
-      // 1. Are NOT marked isRead from server
-      // 2. Are NOT recorded in localStorage
-      // 3. Have NOT been dismissed in the current session
-      const unread = announcements.filter(
-        (a) =>
-          !a.isRead &&
-          !readIds.includes(a.id) &&
-          !sessionDismissedIds.has(a.id)
-      );
-
-      if (unread.length > 0) {
-        setUnreadAnnouncements(unread);
-        setShowPopup(true);
+      if (readIdsStr) {
+        const parsed = JSON.parse(readIdsStr);
+        readIdsSet = new Set(Array.isArray(parsed) ? parsed : []);
       } else {
-        setShowPopup(false);
-        setUnreadAnnouncements([]);
+        readIdsSet = new Set();
       }
     } catch {
-      setShowPopup(false);
+      readIdsSet = new Set();
+      try {
+        localStorage.removeItem("read_announcement_ids");
+      } catch {}
     }
-  }, [announcements]);
+
+    // Filter announcements that:
+    // 1. Are NOT marked isRead from server
+    // 2. Are NOT recorded in localStorage
+    // 3. Have NOT been dismissed in the current session
+    return announcements.filter(
+      (a) =>
+        !a.isRead &&
+        !readIdsSet.has(a.id) &&
+        !sessionDismissedIds.has(a.id)
+    );
+  }, [announcements, dismissedVersion]);
+
+  // When announcements change to new ones, reset dismissed state if there are unread items
+  useEffect(() => {
+    if (unreadAnnouncements.length > 0) {
+      setIsDismissed(false);
+    }
+  }, [unreadAnnouncements]);
 
   const handleMarkAsRead = async () => {
     const idsToMark = unreadAnnouncements.map((a) => a.id);
     if (idsToMark.length === 0) {
-      setShowPopup(false);
+      setIsDismissed(true);
       return;
     }
 
     // 1. Immediately record in module-level session set
     idsToMark.forEach((id) => sessionDismissedIds.add(id));
 
-    // 2. Immediately persist to localStorage
+    // 2. Immediately persist to localStorage safely (pruning oldest if > 200 entries)
     try {
       const readIdsStr = localStorage.getItem("read_announcement_ids");
-      const readIds: string[] = readIdsStr ? JSON.parse(readIdsStr) : [];
-      const newReadIds = Array.from(new Set([...readIds, ...idsToMark]));
+      let readIds: string[] = [];
+      if (readIdsStr) {
+        const parsed = JSON.parse(readIdsStr);
+        if (Array.isArray(parsed)) readIds = parsed;
+      }
+      const newReadIds = Array.from(new Set([...readIds, ...idsToMark])).slice(-200);
       localStorage.setItem("read_announcement_ids", JSON.stringify(newReadIds));
     } catch {}
 
-    // 3. Immediately dismiss popup from UI
-    setShowPopup(false);
-    setUnreadAnnouncements([]);
+    // 3. Immediately dismiss popup from UI and trigger useMemo re-evaluation
+    setIsDismissed(true);
+    setDismissedVersion((v) => v + 1);
 
     // 4. Persist to DB on server and trigger callback
     try {
@@ -82,7 +97,7 @@ export default function AnnouncementBar({
     }
   };
 
-  if (!showPopup || unreadAnnouncements.length === 0) return null;
+  if (isDismissed || unreadAnnouncements.length === 0) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-300">

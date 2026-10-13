@@ -48,7 +48,7 @@ function getCurrentUserId(): string | null {
     const raw = localStorage.getItem("limart_staff_profile_cache");
     if (raw) {
       const p = JSON.parse(raw);
-      return p?.id || null;
+      return (p && typeof p === "object" && typeof p.id === "string") ? p.id : null;
     }
   } catch {}
   return null;
@@ -88,8 +88,16 @@ export async function getStoredQueue(): Promise<OfflineCheckinItem[]> {
     if (typeof window === "undefined") return [];
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      return [];
     } catch {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {}
       return [];
     }
   }

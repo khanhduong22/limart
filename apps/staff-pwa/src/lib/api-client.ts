@@ -5,6 +5,8 @@
 import { enqueueCheckin, isNetworkOnline } from "./offline-queue";
 
 const HOME_CACHE_KEY = "limart_staff_home_data_cache";
+const PROFILE_CACHE_KEY = "limart_staff_profile_cache";
+const LOCAL_CHECKINS_KEY = "limart_staff_today_checkins";
 
 const TOKEN_STORAGE_KEY = "limart_staff_jwt_token";
 
@@ -28,8 +30,9 @@ export function removeAuthToken() {
   try {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem("admin_token");
-    localStorage.removeItem("limart_staff_profile_cache");
+    localStorage.removeItem(PROFILE_CACHE_KEY);
     localStorage.removeItem(HOME_CACHE_KEY);
+    localStorage.removeItem(LOCAL_CHECKINS_KEY);
   } catch {}
 }
 
@@ -83,7 +86,9 @@ export async function fetcher<T = any>(url: string): Promise<T> {
       const data = await res.json();
       if (url.includes("/api/staff/home-data")) {
         try {
-          localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(data));
+          if (data && typeof data === "object") {
+            localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(data));
+          }
         } catch {}
       }
       return data;
@@ -95,8 +100,17 @@ export async function fetcher<T = any>(url: string): Promise<T> {
       const cached = localStorage.getItem(HOME_CACHE_KEY);
       if (cached) {
         try {
-          return JSON.parse(cached);
-        } catch {}
+          const parsed = JSON.parse(cached);
+          if (parsed && typeof parsed === "object" && parsed.data) {
+            return parsed;
+          }
+          // Clean up corrupted or stale entry
+          localStorage.removeItem(HOME_CACHE_KEY);
+        } catch {
+          try {
+            localStorage.removeItem(HOME_CACHE_KEY);
+          } catch {}
+        }
       }
       return { success: true, data: DEFAULT_HOME_DATA } as any;
     }
@@ -682,23 +696,79 @@ export const DEFAULT_TODAY_SHIFT: ShiftInfo = {
 
 export function getCachedProfile(): StaffProfile {
   try {
-    const cached = localStorage.getItem("limart_staff_profile_cache");
-    if (cached) return JSON.parse(cached);
-  } catch {}
+    const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && typeof parsed === "object" && typeof parsed.id === "string" && parsed.id.trim() !== "") {
+        return {
+          ...DEFAULT_STAFF,
+          ...parsed,
+        };
+      }
+      // Corrupted or invalid structure, clean up stale entry
+      localStorage.removeItem(PROFILE_CACHE_KEY);
+    }
+  } catch {
+    try {
+      localStorage.removeItem(PROFILE_CACHE_KEY);
+    } catch {}
+  }
   return DEFAULT_STAFF;
 }
 
-export function saveCachedProfile(p: StaffProfile) {
+export function saveCachedProfile(p: StaffProfile | null | undefined) {
   try {
-    localStorage.setItem("limart_staff_profile_cache", JSON.stringify(p));
-  } catch {}
+    if (!p || typeof p !== "object" || !p.id || typeof p.id !== "string" || !p.id.trim()) {
+      return;
+    }
+    const safeProfile: StaffProfile = {
+      id: p.id,
+      name: p.name || DEFAULT_STAFF.name,
+      email: p.email || "",
+      role: p.role || DEFAULT_STAFF.role,
+      avatarUrl: p.avatarUrl || DEFAULT_STAFF.avatarUrl,
+      employmentType: p.employmentType || DEFAULT_STAFF.employmentType,
+      hourlyRate: typeof p.hourlyRate === "number" ? p.hourlyRate : DEFAULT_STAFF.hourlyRate,
+      streakDays: typeof p.streakDays === "number" ? p.streakDays : DEFAULT_STAFF.streakDays,
+      gachaTickets: typeof p.gachaTickets === "number" ? p.gachaTickets : DEFAULT_STAFF.gachaTickets,
+      achievements: Array.isArray(p.achievements) ? p.achievements : [],
+    };
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(safeProfile));
+  } catch (err) {
+    console.warn("[api-client] Failed to save cached profile:", err);
+  }
 }
 
 export function getTodayCheckins(): CheckinRecord[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_CHECKINS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((r) => r && typeof r === "object" && typeof r.id === "string");
+      }
+      localStorage.removeItem(LOCAL_CHECKINS_KEY);
+    }
+  } catch {
+    try {
+      localStorage.removeItem(LOCAL_CHECKINS_KEY);
+    } catch {}
+  }
   return [];
 }
 
-export function recordLocalCheckin(record: CheckinRecord) {}
+export function recordLocalCheckin(record: CheckinRecord) {
+  try {
+    if (!record || typeof record !== "object" || !record.id) return;
+    const current = getTodayCheckins();
+    // Deduplicate and prune oldest to prevent unbounded growth (max 50 records)
+    const filtered = current.filter((r) => r.id !== record.id);
+    const updated = [record, ...filtered].slice(0, 50);
+    localStorage.setItem(LOCAL_CHECKINS_KEY, JSON.stringify(updated));
+  } catch (err) {
+    console.warn("[api-client] Failed to record local checkin:", err);
+  }
+}
 
 export async function markAnnouncementsAsRead(announcementIds: string[]): Promise<boolean> {
   if (!announcementIds || announcementIds.length === 0) return true;

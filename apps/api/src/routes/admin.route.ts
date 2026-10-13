@@ -536,23 +536,25 @@ const UpdateUserSchema = z.object({
 // GET /api/admin/users
 adminRoute.get("/users", async (c) => {
   try {
-    const users = await prisma.user.findMany({
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        image: true,
-        isActive: true,
-        luckyWheelAllowed: true,
-        employmentType: true,
-        hourlyRate: true,
-        monthlySalary: true,
-        birthday: true,
-        startDate: true,
-        staffTasksAllowed: true,
-      },
+    const users = await getOrSetCache("admin:employees:all", 300, async () => {
+      return prisma.user.findMany({
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          image: true,
+          isActive: true,
+          luckyWheelAllowed: true,
+          employmentType: true,
+          hourlyRate: true,
+          monthlySalary: true,
+          birthday: true,
+          startDate: true,
+          staffTasksAllowed: true,
+        },
+      });
     });
 
     return c.json({ success: true, data: users });
@@ -567,23 +569,25 @@ adminRoute.get("/users", async (c) => {
 // GET /api/admin/employees (alias to /users)
 adminRoute.get("/employees", async (c) => {
   try {
-    const users = await prisma.user.findMany({
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        image: true,
-        isActive: true,
-        luckyWheelAllowed: true,
-        employmentType: true,
-        hourlyRate: true,
-        monthlySalary: true,
-        birthday: true,
-        startDate: true,
-        staffTasksAllowed: true,
-      },
+    const users = await getOrSetCache("admin:employees:all", 300, async () => {
+      return prisma.user.findMany({
+        orderBy: { name: "asc" },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          image: true,
+          isActive: true,
+          luckyWheelAllowed: true,
+          employmentType: true,
+          hourlyRate: true,
+          monthlySalary: true,
+          birthday: true,
+          startDate: true,
+          staffTasksAllowed: true,
+        },
+      });
     });
 
     return c.json({ success: true, data: users });
@@ -658,6 +662,8 @@ adminRoute.patch("/employees/:id/status", async (c) => {
       await prisma.session.deleteMany({ where: { userId: id } });
     }
 
+    await invalidateCachePattern("admin:employees:*").catch(() => {});
+
     return c.json({
       success: true,
       message: `Đã ${isActive ? "kích hoạt" : "vô hiệu hóa"} nhân viên thành công`,
@@ -725,7 +731,10 @@ const handleCreateUser = async (c: any) => {
       },
     });
 
-    await invalidatePayrollCache().catch(() => {});
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("admin:employees:*"),
+    ]).catch(() => {});
 
     return c.json(
       {
@@ -846,6 +855,7 @@ const handleUpdateUser = async (c: any) => {
     await Promise.all([
       invalidatePayrollCache(),
       invalidateShiftDutyCache(id),
+      invalidateCachePattern("admin:employees:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -870,6 +880,7 @@ const handleDeleteUser = async (c: any) => {
     await Promise.all([
       invalidatePayrollCache(),
       invalidateShiftDutyCache(id),
+      invalidateCachePattern("admin:employees:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa nhân viên thành công" });
@@ -2844,6 +2855,8 @@ adminRoute.post("/lucky-wheel/allowed/all", async (c) => {
       data: { luckyWheelAllowed: allowed },
     });
 
+    await invalidateCachePattern("admin:employees:*").catch(() => {});
+
     return c.json({
       success: true,
       message: `Đã ${allowed ? "bật" : "tắt"} quyền quay cho toàn bộ nhân sự!`,
@@ -2865,6 +2878,8 @@ adminRoute.patch("/lucky-wheel/allowed/:userId", async (c) => {
       data: { luckyWheelAllowed: allow },
       select: { id: true, name: true, luckyWheelAllowed: true },
     });
+
+    await invalidateCachePattern("admin:employees:*").catch(() => {});
 
     return c.json({
       success: true,
@@ -3149,272 +3164,271 @@ adminRoute.get("/reports", async (c) => {
       parseInt(c.req.query("month") || "", 10) || new Date().getMonth() + 1;
     const year =
       parseInt(c.req.query("year") || "", 10) || new Date().getFullYear();
-    const { startDate, endDate } = getVietnamMonthRange(month, year);
-    const now = new Date();
+    const reportData = await getOrSetCache(`admin:reports:${month}:${year}`, 120, async () => {
+      const { startDate, endDate } = getVietnamMonthRange(month, year);
+      const now = new Date();
 
-    const [users, checkins, pointTasks, carryingTasks, shifts] = await Promise.all([
-      prisma.user.findMany({
-        where: { isActive: true },
-        select: { id: true, name: true, role: true, image: true, employmentType: true },
-      }),
-      prisma.checkIn.findMany({
-        where: { timestamp: { gte: startDate, lte: endDate } },
-        include: {
-          user: { select: { id: true, name: true, role: true, image: true, employmentType: true } },
-        },
-      }),
-      prisma.userTask.findMany({
-        where: {
-          status: "APPROVED",
-          submittedAt: { gte: startDate, lte: endDate },
-          taskDefinition: { unit: "điểm" },
-        },
-        include: {
-          user: { select: { id: true, name: true, role: true, image: true } },
-        },
-      }),
-      prisma.userTask.findMany({
-        where: {
-          status: "APPROVED",
-          submittedAt: { gte: startDate, lte: endDate },
-          taskDefinition: { unit: "điểm-bưng" },
-        },
-        include: {
-          user: { select: { id: true, name: true, role: true, image: true } },
-        },
-      }),
-      prisma.workShift.findMany({
-        where: { start: { gte: startDate, lte: endDate } },
-      }),
-    ]);
+      const [users, checkins, pointTasks, carryingTasks, shifts] = await Promise.all([
+        prisma.user.findMany({
+          where: { isActive: true },
+          select: { id: true, name: true, role: true, image: true, employmentType: true },
+        }),
+        prisma.checkIn.findMany({
+          where: { timestamp: { gte: startDate, lte: endDate } },
+          include: {
+            user: { select: { id: true, name: true, role: true, image: true, employmentType: true } },
+          },
+        }),
+        prisma.userTask.findMany({
+          where: {
+            status: "APPROVED",
+            submittedAt: { gte: startDate, lte: endDate },
+            taskDefinition: { unit: "điểm" },
+          },
+          include: {
+            user: { select: { id: true, name: true, role: true, image: true } },
+          },
+        }),
+        prisma.userTask.findMany({
+          where: {
+            status: "APPROVED",
+            submittedAt: { gte: startDate, lte: endDate },
+            taskDefinition: { unit: "điểm-bưng" },
+          },
+          include: {
+            user: { select: { id: true, name: true, role: true, image: true } },
+          },
+        }),
+        prisma.workShift.findMany({
+          where: { start: { gte: startDate, lte: endDate } },
+        }),
+      ]);
 
-    const useNewOTRule = year > 2026 || (year === 2026 && month >= 8);
-    const excludedNames = useNewOTRule ? ["Nía", "Na"] : ["Nía"];
+      const useNewOTRule = year > 2026 || (year === 2026 && month >= 8);
+      const excludedNames = useNewOTRule ? ["Nía", "Na"] : ["Nía"];
 
-    // Build shift map
-    const shiftMap: Record<string, any> = {};
-    for (const s of shifts) {
-      const d = toVNDateString(s.start);
-      shiftMap[`${s.userId}-${d}`] = s;
-    }
-
-    const userDisciplineStats: Record<
-      string,
-      {
-        user: any;
-        lateCount: number;
-        strictLateCount: number;
-        totalLateMinutes: number;
-        totalScheduledCheckins: number;
-        onTimeCount: number;
-        totalEarlyMinutes: number;
+      // Build shift map
+      const shiftMap: Record<string, any> = {};
+      for (const s of shifts) {
+        const d = toVNDateString(s.start);
+        shiftMap[`${s.userId}-${d}`] = s;
       }
-    > = {};
 
-    for (const ch of checkins) {
-      if (!userDisciplineStats[ch.userId]) {
-        userDisciplineStats[ch.userId] = {
-          user: ch.user,
-          lateCount: 0,
-          strictLateCount: 0,
-          totalLateMinutes: 0,
-          totalScheduledCheckins: 0,
-          onTimeCount: 0,
-          totalEarlyMinutes: 0,
-        };
-      }
-      const stats = userDisciplineStats[ch.userId];
-      const vnTime = new Date(new Date(ch.timestamp).getTime() + VN_OFFSET_MS);
-      const dateKey = toVNDateString(ch.timestamp);
-      const hour = vnTime.getUTCHours();
-      const min = vnTime.getUTCMinutes();
-      const timeVal = hour + min / 60;
-
-      const shift = shiftMap[`${ch.userId}-${dateKey}`];
-
-      if (ch.type === "checkin") {
-        let expectedStart = 8.5;
-        let shouldCheck = false;
-
-        if (shift) {
-          const sVn = new Date(new Date(shift.start).getTime() + VN_OFFSET_MS);
-          expectedStart = sVn.getUTCHours() + sVn.getUTCMinutes() / 60;
-          shouldCheck = true;
-        } else if (ch.user?.employmentType === "FULL_TIME") {
-          shouldCheck = true;
+      const userDisciplineStats: Record<
+        string,
+        {
+          user: any;
+          lateCount: number;
+          strictLateCount: number;
+          totalLateMinutes: number;
+          totalScheduledCheckins: number;
+          onTimeCount: number;
+          totalEarlyMinutes: number;
         }
+      > = {};
 
-        if (shouldCheck) {
-          stats.totalScheduledCheckins++;
-          if (isLate(timeVal, expectedStart)) {
-            stats.lateCount++;
-            stats.totalLateMinutes += Math.floor((timeVal - expectedStart) * 60);
-          } else {
-            stats.onTimeCount++;
+      for (const ch of checkins) {
+        if (!userDisciplineStats[ch.userId]) {
+          userDisciplineStats[ch.userId] = {
+            user: ch.user,
+            lateCount: 0,
+            strictLateCount: 0,
+            totalLateMinutes: 0,
+            totalScheduledCheckins: 0,
+            onTimeCount: 0,
+            totalEarlyMinutes: 0,
+          };
+        }
+        const stats = userDisciplineStats[ch.userId];
+        const vnTime = new Date(new Date(ch.timestamp).getTime() + VN_OFFSET_MS);
+        const dateKey = toVNDateString(ch.timestamp);
+        const hour = vnTime.getUTCHours();
+        const min = vnTime.getUTCMinutes();
+        const timeVal = hour + min / 60;
+
+        const shift = shiftMap[`${ch.userId}-${dateKey}`];
+
+        if (ch.type === "checkin") {
+          let expectedStart = 8.5;
+          let shouldCheck = false;
+
+          if (shift) {
+            const sVn = new Date(new Date(shift.start).getTime() + VN_OFFSET_MS);
+            expectedStart = sVn.getUTCHours() + sVn.getUTCMinutes() / 60;
+            shouldCheck = true;
+          } else if (ch.user?.employmentType === "FULL_TIME") {
+            shouldCheck = true;
           }
 
-          if (timeVal > expectedStart) {
-            stats.strictLateCount++;
-          }
+          if (shouldCheck) {
+            stats.totalScheduledCheckins++;
+            if (isLate(timeVal, expectedStart)) {
+              stats.lateCount++;
+              stats.totalLateMinutes += Math.floor((timeVal - expectedStart) * 60);
+            } else {
+              stats.onTimeCount++;
+            }
 
-          if (timeVal < expectedStart) {
-            stats.totalEarlyMinutes += Math.round((expectedStart - timeVal) * 60);
+            if (timeVal > expectedStart) {
+              stats.strictLateCount++;
+            }
+
+            if (timeVal < expectedStart) {
+              stats.totalEarlyMinutes += Math.round((expectedStart - timeVal) * 60);
+            }
           }
         }
       }
-    }
 
-    const topLate = Object.values(userDisciplineStats)
-      .filter((u) => !excludedNames.includes(u.user?.name || "") && u.lateCount > 0)
-      .sort((a, b) => b.totalLateMinutes - a.totalLateMinutes)
-      .map((u) => ({
-        user: { id: u.user.id, name: u.user.name || "Nhân viên" },
-        lateCount: u.lateCount,
-        totalLateMinutes: u.totalLateMinutes,
+      const topLate = Object.values(userDisciplineStats)
+        .filter((u) => !excludedNames.includes(u.user?.name || "") && u.lateCount > 0)
+        .sort((a, b) => b.totalLateMinutes - a.totalLateMinutes)
+        .map((u) => ({
+          user: { id: u.user.id, name: u.user.name || "Nhân viên" },
+          lateCount: u.lateCount,
+          totalLateMinutes: u.totalLateMinutes,
+        }));
+
+      const topDiscipline = Object.values(userDisciplineStats)
+        .filter(
+          (u) =>
+            !excludedNames.includes(u.user?.name || "") &&
+            u.totalScheduledCheckins > 0 &&
+            u.strictLateCount === 0
+        )
+        .map((u) => ({
+          id: u.user.id,
+          name: u.user.name || "Nhân viên",
+          image: u.user.image,
+          user: { id: u.user.id, name: u.user.name || "Nhân viên", image: u.user.image },
+          totalScheduledCheckins: u.totalScheduledCheckins,
+          punctualityRate:
+            Math.round(((u.onTimeCount / u.totalScheduledCheckins) * 100) * 10) / 10,
+          totalEarlyMinutes: u.totalEarlyMinutes,
+        }))
+        .sort((a, b) => {
+          if (b.punctualityRate === a.punctualityRate) {
+            if (b.totalEarlyMinutes === a.totalEarlyMinutes) {
+              return b.totalScheduledCheckins - a.totalScheduledCheckins;
+            }
+            return b.totalEarlyMinutes - a.totalEarlyMinutes;
+          }
+          return b.punctualityRate - a.punctualityRate;
+        })
+        .slice(0, 5);
+
+      const payrollSummary = await calculateMonthlyPayrollSummary(
+        new Date(year, month - 1, 15)
+      ).catch(() => ({
+        totalPayroll: 0,
+        totalProjected: 0,
+        details: [],
       }));
 
-    const topDiscipline = Object.values(userDisciplineStats)
-      .filter(
-        (u) =>
-          !excludedNames.includes(u.user?.name || "") &&
-          u.totalScheduledCheckins > 0 &&
-          u.strictLateCount === 0
-      )
-      .map((u) => ({
-        id: u.user.id,
-        name: u.user.name || "Nhân viên",
-        image: u.user.image,
-        user: { id: u.user.id, name: u.user.name || "Nhân viên", image: u.user.image },
-        totalScheduledCheckins: u.totalScheduledCheckins,
-        punctualityRate:
-          Math.round(((u.onTimeCount / u.totalScheduledCheckins) * 100) * 10) / 10,
-        totalEarlyMinutes: u.totalEarlyMinutes,
-      }))
-      .sort((a, b) => {
-        if (b.punctualityRate === a.punctualityRate) {
-          if (b.totalEarlyMinutes === a.totalEarlyMinutes) {
-            return b.totalScheduledCheckins - a.totalScheduledCheckins;
-          }
-          return b.totalEarlyMinutes - a.totalEarlyMinutes;
-        }
-        return b.punctualityRate - a.punctualityRate;
-      })
-      .slice(0, 5);
+      const totalPayrollCost = payrollSummary?.totalPayroll || 0;
+      const totalHoursAll = Array.isArray(payrollSummary?.details)
+        ? payrollSummary.details.reduce(
+            (acc: number, d: any) => acc + (d.actualHours || 0),
+            0
+          )
+        : 0;
 
-    const payrollSummary = await calculateMonthlyPayrollSummary(
-      new Date(year, month - 1, 15)
-    ).catch(() => ({
-      totalPayroll: 0,
-      totalProjected: 0,
-      details: [],
-    }));
+      const activeDetails = Array.isArray(payrollSummary?.details)
+        ? payrollSummary.details.filter(
+            (d: any) => !excludedNames.includes(d.userName) && d.role !== "ADMIN"
+          )
+        : [];
 
-    const totalPayrollCost = payrollSummary?.totalPayroll || 0;
-    const totalHoursAll = Array.isArray(payrollSummary?.details)
-      ? payrollSummary.details.reduce(
-          (acc: number, d: any) => acc + (d.actualHours || 0),
-          0
-        )
-      : 0;
-
-    const activeDetails = Array.isArray(payrollSummary?.details)
-      ? payrollSummary.details.filter(
-          (d: any) => !excludedNames.includes(d.userName) && d.role !== "ADMIN"
-        )
-      : [];
-
-    const topHardworking = activeDetails
-      .filter((d: any) => d.employmentType !== "FULL_TIME" && (d.actualHours || 0) > 0)
-      .slice()
-      .sort((a: any, b: any) => (b.actualHours || 0) - (a.actualHours || 0))
-      .slice(0, 5)
-      .map((d: any) => ({
-        id: d.userId,
-        name: d.userName,
-        totalHours: d.actualHours || 0,
-        daysWorked: d.daysWorked || 0,
-      }));
-
-    const isCurrentMonth =
-      now.getMonth() + 1 === month && now.getFullYear() === year;
-    const referenceDay = isCurrentMonth ? now.getDate() : 31;
-    let minDays = 1;
-    if (referenceDay >= 22) {
-      minDays = 16;
-    } else if (referenceDay >= 8) {
-      minDays = 8;
-    }
-
-    const topOvertime = activeDetails
-      .filter((d: any) => {
-        const otHours = useNewOTRule
-          ? (d.leaderboardOvertimeHours ?? d.overtimeHours ?? 0)
-          : (d.totalOvertimeHours ?? d.overtimeHours ?? 0);
-        return otHours > 0 && (d.daysWorked || 0) >= minDays;
-      })
-      .map((d: any) => {
-        const otHours = useNewOTRule
-          ? (d.leaderboardOvertimeHours ?? d.overtimeHours ?? 0)
-          : (d.totalOvertimeHours ?? d.overtimeHours ?? 0);
-        const days = d.daysWorked || 1;
-        return {
+      const topHardworking = activeDetails
+        .filter((d: any) => d.employmentType !== "FULL_TIME" && (d.actualHours || 0) > 0)
+        .slice()
+        .sort((a: any, b: any) => (b.actualHours || 0) - (a.actualHours || 0))
+        .slice(0, 5)
+        .map((d: any) => ({
           id: d.userId,
           name: d.userName,
-          avgOvertime: Math.round((otHours / days) * 10) / 10,
-          displayOvertimeHours: Math.round(otHours * 10) / 10,
-          daysWorked: days,
-        };
-      })
-      .sort((a, b) => b.avgOvertime - a.avgOvertime)
-      .slice(0, 5);
+          totalHours: d.actualHours || 0,
+          daysWorked: d.daysWorked || 0,
+        }));
 
-    // Top Packing
-    const userPointsMap: Record<
-      string,
-      { id: string; name: string; image: string | null; points: number }
-    > = {};
-    for (const pt of pointTasks) {
-      if (pt.user?.role === "ADMIN") continue;
-      if (!userPointsMap[pt.userId]) {
-        userPointsMap[pt.userId] = {
-          id: pt.user.id,
-          name: pt.user.name || "Nhân viên",
-          image: pt.user.image,
-          points: 0,
-        };
+      const isCurrentMonth =
+        now.getMonth() + 1 === month && now.getFullYear() === year;
+      const referenceDay = isCurrentMonth ? now.getDate() : 31;
+      let minDays = 1;
+      if (referenceDay >= 22) {
+        minDays = 16;
+      } else if (referenceDay >= 8) {
+        minDays = 8;
       }
-      userPointsMap[pt.userId].points += pt.finalAmount || pt.quantity || 0;
-    }
-    const topPacking = Object.values(userPointsMap)
-      .filter((u) => !excludedNames.includes(u.name))
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 5);
 
-    // Top Carrying
-    const userCarryingMap: Record<
-      string,
-      { id: string; name: string; image: string | null; points: number }
-    > = {};
-    for (const ct of carryingTasks) {
-      if (ct.user?.role === "ADMIN") continue;
-      if (!userCarryingMap[ct.userId]) {
-        userCarryingMap[ct.userId] = {
-          id: ct.user.id,
-          name: ct.user.name || "Nhân viên",
-          image: ct.user.image,
-          points: 0,
-        };
+      const topOvertime = activeDetails
+        .filter((d: any) => {
+          const otHours = useNewOTRule
+            ? (d.leaderboardOvertimeHours ?? d.overtimeHours ?? 0)
+            : (d.totalOvertimeHours ?? d.overtimeHours ?? 0);
+          return otHours > 0 && (d.daysWorked || 0) >= minDays;
+        })
+        .map((d: any) => {
+          const otHours = useNewOTRule
+            ? (d.leaderboardOvertimeHours ?? d.overtimeHours ?? 0)
+            : (d.totalOvertimeHours ?? d.overtimeHours ?? 0);
+          const days = d.daysWorked || 1;
+          return {
+            id: d.userId,
+            name: d.userName,
+            avgOvertime: Math.round((otHours / days) * 10) / 10,
+            displayOvertimeHours: Math.round(otHours * 10) / 10,
+            daysWorked: days,
+          };
+        })
+        .sort((a, b) => b.avgOvertime - a.avgOvertime)
+        .slice(0, 5);
+
+      // Top Packing
+      const userPointsMap: Record<
+        string,
+        { id: string; name: string; image: string | null; points: number }
+      > = {};
+      for (const pt of pointTasks) {
+        if (pt.user?.role === "ADMIN") continue;
+        if (!userPointsMap[pt.userId]) {
+          userPointsMap[pt.userId] = {
+            id: pt.user.id,
+            name: pt.user.name || "Nhân viên",
+            image: pt.user.image,
+            points: 0,
+          };
+        }
+        userPointsMap[pt.userId].points += pt.finalAmount || pt.quantity || 0;
       }
-      userCarryingMap[ct.userId].points += ct.finalAmount || ct.quantity || 0;
-    }
-    const topCarrying = Object.values(userCarryingMap)
-      .filter((u) => !excludedNames.includes(u.name) && u.points >= 10)
-      .sort((a, b) => b.points - a.points)
-      .slice(0, 5);
+      const topPacking = Object.values(userPointsMap)
+        .filter((u) => !excludedNames.includes(u.name))
+        .sort((a, b) => b.points - a.points)
+        .slice(0, 5);
 
-    return c.json({
-      success: true,
-      data: {
+      // Top Carrying
+      const userCarryingMap: Record<
+        string,
+        { id: string; name: string; image: string | null; points: number }
+      > = {};
+      for (const ct of carryingTasks) {
+        if (ct.user?.role === "ADMIN") continue;
+        if (!userCarryingMap[ct.userId]) {
+          userCarryingMap[ct.userId] = {
+            id: ct.user.id,
+            name: ct.user.name || "Nhân viên",
+            image: ct.user.image,
+            points: 0,
+          };
+        }
+        userCarryingMap[ct.userId].points += ct.finalAmount || ct.quantity || 0;
+      }
+      const topCarrying = Object.values(userCarryingMap)
+        .filter((u) => !excludedNames.includes(u.name) && u.points >= 10)
+        .sort((a, b) => b.points - a.points)
+        .slice(0, 5);
+
+      return {
         totalPayrollCost,
         totalHoursAll,
         totalEmployeeCount: users.length,
@@ -3424,7 +3438,12 @@ adminRoute.get("/reports", async (c) => {
         topPacking,
         topCarrying,
         topLate,
-      },
+      };
+    });
+
+    return c.json({
+      success: true,
+      data: reportData,
     });
   } catch (err: any) {
     return c.json(

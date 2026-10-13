@@ -136,7 +136,7 @@ export function ReportsPage() {
       {/* 🏆 HERO SECTION: HALL OF FAME */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5">
         {/* Top Chăm Chỉ */}
-        <Card id="report-top-hardworking" className="bg-gradient-to-br from-yellow-50 to-orange-50 border-orange-200">
+        <Card id="report-top-hardworking" className="cv-auto-card bg-gradient-to-br from-yellow-50 to-orange-50 border-orange-200">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-orange-800 text-base font-bold">
               🐝 Top Chăm Chỉ
@@ -179,7 +179,7 @@ export function ReportsPage() {
         </Card>
 
         {/* Top Kỷ Luật */}
-        <Card className="bg-gradient-to-br from-teal-50 to-emerald-50 border-emerald-200">
+        <Card id="report-top-discipline" className="cv-auto-card bg-gradient-to-br from-teal-50 to-emerald-50 border-emerald-200">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-emerald-800 text-base font-bold">
               🌟 Top Kỷ Luật
@@ -217,7 +217,7 @@ export function ReportsPage() {
         </Card>
 
         {/* Top Cày Cuốc */}
-        <Card id="report-top-overtime" className="bg-gradient-to-br from-rose-50 to-pink-50 border-pink-200">
+        <Card id="report-top-overtime" className="cv-auto-card bg-gradient-to-br from-rose-50 to-pink-50 border-pink-200">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-pink-800 text-base font-bold">
               🔥 Top Cày Cuốc (OT)
@@ -258,7 +258,7 @@ export function ReportsPage() {
         </Card>
 
         {/* Vua Đóng Hàng */}
-        <Card id="report-top-packing" className="bg-gradient-to-br from-indigo-50 to-purple-50 border-purple-200">
+        <Card id="report-top-packing" className="cv-auto-card bg-gradient-to-br from-indigo-50 to-purple-50 border-purple-200">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-purple-800 text-base font-bold">
               📦 Vua Đóng Hàng
@@ -301,7 +301,7 @@ export function ReportsPage() {
         </Card>
 
         {/* Chiến Thần Bưng Hàng */}
-        <Card id="report-top-carrying" className="bg-gradient-to-br from-amber-50 to-orange-50 border-orange-200">
+        <Card id="report-top-carrying" className="cv-auto-card bg-gradient-to-br from-amber-50 to-orange-50 border-orange-200">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-amber-800 text-base font-bold">
               🛗 Chiến Thần Bưng Hàng
@@ -345,7 +345,7 @@ export function ReportsPage() {
       </div>
 
       {/* 🔥 SHAME SECTION: VIOLATIONS */}
-      <Card id="report-violations" className="border-red-100 shadow-sm bg-white">
+      <Card id="report-violations" className="cv-auto-card border-red-100 shadow-sm bg-white">
         <CardHeader className="border-b bg-red-50/40 pb-3">
           <CardTitle className="text-red-700 flex items-center gap-2 text-base sm:text-lg font-bold">
             🚨 Báo cáo Vi Phạm (Đi muộn)
@@ -366,7 +366,7 @@ export function ReportsPage() {
                 {(Array.isArray(report.topLate) ? report.topLate : [])
                   .filter((u: any) => (u?.lateCount || 0) > 0)
                   .map((u: any, idx: number) => (
-                    <tr key={u.user?.id || u.id || `late-${idx}`} className="hover:bg-red-50/20 transition-colors">
+                    <tr key={u.user?.id || u.id || `late-${idx}`} className="cv-auto-table-row hover:bg-red-50/20 transition-colors">
                       <td className="px-4 sm:px-6 py-3.5 font-medium flex items-center gap-3">
                         <span className="text-red-500 font-bold shrink-0">⚠️</span>
                         <Link to={`/employees`} className="hover:underline text-slate-800 truncate">

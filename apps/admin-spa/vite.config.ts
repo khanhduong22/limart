@@ -41,9 +41,6 @@ export default defineConfig({
             ) {
               return "vendor-ui";
             }
-            if (id.includes("/recharts/")) {
-              return "vendor-charts";
-            }
           }
         },
       },

@@ -27,36 +27,11 @@ import { ensureAdminNaSchedule } from "../lib/auto-schedule";
 
 export const staffRoute = new Hono<AppEnv>();
 
-let announcementReadTableChecked = false;
-
-export async function ensureAnnouncementReadTable() {
-  if (announcementReadTableChecked) return;
-  try {
-    if ((prisma as any).$executeRawUnsafe) {
-      await (prisma as any).$executeRawUnsafe(`
-        CREATE TABLE IF NOT EXISTS "AnnouncementRead" (
-          "id" TEXT PRIMARY KEY,
-          "announcementId" TEXT NOT NULL,
-          "userId" TEXT NOT NULL,
-          "readAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-          CONSTRAINT "AnnouncementRead_announcementId_userId_key" UNIQUE ("announcementId", "userId")
-        )
-      `);
-      try {
-        await (prisma as any).$executeRawUnsafe(`
-          CREATE INDEX IF NOT EXISTS "AnnouncementRead_userId_idx" ON "AnnouncementRead"("userId")
-        `);
-      } catch {}
-      try {
-        await (prisma as any).$executeRawUnsafe(`
-          CREATE INDEX IF NOT EXISTS "AnnouncementRead_announcementId_idx" ON "AnnouncementRead"("announcementId")
-        `);
-      } catch {}
-    }
-    announcementReadTableChecked = true;
-  } catch (err) {
-    console.error("[staff.route] ensureAnnouncementReadTable error:", err);
-  }
+/**
+ * No-op: AnnouncementRead is a first-class Prisma model defined in schema.prisma and managed via Prisma migrations.
+ */
+export async function ensureAnnouncementReadTable(): Promise<void> {
+  return;
 }
 
 // GET /api/staff/home-data

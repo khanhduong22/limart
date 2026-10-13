@@ -197,6 +197,7 @@ export async function invalidateShiftDutyCache(userId?: string, shiftId?: number
     await invalidateCachePattern("shifts:*");
     await invalidateCachePattern("staff:home:*");
     await invalidateCachePattern("admin:schedule:*");
+    await invalidateCachePattern("admin:schedule:duties:*");
     await invalidateCachePattern("staff:schedule:*");
     await invalidateCachePattern("staff:rewards:*");
     await invalidateCachePattern("staff:reports:*");
@@ -227,6 +228,9 @@ export async function invalidateScheduleCache(): Promise<void> {
 export async function invalidatePayrollCache(): Promise<void> {
   try {
     await invalidateCachePattern("payroll:*");
+    await invalidateCachePattern("admin:payroll:*");
+    await invalidateCachePattern("admin:payroll-user:*");
+    await invalidateCachePattern("admin:employee-detail:*");
     await invalidateCachePattern("staff:payroll:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("stats:monthly:*");

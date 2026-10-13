@@ -90,15 +90,42 @@ staffTasksRoute.get("/", authMiddleware, async (c) => {
     const requestedUserId = c.req.query("userId");
     const targetUserId = isAdmin ? requestedUserId : userId;
 
-    const whereClause: any = {};
-    if (targetUserId) {
-      whereClause.assigneeId = targetUserId;
-    }
+    const cacheKey = `tasks:staff-tasks:${targetUserId || "all"}`;
+    const payload = await getOrSetCache(cacheKey, 60, async () => {
+      const whereClause: any = {};
+      if (targetUserId) {
+        whereClause.assigneeId = targetUserId;
+      }
 
-    const tasks = await prisma.staffTask.findMany({
-      where: whereClause,
-      include: {
-        assignee: {
+      const tasks = await prisma.staffTask.findMany({
+        where: whereClause,
+        include: {
+          assignee: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+              staffTasksAllowed: true,
+            },
+          },
+          createdBy: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      let users: any[] = [];
+      if (isAdmin) {
+        users = await prisma.user.findMany({
+          where: {
+            isActive: true,
+            staffTasksAllowed: true,
+          },
           select: {
             id: true,
             name: true,
@@ -106,41 +133,19 @@ staffTasksRoute.get("/", authMiddleware, async (c) => {
             image: true,
             staffTasksAllowed: true,
           },
-        },
-        createdBy: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+          orderBy: { name: "asc" },
+        });
+      }
 
-    let users: any[] = [];
-    if (isAdmin) {
-      users = await prisma.user.findMany({
-        where: {
-          isActive: true,
-          staffTasksAllowed: true,
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          image: true,
-          staffTasksAllowed: true,
-        },
-        orderBy: { name: "asc" },
-      });
-    }
+      return { tasks, users };
+    });
 
     return c.json({
       success: true,
       allowed: true,
-      data: { tasks, users },
-      tasks,
-      users,
+      data: payload,
+      tasks: payload.tasks,
+      users: payload.users,
     });
   } catch (err: any) {
     return c.json(
@@ -369,6 +374,7 @@ staffTasksRoute.post("/", authMiddleware, async (c) => {
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
+    await invalidateCachePattern("tasks:staff-tasks:*");
 
     return c.json({ success: true, data: task, task }, 201);
   } catch (err: any) {
@@ -482,6 +488,7 @@ async function handleUpdateTask(c: any) {
       await invalidateCachePattern("payroll:*");
       await invalidateCachePattern("stats:*");
       await invalidateCachePattern("staff-tasks:stats:*");
+      await invalidateCachePattern("tasks:staff-tasks:*");
 
       return c.json({ success: true, data: updated, task: updated });
     }
@@ -550,6 +557,7 @@ async function handleUpdateTask(c: any) {
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
+    await invalidateCachePattern("tasks:staff-tasks:*");
 
     return c.json({ success: true, data: updated, task: updated });
   } catch (err: any) {
@@ -647,6 +655,7 @@ staffTasksRoute.patch("/:id/status", authMiddleware, async (c) => {
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
+    await invalidateCachePattern("tasks:staff-tasks:*");
 
     return c.json({ success: true, data: updated, task: updated });
   } catch (err: any) {
@@ -693,6 +702,7 @@ staffTasksRoute.post("/bulk-status", authMiddleware, async (c) => {
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
+    await invalidateCachePattern("tasks:staff-tasks:*");
 
     return c.json({
       success: true,
@@ -753,6 +763,7 @@ staffTasksRoute.post("/:id/approve", authMiddleware, async (c) => {
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
+    await invalidateCachePattern("tasks:staff-tasks:*");
 
     return c.json({ success: true, message: "Đã duyệt nhiệm vụ thành công", data: updated, task: updated });
   } catch (err: any) {
@@ -809,6 +820,7 @@ staffTasksRoute.post("/:id/reject", authMiddleware, async (c) => {
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
+    await invalidateCachePattern("tasks:staff-tasks:*");
 
     return c.json({ success: true, message: "Đã từ chối nhiệm vụ", data: updated, task: updated });
   } catch (err: any) {
@@ -846,6 +858,7 @@ staffTasksRoute.delete("/:id", authMiddleware, async (c) => {
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("staff-tasks:stats:*");
+    await invalidateCachePattern("tasks:staff-tasks:*");
 
     return c.json({ success: true, message: "Đã xóa nhiệm vụ thành công!" });
   } catch (err: any) {

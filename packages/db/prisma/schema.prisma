@@ -105,6 +105,8 @@ model WorkShift {
   @@index([start])
   @@index([start, end])
   @@index([isOpenForSwap, start])
+  @@index([status, start])
+  @@index([userId, status])
 }
 
 model ShiftAuditLog {
@@ -193,6 +195,7 @@ model PayrollAdjustment {
   @@index([userId])
   @@index([userId, date])
   @@index([date])
+  @@index([userId, createdAt])
 }
 
 model LuckyWheelPrize {
@@ -383,6 +386,7 @@ model Payslip {
 
   @@unique([userId, month, year])
   @@index([month, year])
+  @@index([status, month, year])
 }
 
 model Document {
@@ -544,6 +548,8 @@ model ShiftDuty {
   @@index([createdById])
   @@index([date])
   @@index([shiftId])
+  @@index([shiftId, isCompleted])
+  @@index([date, isCompleted])
 }
 
 model SessionAuditLog {

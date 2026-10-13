@@ -14,13 +14,22 @@ import {
   StaffTasksFilterBar,
   StaffTasksTable,
   StaffKpiStatsCards,
-  StaffTaskFormDialog,
-  TaskReviewModal,
-  CreateTaskDefinitionDialog,
-  TaskRejectDialog,
   computeStaffTaskDateRanges,
   filterStaffTasks,
 } from "@/components/tasks/staff";
+
+const StaffTaskFormDialog = React.lazy(() =>
+  import("@/components/tasks/staff").then((m) => ({ default: m.StaffTaskFormDialog }))
+);
+const TaskReviewModal = React.lazy(() =>
+  import("@/components/tasks/staff").then((m) => ({ default: m.TaskReviewModal }))
+);
+const CreateTaskDefinitionDialog = React.lazy(() =>
+  import("@/components/tasks/staff").then((m) => ({ default: m.CreateTaskDefinitionDialog }))
+);
+const TaskRejectDialog = React.lazy(() =>
+  import("@/components/tasks/staff").then((m) => ({ default: m.TaskRejectDialog }))
+);
 
 export function StaffTasksPage() {
   const {
@@ -279,29 +288,37 @@ export function StaffTasksPage() {
       />
 
       {/* Dialogs */}
-      <StaffTaskFormDialog
-        assignableUsers={allowedUsers}
-        existingTasks={tasks}
-        onSubmit={handleSaveStaffTask}
-        submitting={submitting}
-      />
+      <React.Suspense fallback={null}>
+        <StaffTaskFormDialog
+          assignableUsers={allowedUsers}
+          existingTasks={tasks}
+          onSubmit={handleSaveStaffTask}
+          submitting={submitting}
+        />
+      </React.Suspense>
 
-      <TaskReviewModal
-        onApprove={(task, adminNote) => handleApproveTask(task, undefined, adminNote)}
-        onReject={handleRejectTask}
-        submitting={submitting}
-      />
+      <React.Suspense fallback={null}>
+        <TaskReviewModal
+          onApprove={(task, adminNote) => handleApproveTask(task, undefined, adminNote)}
+          onReject={handleRejectTask}
+          submitting={submitting}
+        />
+      </React.Suspense>
 
-      <CreateTaskDefinitionDialog />
+      <React.Suspense fallback={null}>
+        <CreateTaskDefinitionDialog />
+      </React.Suspense>
 
-      <TaskRejectDialog
-        onSubmit={(reason) => {
-          if (selectedTaskForReject) {
-            return handleRejectTask(selectedTaskForReject, reason);
-          }
-        }}
-        submitting={submitting}
-      />
+      <React.Suspense fallback={null}>
+        <TaskRejectDialog
+          onSubmit={(reason) => {
+            if (selectedTaskForReject) {
+              return handleRejectTask(selectedTaskForReject, reason);
+            }
+          }}
+          submitting={submitting}
+        />
+      </React.Suspense>
     </div>
   );
 }

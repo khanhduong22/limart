@@ -2040,10 +2040,13 @@ adminRoute.get("/schedule/:id/duties", async (c) => {
   try {
     const shiftId = parseInt(c.req.param("id"), 10);
     if (isNaN(shiftId)) return c.json({ success: false, error: "Invalid shift id" }, 400);
-    const duties = await prisma.shiftDuty.findMany({
-      where: { shiftId },
-      include: { user: { select: { id: true, name: true, email: true, image: true } } },
-      orderBy: { createdAt: "asc" },
+    const cacheKey = `admin:schedule:duties:${shiftId}`;
+    const duties = await getOrSetCache(cacheKey, 60, async () => {
+      return await prisma.shiftDuty.findMany({
+        where: { shiftId },
+        include: { user: { select: { id: true, name: true, email: true, image: true } } },
+        orderBy: { createdAt: "asc" },
+      });
     });
     return c.json({ success: true, data: duties });
   } catch (err: any) {
@@ -2076,6 +2079,7 @@ adminRoute.post("/schedule/duties", async (c) => {
     await Promise.all([
       invalidateShiftDutyCache(),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:duties:*"),
     ]).catch(() => {});
     return c.json({ success: true, data: duty }, 201);
   } catch (err: any) {
@@ -2091,6 +2095,7 @@ adminRoute.delete("/schedule/duties/:dutyId", async (c) => {
     await Promise.all([
       invalidateShiftDutyCache(),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:duties:*"),
     ]).catch(() => {});
     return c.json({ success: true, message: "Đã xóa nhiệm vụ" });
   } catch (err: any) {
@@ -2300,204 +2305,210 @@ adminRoute.get("/payroll", async (c) => {
     const month = parseInt(c.req.query("month") || "", 10) || new Date().getMonth() + 1;
     const year = parseInt(c.req.query("year") || "", 10) || new Date().getFullYear();
 
-    const { startDate, endDate } = getVietnamMonthRange(month, year);
+    const cacheKey = `admin:payroll:${month}:${year}`;
+    const result = await getOrSetCache(cacheKey, 60, async () => {
+      const { startDate, endDate } = getVietnamMonthRange(month, year);
 
-    const [users, period] = await Promise.all([
-      prisma.user.findMany({
-        where: {
-          OR: [
-            { isActive: true },
-            { shifts: { some: { start: { gte: startDate, lte: endDate } } } },
-            { checkins: { some: { timestamp: { gte: startDate, lte: endDate } } } },
-            { adjustments: { some: { date: { gte: startDate, lte: endDate } } } },
-          ],
-        },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          role: true,
-          hourlyRate: true,
-          monthlySalary: true,
-          employmentType: true,
-          adjustments: {
-            where: { date: { gte: startDate, lte: endDate } },
-            orderBy: { date: "desc" },
+      const [users, period] = await Promise.all([
+        prisma.user.findMany({
+          where: {
+            OR: [
+              { isActive: true },
+              { shifts: { some: { start: { gte: startDate, lte: endDate } } } },
+              { checkins: { some: { timestamp: { gte: startDate, lte: endDate } } } },
+              { adjustments: { some: { date: { gte: startDate, lte: endDate } } } },
+            ],
           },
-        },
-        orderBy: { name: "asc" },
-      }),
-      prisma.payrollPeriod.findUnique({
-        where: { month_year: { month, year } },
-      }),
-    ]);
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            hourlyRate: true,
+            monthlySalary: true,
+            employmentType: true,
+            adjustments: {
+              where: { date: { gte: startDate, lte: endDate } },
+              orderBy: { date: "desc" },
+            },
+          },
+          orderBy: { name: "asc" },
+        }),
+        prisma.payrollPeriod.findUnique({
+          where: { month_year: { month, year } },
+        }),
+      ]);
 
-    const isPeriodClosed = period?.status === "CLOSED";
+      const isPeriodClosed = period?.status === "CLOSED";
 
-    if (isPeriodClosed) {
-      const payslips = await prisma.payslip.findMany({
-        where: { month, year },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              role: true,
-              employmentType: true,
-              hourlyRate: true,
-              adjustments: {
-                where: { date: { gte: startDate, lte: endDate } },
-                orderBy: { date: "desc" },
+      if (isPeriodClosed) {
+        const payslips = await prisma.payslip.findMany({
+          where: { month, year },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                employmentType: true,
+                hourlyRate: true,
+                adjustments: {
+                  where: { date: { gte: startDate, lte: endDate } },
+                  orderBy: { date: "desc" },
+                },
               },
             },
           },
-        },
-      });
+        });
 
-      if (payslips.length > 0) {
-        const payrollItems = payslips.map((p) => {
-          const content = (p.content as any) || {};
+        if (payslips.length > 0) {
+          const payrollItems = payslips.map((p) => {
+            const content = (p.content as any) || {};
+            return {
+              id: p.userId,
+              name: p.user.name,
+              email: p.user.email,
+              role: p.user.role,
+              stats: content,
+              recentAdjustments: (p.user.adjustments || []).map((a: any) => ({
+                id: a.id,
+                amount: a.amount,
+                reason: a.reason,
+                date: a.date ? new Date(a.date).toISOString() : new Date().toISOString(),
+              })),
+              userId: p.userId,
+              userName: p.user.name,
+              userEmail: p.user.email,
+              department: (content.employmentType || p.user.employmentType) === "FULL_TIME" ? "Toàn thời gian" : "Bán thời gian",
+              month,
+              year,
+              standardHours: 176,
+              actualHours: content.totalHours || 0,
+              overtimeHours: Math.max(0, (content.totalHours || 0) - 176),
+              hourlyRate: content.hourlyRate || p.user.hourlyRate || 0,
+              baseSalary: content.baseSalary || 0,
+              bonus: content.bonusAmount || 0,
+              allowance: 0,
+              penalty: content.latePenaltyAmount || 0,
+              totalSalary: content.totalSalary || 0,
+              isPaid: true,
+              emailSentAt: p.emailSentAt,
+            };
+          });
+
           return {
-            id: p.userId,
-            name: p.user.name,
-            email: p.user.email,
-            role: p.user.role,
-            stats: content,
-            recentAdjustments: (p.user.adjustments || []).map((a: any) => ({
+            data: payrollItems,
+            isClosed: true,
+            period,
+            bonusPercent: period?.bonusPercent || 0,
+            bonusTargets: (period?.bonusTargets as string[]) || ["PART_TIME"],
+            excludedBonusUsers: (period?.excludedBonusUsers as string[]) || [],
+          };
+        }
+      }
+
+      const targetDate = new Date(year, month - 1, 15);
+
+      const payrollItems = await Promise.all(
+        users.map(async (u) => {
+          const stats = await calculateUserMonthlyStats(u.id, targetDate).catch(() => null);
+
+          const standardHours = 176;
+          const actualHours = stats?.totalHours || 0;
+          const overtimeHours = stats ? Math.max(0, actualHours - standardHours) : 0;
+          const hourlyRate = stats?.hourlyRate || u.hourlyRate || 0;
+          const baseSalary = stats?.baseSalary || 0;
+          const bonusTargets = (period?.bonusTargets as string[]) || ["PART_TIME"];
+          const excludedBonusUsers = (period?.excludedBonusUsers as string[]) || [];
+          const isThuKpiSalary =
+            (u.email === "cuccung123456789@gmail.com" || u.name === "Thư") &&
+            (year > 2026 || (year === 2026 && month >= 6));
+          const shouldApplyBonus =
+            Boolean(period?.bonusPercent) &&
+            (bonusTargets.includes(stats?.employmentType || u.employmentType) ||
+              (isThuKpiSalary && bonusTargets.includes("PART_TIME"))) &&
+            !excludedBonusUsers.includes(u.id);
+          const bonus = shouldApplyBonus && period?.bonusPercent ? Math.round(baseSalary * (period.bonusPercent / 100)) : 0;
+          const allowance = 0;
+          const penalty = stats?.latePenaltyAmount || 0;
+          const preBonusTotalSalary = stats?.totalSalary ?? (baseSalary - penalty);
+
+          return {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            stats: {
+              ...(stats || {}),
+              employmentType: stats?.employmentType || u.employmentType,
+              baseSalary: stats?.baseSalary || 0,
+              totalSalary: preBonusTotalSalary, // Pre-bonus salary to avoid double bonus!
+              hourlyRate: stats?.hourlyRate || u.hourlyRate || 0,
+              dynamicHourlyRate: stats?.dynamicHourlyRate || stats?.hourlyRate || u.hourlyRate || 0,
+              daysWorked: stats?.daysWorked || 0,
+              standardDays: stats?.standardDays || 26,
+              leaveCount: stats?.leaveCount || 0,
+              deduction: stats?.deduction || 0,
+              totalHours: stats?.totalHours || 0,
+              bonusAmount: bonus,
+              finalNet: preBonusTotalSalary + bonus,
+              adjustments: stats?.adjustments || (u.adjustments || []).map((a: any) => ({
+                ...a,
+                date: a.date ? new Date(a.date).toISOString() : new Date().toISOString(),
+              })),
+            },
+            recentAdjustments: (u.adjustments || []).map((a: any) => ({
               id: a.id,
               amount: a.amount,
               reason: a.reason,
               date: a.date ? new Date(a.date).toISOString() : new Date().toISOString(),
             })),
-            userId: p.userId,
-            userName: p.user.name,
-            userEmail: p.user.email,
-            department: (content.employmentType || p.user.employmentType) === "FULL_TIME" ? "Toàn thời gian" : "Bán thời gian",
+            // Flat fields for backwards compatibility:
+            userId: u.id,
+            userName: u.name,
+            userEmail: u.email,
+            department: (stats?.employmentType || u.employmentType) === "FULL_TIME" ? "Toàn thời gian" : "Bán thời gian",
             month,
             year,
-            standardHours: 176,
-            actualHours: content.totalHours || 0,
-            overtimeHours: Math.max(0, (content.totalHours || 0) - 176),
-            hourlyRate: content.hourlyRate || p.user.hourlyRate || 0,
-            baseSalary: content.baseSalary || 0,
-            bonus: content.bonusAmount || 0,
-            allowance: 0,
-            penalty: content.latePenaltyAmount || 0,
-            totalSalary: content.totalSalary || 0,
-            isPaid: true,
-            emailSentAt: p.emailSentAt,
+            standardHours,
+            actualHours,
+            overtimeHours,
+            hourlyRate,
+            baseSalary,
+            bonus,
+            allowance,
+            penalty,
+            totalSalary: preBonusTotalSalary,
+            isPaid: isPeriodClosed,
           };
-        });
+        })
+      );
 
-        return c.json({
-          success: true,
-          data: payrollItems,
-          isClosed: true,
-          period,
-          bonusPercent: period?.bonusPercent || 0,
-          bonusTargets: (period?.bonusTargets as string[]) || ["PART_TIME"],
-          excludedBonusUsers: (period?.excludedBonusUsers as string[]) || [],
-        });
-      }
-    }
+      // Apply Top 1 Hardworking Bonus (+200k) from @checkin/shared (BUG-PAY-04)
+      const itemsWithBonus = applyHardworkingBonus(payrollItems, month, year, true);
 
-    const targetDate = new Date(year, month - 1, 15);
-
-    const payrollItems = await Promise.all(
-      users.map(async (u) => {
-        const stats = await calculateUserMonthlyStats(u.id, targetDate).catch(() => null);
-
-        const standardHours = 176;
-        const actualHours = stats?.totalHours || 0;
-        const overtimeHours = stats ? Math.max(0, actualHours - standardHours) : 0;
-        const hourlyRate = stats?.hourlyRate || u.hourlyRate || 0;
-        const baseSalary = stats?.baseSalary || 0;
-        const bonusTargets = (period?.bonusTargets as string[]) || ["PART_TIME"];
-        const excludedBonusUsers = (period?.excludedBonusUsers as string[]) || [];
-        const isThuKpiSalary =
-          (u.email === "cuccung123456789@gmail.com" || u.name === "Thư") &&
-          (year > 2026 || (year === 2026 && month >= 6));
-        const shouldApplyBonus =
-          Boolean(period?.bonusPercent) &&
-          (bonusTargets.includes(stats?.employmentType || u.employmentType) ||
-            (isThuKpiSalary && bonusTargets.includes("PART_TIME"))) &&
-          !excludedBonusUsers.includes(u.id);
-        const bonus = shouldApplyBonus && period?.bonusPercent ? Math.round(baseSalary * (period.bonusPercent / 100)) : 0;
-        const allowance = 0;
-        const penalty = stats?.latePenaltyAmount || 0;
-        const preBonusTotalSalary = stats?.totalSalary ?? (baseSalary - penalty);
-
+      const finalPayrollItems = itemsWithBonus.map((item) => {
+        const stats = item.stats || {};
         return {
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          role: u.role,
-          stats: {
-            ...(stats || {}),
-            employmentType: stats?.employmentType || u.employmentType,
-            baseSalary: stats?.baseSalary || 0,
-            totalSalary: preBonusTotalSalary, // Pre-bonus salary to avoid double bonus!
-            hourlyRate: stats?.hourlyRate || u.hourlyRate || 0,
-            dynamicHourlyRate: stats?.dynamicHourlyRate || stats?.hourlyRate || u.hourlyRate || 0,
-            daysWorked: stats?.daysWorked || 0,
-            standardDays: stats?.standardDays || 26,
-            leaveCount: stats?.leaveCount || 0,
-            deduction: stats?.deduction || 0,
-            totalHours: stats?.totalHours || 0,
-            bonusAmount: bonus,
-            finalNet: preBonusTotalSalary + bonus,
-            adjustments: stats?.adjustments || (u.adjustments || []).map((a: any) => ({
-              ...a,
-              date: a.date ? new Date(a.date).toISOString() : new Date().toISOString(),
-            })),
-          },
-          recentAdjustments: (u.adjustments || []).map((a: any) => ({
-            id: a.id,
-            amount: a.amount,
-            reason: a.reason,
-            date: a.date ? new Date(a.date).toISOString() : new Date().toISOString(),
-          })),
-          // Flat fields for backwards compatibility:
-          userId: u.id,
-          userName: u.name,
-          userEmail: u.email,
-          department: (stats?.employmentType || u.employmentType) === "FULL_TIME" ? "Toàn thời gian" : "Bán thời gian",
-          month,
-          year,
-          standardHours,
-          actualHours,
-          overtimeHours,
-          hourlyRate,
-          baseSalary,
-          bonus,
-          allowance,
-          penalty,
-          totalSalary: preBonusTotalSalary,
-          isPaid: isPeriodClosed,
+          ...item,
+          totalSalary: stats.totalSalary !== undefined ? stats.totalSalary : item.totalSalary,
         };
-      })
-    );
+      });
 
-    // Apply Top 1 Hardworking Bonus (+200k) from @checkin/shared (BUG-PAY-04)
-    const itemsWithBonus = applyHardworkingBonus(payrollItems, month, year, true);
-
-    const finalPayrollItems = itemsWithBonus.map((item) => {
-      const stats = item.stats || {};
       return {
-        ...item,
-        totalSalary: stats.totalSalary !== undefined ? stats.totalSalary : item.totalSalary,
+        data: finalPayrollItems,
+        isClosed: isPeriodClosed,
+        period,
+        bonusPercent: period?.bonusPercent || 0,
+        bonusTargets: (period?.bonusTargets as string[]) || ["PART_TIME"],
+        excludedBonusUsers: (period?.excludedBonusUsers as string[]) || [],
       };
     });
 
     return c.json({
       success: true,
-      data: finalPayrollItems,
-      isClosed: isPeriodClosed,
-      period,
-      bonusPercent: period?.bonusPercent || 0,
-      bonusTargets: (period?.bonusTargets as string[]) || ["PART_TIME"],
-      excludedBonusUsers: (period?.excludedBonusUsers as string[]) || [],
+      ...result,
     });
   } catch (err: any) {
     return c.json(
@@ -2516,60 +2527,69 @@ adminRoute.get("/payroll/:userId", async (c) => {
     const year = parseInt(c.req.query("year") || "", 10) || now.getFullYear();
     const targetDate = new Date(year, month - 1, 1);
 
-    const [user, period, payslip] = await Promise.all([
-      prisma.user.findUnique({ where: { id: userId } }),
-      prisma.payrollPeriod.findUnique({
-        where: { month_year: { month, year } },
-      }),
-      prisma.payslip.findUnique({
-        where: { userId_month_year: { userId, month, year } },
-      }),
-    ]);
+    const cacheKey = `admin:payroll-user:${userId}:${month}:${year}`;
+    const result = await getOrSetCache(cacheKey, 60, async () => {
+      const [user, period, payslip] = await Promise.all([
+        prisma.user.findUnique({ where: { id: userId } }),
+        prisma.payrollPeriod.findUnique({
+          where: { month_year: { month, year } },
+        }),
+        prisma.payslip.findUnique({
+          where: { userId_month_year: { userId, month, year } },
+        }),
+      ]);
 
-    if (!user) {
-      return c.json({ success: false, error: "Không tìm thấy nhân viên" }, 404);
-    }
+      if (!user) {
+        return null;
+      }
 
-    const isClosed = period?.status === "CLOSED" && !!payslip;
-    let stats: any;
+      const isClosed = period?.status === "CLOSED" && !!payslip;
+      let stats: any;
 
-    if (isClosed && payslip) {
-      stats = payslip.content;
-    } else {
-      const liveStats = await calculateUserMonthlyStats(userId, targetDate);
-      const bonusPercent = period?.bonusPercent || 0;
-      const bonusTargets = (period?.bonusTargets as string[]) || ["PART_TIME"];
-      const excludedBonusUsers = (period?.excludedBonusUsers as string[]) || [];
-      const isThuKpiSalary =
-        (user.email === "cuccung123456789@gmail.com" || user.name === "Thư") &&
-        (year > 2026 || (year === 2026 && month >= 6));
-      const shouldApplyBonus =
-        bonusPercent > 0 &&
-        (bonusTargets.includes(user.employmentType) || (isThuKpiSalary && bonusTargets.includes("PART_TIME"))) &&
-        !excludedBonusUsers.includes(user.id);
-      const bonusAmount =
-        shouldApplyBonus && liveStats
-          ? Math.round((liveStats.baseSalary || 0) * (bonusPercent / 100))
-          : 0;
-      const finalNet = (liveStats?.totalSalary || 0) + bonusAmount;
+      if (isClosed && payslip) {
+        stats = payslip.content;
+      } else {
+        const liveStats = await calculateUserMonthlyStats(userId, targetDate);
+        const bonusPercent = period?.bonusPercent || 0;
+        const bonusTargets = (period?.bonusTargets as string[]) || ["PART_TIME"];
+        const excludedBonusUsers = (period?.excludedBonusUsers as string[]) || [];
+        const isThuKpiSalary =
+          (user.email === "cuccung123456789@gmail.com" || user.name === "Thư") &&
+          (year > 2026 || (year === 2026 && month >= 6));
+        const shouldApplyBonus =
+          bonusPercent > 0 &&
+          (bonusTargets.includes(user.employmentType) || (isThuKpiSalary && bonusTargets.includes("PART_TIME"))) &&
+          !excludedBonusUsers.includes(user.id);
+        const bonusAmount =
+          shouldApplyBonus && liveStats
+            ? Math.round((liveStats.baseSalary || 0) * (bonusPercent / 100))
+            : 0;
+        const finalNet = (liveStats?.totalSalary || 0) + bonusAmount;
 
-      stats = {
-        ...liveStats,
-        bonusPercent: shouldApplyBonus ? bonusPercent : 0,
-        bonusAmount,
-        finalNet,
-      };
-    }
+        stats = {
+          ...liveStats,
+          bonusPercent: shouldApplyBonus ? bonusPercent : 0,
+          bonusAmount,
+          finalNet,
+        };
+      }
 
-    return c.json({
-      success: true,
-      data: {
+      return {
         user,
         period,
         payslip,
         stats,
         isClosed,
-      },
+      };
+    });
+
+    if (!result || !result.user) {
+      return c.json({ success: false, error: "Không tìm thấy nhân viên" }, 404);
+    }
+
+    return c.json({
+      success: true,
+      data: result,
     });
   } catch (err: any) {
     return c.json(

@@ -1,6 +1,6 @@
 import React from "react";
 import { useAppQuery } from "@/lib/api-query";
-import HistoryGantt from "@/components/HistoryGantt";
+const HistoryGantt = React.lazy(() => import("@/components/HistoryGantt"));
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
@@ -30,7 +30,9 @@ export const HistoryView: React.FC = () => {
       </div>
 
         {/* Gantt Chart */}
-        <HistoryGantt checkins={history} />
+        <React.Suspense fallback={<div className="h-32 w-full animate-pulse rounded-2xl bg-orange-50/50" />}>
+          <HistoryGantt checkins={history} />
+        </React.Suspense>
 
         {/* Check-in Log Table Card */}
         <Card className="rounded-2xl shadow-xs overflow-hidden">

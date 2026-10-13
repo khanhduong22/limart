@@ -5,9 +5,9 @@ import {
   StaffHomeData,
 } from "@/lib/api-client";
 import CheckInButtons from "@/components/CheckInButtons";
-import AnnouncementBar from "@/components/AnnouncementBar";
 import HomeAnnouncements from "@/components/HomeAnnouncements";
 import PrivacyStats from "@/components/PrivacyStats";
+const AnnouncementBar = lazy(() => import("@/components/AnnouncementBar"));
 const ShiftDutyHomeWidget = lazy(() => import("@/components/shift-duty/ShiftDutyHomeWidget"));
 const GachaButton = lazy(() => import("@/components/GachaButton"));
 const CapyAssistant = lazy(() => import("@/components/CapyAssistant"));
@@ -103,10 +103,12 @@ export const HomeCheckinView: React.FC = () => {
 
         {/* Announcements Modal Popup */}
         <div id="home-announcement">
-          <AnnouncementBar
-            announcements={announcements || []}
-            onMarkedRead={() => mutate()}
-          />
+          <Suspense fallback={null}>
+            <AnnouncementBar
+              announcements={announcements || []}
+              onMarkedRead={() => mutate()}
+            />
+          </Suspense>
         </div>
 
         {/* Rejected Tasks Alert Banner */}

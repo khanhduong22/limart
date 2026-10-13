@@ -196,8 +196,22 @@ export async function invalidateShiftDutyCache(userId?: string, shiftId?: number
     await invalidateCachePattern("shift-duties:*");
     await invalidateCachePattern("shifts:*");
     await invalidateCachePattern("staff:home:*");
+    await invalidateCachePattern("admin:schedule:*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate shift duty cache:", e);
+  }
+}
+
+/**
+ * Invalidate admin schedule cache
+ */
+export async function invalidateScheduleCache(): Promise<void> {
+  try {
+    await invalidateCachePattern("admin:schedule:*");
+    await invalidateCachePattern("shifts:*");
+    await invalidateCachePattern("shift-duties:*");
+  } catch (e) {
+    console.warn("[Cache Warning] Failed to invalidate schedule cache:", e);
   }
 }
 

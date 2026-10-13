@@ -120,6 +120,7 @@ export async function autoScheduleAdminNa(weeksAhead: number = 12): Promise<Auto
       await invalidateCachePattern("stats:*");
       await invalidateCachePattern("payroll:*");
       await invalidateCachePattern("shift*");
+      await invalidateCachePattern("admin:schedule:*");
     } catch (e) {
       console.error("Failed to invalidate cache after auto schedule:", e);
     }

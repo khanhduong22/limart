@@ -37,7 +37,7 @@ export function Sidebar({
               className="h-6 w-6 object-contain"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).src =
-                  "/icons/capy_dashboard.png";
+                  "/icons/capy_dashboard.webp";
               }}
             />
           </div>

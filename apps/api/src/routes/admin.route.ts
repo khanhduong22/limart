@@ -856,6 +856,7 @@ const handleUpdateUser = async (c: any) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(id),
       invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("admin:schedule:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -1308,8 +1309,10 @@ adminRoute.post("/requests/:id/reject", async (c) => {
 // GET /api/admin/announcements
 adminRoute.get("/announcements", async (c) => {
   try {
-    const announcements = await prisma.announcement.findMany({
-      orderBy: { createdAt: "desc" },
+    const announcements = await getOrSetCache("admin:announcements:all", 300, async () => {
+      return prisma.announcement.findMany({
+        orderBy: { createdAt: "desc" },
+      });
     });
     return c.json({ success: true, data: announcements });
   } catch (err: any) {
@@ -1340,6 +1343,11 @@ adminRoute.post("/announcements", async (c) => {
       },
     });
 
+    await Promise.all([
+      invalidateCachePattern("admin:announcements:*"),
+      invalidateCachePattern("staff:home:*"),
+    ]).catch(() => {});
+
     return c.json(
       {
         success: true,
@@ -1361,6 +1369,12 @@ adminRoute.delete("/announcements/:id", async (c) => {
   try {
     const id = c.req.param("id");
     await prisma.announcement.delete({ where: { id } });
+
+    await Promise.all([
+      invalidateCachePattern("admin:announcements:*"),
+      invalidateCachePattern("staff:home:*"),
+    ]).catch(() => {});
+
     return c.json({ success: true, message: "Đã xóa thông báo thành công!" });
   } catch (err: any) {
     return c.json(
@@ -1384,6 +1398,12 @@ adminRoute.patch("/announcements/:id/toggle", async (c) => {
       where: { id },
       data: { active: nextActive },
     });
+
+    await Promise.all([
+      invalidateCachePattern("admin:announcements:*"),
+      invalidateCachePattern("staff:home:*"),
+    ]).catch(() => {});
+
     return c.json({ success: true, data: updated });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to toggle announcement" }, 500);
@@ -1401,53 +1421,57 @@ adminRoute.get("/schedule", async (c) => {
     const startQuery = c.req.query("start");
     const endQuery = c.req.query("end");
 
-    let whereClause: any = {};
-    if (startQuery && endQuery) {
-      whereClause.start = { gte: new Date(startQuery), lte: new Date(endQuery) };
-    } else if (monthQuery || yearQuery) {
-      const { startDate, endDate } = getVietnamMonthRange(
-        monthQuery ? parseInt(monthQuery, 10) : undefined,
-        yearQuery ? parseInt(yearQuery, 10) : undefined
-      );
-      whereClause.start = { gte: startDate, lte: endDate };
-    } else {
-      const today = new Date();
-      const startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      whereClause.start = { gte: startDate };
-    }
+    const cacheKey = `admin:schedule:${monthQuery || "all"}:${yearQuery || "all"}:${startQuery || "none"}:${endQuery || "none"}`;
 
-    const shifts = await prisma.workShift.findMany({
-      where: whereClause,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            email: true,
-            role: true,
-            employmentType: true,
+    const events = await getOrSetCache(cacheKey, 120, async () => {
+      let whereClause: any = {};
+      if (startQuery && endQuery) {
+        whereClause.start = { gte: new Date(startQuery), lte: new Date(endQuery) };
+      } else if (monthQuery || yearQuery) {
+        const { startDate, endDate } = getVietnamMonthRange(
+          monthQuery ? parseInt(monthQuery, 10) : undefined,
+          yearQuery ? parseInt(yearQuery, 10) : undefined
+        );
+        whereClause.start = { gte: startDate, lte: endDate };
+      } else {
+        const today = new Date();
+        const startDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        whereClause.start = { gte: startDate };
+      }
+
+      const shifts = await prisma.workShift.findMany({
+        where: whereClause,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              image: true,
+              email: true,
+              role: true,
+              employmentType: true,
+            },
           },
+          duties: true,
         },
-        duties: true,
-      },
-      orderBy: { start: "asc" },
-    });
+        orderBy: { start: "asc" },
+      });
 
-    const events = shifts.map((s: any) => ({
-      id: s.id,
-      title: s.user?.name || "Staff",
-      start: s.start.toISOString(),
-      end: s.end.toISOString(),
-      userId: s.userId,
-      user: s.user,
-      employmentType: s.user?.employmentType || "PART_TIME",
-      duties: s.duties || [],
-      isSenior: Boolean(s.isSenior),
-      isOpenForSwap: Boolean(s.isOpenForSwap),
-      shiftType: s.shiftType,
-      status: s.status,
-    }));
+      return shifts.map((s: any) => ({
+        id: s.id,
+        title: s.user?.name || "Staff",
+        start: s.start instanceof Date ? s.start.toISOString() : new Date(s.start).toISOString(),
+        end: s.end instanceof Date ? s.end.toISOString() : new Date(s.end).toISOString(),
+        userId: s.userId,
+        user: s.user,
+        employmentType: s.user?.employmentType || "PART_TIME",
+        duties: s.duties || [],
+        isSenior: Boolean(s.isSenior),
+        isOpenForSwap: Boolean(s.isOpenForSwap),
+        shiftType: s.shiftType,
+        status: s.status,
+      }));
+    });
 
     return c.json({ success: true, data: events });
   } catch (err: any) {
@@ -1518,7 +1542,11 @@ adminRoute.post("/schedule", async (c) => {
       status: shift.status,
     };
 
-    await Promise.all([invalidatePayrollCache(), invalidateShiftDutyCache(shift.userId, shift.id)]).catch(() => {});
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateShiftDutyCache(shift.userId, shift.id),
+      invalidateCachePattern("admin:schedule:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: event, id: shift.id }, 201);
   } catch (err: any) {
@@ -1586,7 +1614,11 @@ adminRoute.put("/schedule/:id", async (c) => {
       status: updated.status,
     };
 
-    await Promise.all([invalidatePayrollCache(), invalidateShiftDutyCache(existing.userId, id)]).catch(() => {});
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateShiftDutyCache(existing.userId, id),
+      invalidateCachePattern("admin:schedule:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: event });
   } catch (err: any) {
@@ -1619,7 +1651,11 @@ adminRoute.delete("/schedule/:id", async (c) => {
 
     await prisma.workShift.delete({ where: { id } });
 
-    await Promise.all([invalidatePayrollCache(), invalidateShiftDutyCache(existing.userId, id)]).catch(() => {});
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateShiftDutyCache(existing.userId, id),
+      invalidateCachePattern("admin:schedule:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa ca trực" });
   } catch (err: any) {
@@ -1645,6 +1681,8 @@ const clearUserScheduleHandler = async (c: any) => {
     await Promise.all([
       invalidatePayrollCache(),
       invalidateCachePattern("shifts:*"),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateShiftDutyCache(userId),
     ]).catch(() => {});
 
     return c.json({
@@ -1736,9 +1774,12 @@ adminRoute.patch("/schedule/:id/senior", async (c) => {
       ? `Đã gán ${shiftUserName} làm Trưởng ca (+3k/h)!`
       : `Đã hủy vai trò Trưởng ca của ${shiftUserName}.`;
 
-    await invalidateShiftDutyCache();
-    await invalidateCachePattern("payroll:*");
-    await invalidateCachePattern("stats:*");
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("admin:schedule:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: updated, isSenior, message, unsetShiftIds });
   } catch (err: any) {
@@ -1858,7 +1899,11 @@ adminRoute.post("/schedule/upload", async (c) => {
       message = `Đã xếp ${createdShifts.length} ca. Không tìm thấy nhân viên: ${Array.from(unrecognizedNames).join(", ")}`;
     }
 
-    await Promise.all([invalidatePayrollCache(), invalidateShiftDutyCache()]).catch(() => {});
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("admin:schedule:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, message, count: createdShifts.length });
   } catch (err: any) {
@@ -1945,7 +1990,10 @@ adminRoute.post("/schedule/duties", async (c) => {
         user: { select: { id: true, name: true, email: true, image: true } },
       },
     });
-    await invalidateShiftDutyCache();
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("admin:schedule:*"),
+    ]).catch(() => {});
     return c.json({ success: true, data: duty }, 201);
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to create duty" }, 500);
@@ -1957,19 +2005,25 @@ adminRoute.delete("/schedule/duties/:dutyId", async (c) => {
   try {
     const dutyId = c.req.param("dutyId");
     await prisma.shiftDuty.delete({ where: { id: dutyId } });
-    await invalidateShiftDutyCache();
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("admin:schedule:*"),
+    ]).catch(() => {});
     return c.json({ success: true, message: "Đã xóa nhiệm vụ" });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to delete duty" }, 500);
   }
 });
 
-// POST /api/admin/schedule/:id/swap
-adminRoute.post("/schedule/:id/swap", async (c) => {
+// POST /api/admin/schedule/:id/swap & POST /api/admin/schedule/swap
+const toggleSwapHandler = async (c: any) => {
   try {
-    const id = parseInt(c.req.param("id"), 10);
-    if (isNaN(id)) return c.json({ success: false, error: "Invalid shift id" }, 400);
     const body = await c.req.json().catch(() => ({}));
+    const paramId = c.req.param("id");
+    const rawId = paramId !== undefined ? paramId : (body.id ?? body.shiftId);
+    const id = parseInt(String(rawId), 10);
+    if (isNaN(id)) return c.json({ success: false, error: "Invalid shift id" }, 400);
+
     const existing = await prisma.workShift.findUnique({ where: { id } });
     if (!existing) return c.json({ success: false, error: "Ca làm không tồn tại" }, 404);
     await assertPeriodOpen(existing.start);
@@ -1978,17 +2032,31 @@ adminRoute.post("/schedule/:id/swap", async (c) => {
       where: { id },
       data: { isOpenForSwap: isOpen },
     });
+
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("shifts:*"),
+    ]).catch(() => {});
+
     return c.json({ success: true, data: updated, isOpenForSwap: isOpen });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to toggle swap" }, 500);
   }
-});
+};
 
-// POST /api/admin/schedule/:id/take
-adminRoute.post("/schedule/:id/take", async (c) => {
+adminRoute.post("/schedule/:id/swap", toggleSwapHandler);
+adminRoute.post("/schedule/swap", toggleSwapHandler);
+
+// POST /api/admin/schedule/:id/take & POST /api/admin/schedule/take
+const takeShiftHandler = async (c: any) => {
   try {
-    const id = parseInt(c.req.param("id"), 10);
+    const body = await c.req.json().catch(() => ({}));
+    const paramId = c.req.param("id");
+    const rawId = paramId !== undefined ? paramId : (body.id ?? body.shiftId);
+    const id = parseInt(String(rawId), 10);
     if (isNaN(id)) return c.json({ success: false, error: "Invalid shift id" }, 400);
+
     const tokenPayload = c.get("user");
     const existing = await prisma.workShift.findUnique({ where: { id } });
     if (!existing) return c.json({ success: false, error: "Ca làm không tồn tại" }, 404);
@@ -2020,15 +2088,22 @@ adminRoute.post("/schedule/:id/take", async (c) => {
       },
     }).catch(() => {});
 
-    await invalidateShiftDutyCache();
-    await invalidateCachePattern("payroll:*");
-    await invalidateCachePattern("stats:*");
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("shifts:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: updated, message: "Đã nhận ca thành công!" });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to take shift" }, 500);
   }
-});
+};
+
+adminRoute.post("/schedule/:id/take", takeShiftHandler);
+adminRoute.post("/schedule/take", takeShiftHandler);
 
 // ============================================================================
 // 7. BATCH CLOSE SHIFTS

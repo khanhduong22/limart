@@ -4,6 +4,7 @@ import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { getVietnamMonthRange } from "../lib/date-utils";
 import { isShiftLocked } from "../lib/schedule-lock";
 import { assertPeriodOpen } from "../lib/payroll-period";
+import { invalidateShiftDutyCache, invalidateCachePattern } from "../lib/cache";
 
 export const scheduleRoute = new Hono<AppEnv>();
 
@@ -203,6 +204,12 @@ scheduleRoute.post("/:id/swap", authMiddleware, async (c) => {
       },
     });
 
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("shifts:*"),
+    ]).catch(() => {});
+
     return c.json({
       success: true,
       message: newSwapStatus
@@ -259,6 +266,14 @@ scheduleRoute.post("/:id/take", authMiddleware, async (c) => {
         user: { select: { id: true, name: true, image: true, email: true } },
       },
     });
+
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("shifts:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,

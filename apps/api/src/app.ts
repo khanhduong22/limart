@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { cors } from "hono/cors";
+import { compress } from "hono/compress";
 import { etag } from "hono/etag";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
@@ -73,7 +74,10 @@ export function createApp() {
   // 5. Server-Timing APM & Network Waterfall Visibility
   app.use("*", serverTiming());
 
-  // 6. ETag & HTTP Response Optimization (RFC 7232 304 Not Modified)
+  // 6. Response Compression (Gzip / Deflate for Accept-Encoding)
+  app.use("*", compress());
+
+  // 7. ETag & HTTP Response Optimization (RFC 7232 304 Not Modified)
   app.use("*", etag());
 
   // Global Error Handler

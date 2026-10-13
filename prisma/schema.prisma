@@ -138,6 +138,7 @@ model Request {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
+  @@index([userId, createdAt])
   @@index([date])
   @@index([userId, status])
   @@index([createdAt])
@@ -184,6 +185,7 @@ model PayrollAdjustment {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, date])
   @@index([date])
 }
 
@@ -213,6 +215,8 @@ model LuckyWheelHistory {
   user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, createdAt])
+  @@index([createdAt])
   @@index([prizeId])
 }
 

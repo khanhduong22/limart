@@ -264,7 +264,7 @@ export function StaffTasksPage() {
         userStats={userStats}
       />
 
-      {/* Staff Tasks Responsive Table / Kanban Board */}
+      {/* Staff Tasks Responsive Table / Kanban Board with .cv-auto-table-row & .cv-auto-card */}
       <StaffTasksTable
         tasks={filteredTasks}
         onSelectTask={(task) => openReviewModal(task)}

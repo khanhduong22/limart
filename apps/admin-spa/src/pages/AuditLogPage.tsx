@@ -381,7 +381,7 @@ export function AuditLogPage() {
                 table.getRowModel().rows.map((row) => (
                   <tr
                     key={row.id}
-                    className="hover:bg-slate-50/60 transition-colors"
+                    className="cv-auto-table-row hover:bg-slate-50/60 transition-colors"
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="py-3 px-4">

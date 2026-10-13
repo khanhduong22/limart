@@ -179,7 +179,7 @@ export function HistoryTab() {
                         <tr
                           key={idx}
                           onClick={() => openHistoryDetail(day)}
-                          className="hover:bg-slate-50/70 cursor-pointer transition-colors"
+                          className="cv-auto-table-row hover:bg-slate-50/70 cursor-pointer transition-colors"
                           title="Nhấp để xem chi tiết ngày làm việc"
                         >
                           <td className="px-4 py-3 font-semibold text-slate-800">

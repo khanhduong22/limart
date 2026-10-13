@@ -120,7 +120,7 @@ export function StaffTasksTable({
                 return (
                   <TableRow
                     key={task.id}
-                    className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors cursor-pointer"
+                    className="cv-auto-table-row border-b border-slate-100 hover:bg-slate-50/80 transition-colors cursor-pointer"
                     onClick={() => handleOpenDetail(task)}
                   >
                     {/* Task Title & Description */}
@@ -295,7 +295,7 @@ export function StaffTasksTable({
                 colTasks.map((task) => (
                   <Card
                     key={task.id}
-                    className="hover:shadow-md hover:scale-[1.01] transition-all duration-200 border-slate-200/80 cursor-pointer overflow-hidden bg-white"
+                    className="cv-auto-card hover:shadow-md hover:scale-[1.01] transition-all duration-200 border-slate-200/80 cursor-pointer overflow-hidden bg-white"
                     onClick={() => handleOpenDetail(task)}
                   >
                     <div className="p-3.5 space-y-2.5">

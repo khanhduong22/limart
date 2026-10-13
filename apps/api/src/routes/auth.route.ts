@@ -6,6 +6,7 @@ import { authMiddleware, adminMiddleware, AppEnv } from "../middleware/auth.midd
 import { getClientIP } from "../lib/ip-utils";
 import { authRateLimiter } from "../middleware/rate-limiter";
 import { recordSecureAuditLog } from "../lib/audit";
+import { getOrSetCache } from "../lib/cache";
 
 export const authRoute = new Hono<AppEnv>();
 
@@ -288,23 +289,25 @@ authRoute.get("/audit-logs", authMiddleware, adminMiddleware, async (c) => {
 // GET /api/auth/me (also mounted at /api/me)
 authRoute.get("/me", authMiddleware, async (c) => {
   const tokenPayload = c.get("user");
-  const user = await prisma.user.findUnique({
-    where: { id: tokenPayload.sub },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      image: true,
-      isActive: true,
-      employmentType: true,
-      hourlyRate: true,
-      monthlySalary: true,
-      birthday: true,
-      startDate: true,
-      luckyWheelAllowed: true,
-      achievements: true,
-    },
+  const user = await getOrSetCache(`user:me:${tokenPayload.sub}`, 120, async () => {
+    return prisma.user.findUnique({
+      where: { id: tokenPayload.sub },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        image: true,
+        isActive: true,
+        employmentType: true,
+        hourlyRate: true,
+        monthlySalary: true,
+        birthday: true,
+        startDate: true,
+        luckyWheelAllowed: true,
+        achievements: true,
+      },
+    });
   });
 
   if (!user || !user.isActive) {

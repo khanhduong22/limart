@@ -645,8 +645,8 @@ adminRoute.get("/employees/:id", async (c) => {
   }
 });
 
-// PATCH /api/admin/employees/:id/status
-adminRoute.patch("/employees/:id/status", async (c) => {
+// PATCH /api/admin/employees/:id/status and alias /api/admin/users/:id/status
+const handleUpdateUserStatus = async (c: any) => {
   try {
     const id = c.req.param("id");
     const body = await c.req.json().catch(() => ({}));
@@ -662,7 +662,10 @@ adminRoute.patch("/employees/:id/status", async (c) => {
       await prisma.session.deleteMany({ where: { userId: id } });
     }
 
-    await invalidateCachePattern("admin:employees:*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("user:me:" + id),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -675,7 +678,9 @@ adminRoute.patch("/employees/:id/status", async (c) => {
       500
     );
   }
-});
+};
+adminRoute.patch("/employees/:id/status", handleUpdateUserStatus);
+adminRoute.patch("/users/:id/status", handleUpdateUserStatus);
 
 // Common handler for creating user/employee
 const handleCreateUser = async (c: any) => {
@@ -857,6 +862,7 @@ const handleUpdateUser = async (c: any) => {
       invalidateShiftDutyCache(id),
       invalidateCachePattern("admin:employees:*"),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("user:me:" + id),
     ]).catch(() => {});
 
     return c.json({
@@ -882,6 +888,7 @@ const handleDeleteUser = async (c: any) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(id),
       invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("user:me:" + id),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa nhân viên thành công" });
@@ -2878,6 +2885,8 @@ adminRoute.post("/lucky-wheel/prizes", async (c) => {
       },
     });
 
+    await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
+
     return c.json({ success: true, data: prize }, 201);
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to create prize" }, 500);
@@ -2903,6 +2912,9 @@ adminRoute.put("/lucky-wheel/prizes/:id", async (c) => {
         ...(active !== undefined && { active: Boolean(active) }),
       },
     });
+
+    await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
+
     return c.json({ success: true, data: updated });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to update prize" }, 500);
@@ -2914,6 +2926,9 @@ adminRoute.delete("/lucky-wheel/prizes/:id", async (c) => {
   try {
     const id = c.req.param("id");
     await prisma.luckyWheelPrize.delete({ where: { id } });
+
+    await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
+
     return c.json({ success: true, message: "Prize deleted" });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to delete prize" }, 500);
@@ -2930,7 +2945,10 @@ adminRoute.post("/lucky-wheel/allowed/all", async (c) => {
       data: { luckyWheelAllowed: allowed },
     });
 
-    await invalidateCachePattern("admin:employees:*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("user:me:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -2954,7 +2972,10 @@ adminRoute.patch("/lucky-wheel/allowed/:userId", async (c) => {
       select: { id: true, name: true, luckyWheelAllowed: true },
     });
 
-    await invalidateCachePattern("admin:employees:*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("user:me:" + userId),
+    ]).catch(() => {});
 
     return c.json({
       success: true,

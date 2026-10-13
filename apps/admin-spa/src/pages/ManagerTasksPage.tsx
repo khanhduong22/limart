@@ -145,7 +145,7 @@ export function ManagerTasksPage() {
         </div>
       </div>
 
-      {/* Tab Content */}
+      {/* Tab Content (Tasks, templates, and history rendered with .cv-auto-table-row) */}
       {activeTab === "checklist" && <DailyChecklistTab />}
       {activeTab === "templates" && <TemplatesTab />}
       {activeTab === "history" && <HistoryTab />}

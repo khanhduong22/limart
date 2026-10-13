@@ -222,7 +222,7 @@ export function DailyChecklistTab() {
                     <div
                       key={task.id}
                       onClick={() => handleToggle(task.id, task.completed)}
-                      className={`flex items-start gap-4 p-4 transition-all hover:bg-slate-50 cursor-pointer select-none ${
+                      className={`cv-auto-table-row flex items-start gap-4 p-4 transition-all hover:bg-slate-50 cursor-pointer select-none ${
                         task.completed ? "bg-emerald-50/20" : ""
                       }`}
                     >
@@ -334,7 +334,7 @@ export function DailyChecklistTab() {
                   {weeklyTasks.map((task) => (
                     <div
                       key={task.id}
-                      className={`flex items-start justify-between p-4 transition-all hover:bg-slate-50/50 gap-4 ${
+                      className={`cv-auto-table-row flex items-start justify-between p-4 transition-all hover:bg-slate-50/50 gap-4 ${
                         task.completed ? "bg-emerald-50/10" : ""
                       }`}
                     >

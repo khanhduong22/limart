@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { prisma } from "@checkin/db";
 import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { getVietnamDayRange } from "../lib/date-utils";
-import { invalidateCachePattern } from "../lib/cache";
+import { getOrSetCache, invalidateCachePattern } from "../lib/cache";
 import { acquireLock } from "../lib/lock";
 import { luckyWheelRateLimiter } from "../middleware/rate-limiter";
 
@@ -20,10 +20,12 @@ luckyWheelRoute.get("/", authMiddleware, async (c) => {
         where: { id: userId },
         select: { id: true, role: true, luckyWheelAllowed: true },
       }),
-      prisma.luckyWheelPrize.findMany({
-        where: { active: true },
-        orderBy: { createdAt: "asc" },
-      }),
+      getOrSetCache("meta:lucky-wheel:prizes", 300, () =>
+        prisma.luckyWheelPrize.findMany({
+          where: { active: true },
+          orderBy: { createdAt: "asc" },
+        })
+      ),
       prisma.checkIn.findFirst({
         where: {
           userId,
@@ -36,19 +38,21 @@ luckyWheelRoute.get("/", authMiddleware, async (c) => {
           createdAt: { gte: startOfDay, lte: endOfDay },
         },
       }),
-      prisma.luckyWheelHistory.findMany({
-        take: 20,
-        orderBy: { createdAt: "desc" },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
+      getOrSetCache("meta:lucky-wheel:recent-winners", 60, () =>
+        prisma.luckyWheelHistory.findMany({
+          take: 20,
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+              },
             },
           },
-        },
-      }),
+        })
+      ),
     ]);
 
     const isAllowed = user?.role === "ADMIN" || Boolean(user?.luckyWheelAllowed);
@@ -258,6 +262,8 @@ luckyWheelRoute.post("/spin", authMiddleware, luckyWheelRateLimiter, async (c) =
 
       return prize;
     });
+
+    await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
 
     if (selectedPrize.type === "MONEY" && selectedPrize.value > 0) {
       await invalidateCachePattern("payroll:*");

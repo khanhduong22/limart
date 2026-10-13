@@ -157,7 +157,7 @@ export function TemplatesTab() {
             {templates.map((task, idx) => (
               <div
                 key={task.id}
-                className="flex justify-between items-center p-4 hover:bg-slate-50 gap-4"
+                className="cv-auto-table-row flex justify-between items-center p-4 hover:bg-slate-50 gap-4"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">

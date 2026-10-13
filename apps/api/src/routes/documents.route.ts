@@ -3,6 +3,7 @@ import { prisma } from "@checkin/db";
 import mammoth from "mammoth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { authMiddleware, adminMiddleware, AppEnv } from "../middleware/auth.middleware";
+import { getOrSetCache, invalidateCachePattern } from "../lib/cache";
 
 export const documentsRoute = new Hono<AppEnv>();
 
@@ -36,17 +37,19 @@ function chunkText(text: string, maxTokens: number = 800): string[] {
 // ----------------------------------------------------------------------------
 documentsRoute.get("/", async (c) => {
   try {
-    const docs = await prisma.document.findMany({
-      select: {
-        id: true,
-        title: true,
-        path: true,
-        content: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: { title: "asc" },
-    });
+    const docs = await getOrSetCache("meta:documents:all", 600, () =>
+      prisma.document.findMany({
+        select: {
+          id: true,
+          title: true,
+          path: true,
+          content: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: { title: "asc" },
+      })
+    );
 
     return c.json({
       success: true,
@@ -281,6 +284,8 @@ documentsRoute.post("/", authMiddleware, adminMiddleware, async (c) => {
       }
     }
 
+    await invalidateCachePattern("meta:documents:*").catch(() => {});
+
     return c.json({
       success: true,
       data: document,
@@ -322,6 +327,8 @@ documentsRoute.delete("/:id", authMiddleware, adminMiddleware, async (c) => {
     await prisma.document.delete({
       where: { id },
     });
+
+    await invalidateCachePattern("meta:documents:*").catch(() => {});
 
     return c.json({
       success: true,

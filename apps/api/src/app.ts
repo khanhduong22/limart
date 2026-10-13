@@ -26,6 +26,7 @@ import { cronRoute } from "./routes/cron.route";
 import { authMiddleware, AppEnv } from "./middleware/auth.middleware";
 import { serverTiming } from "./middleware/server-timing.middleware";
 import { prisma } from "@checkin/db";
+import { getOrSetCache } from "./lib/cache";
 
 export function createApp() {
   const app = new Hono<AppEnv>();
@@ -101,23 +102,25 @@ export function createApp() {
   // Route alias: GET /api/me directly
   app.get("/api/me", authMiddleware, async (c) => {
     const tokenPayload = c.get("user");
-    const user = await prisma.user.findUnique({
-      where: { id: tokenPayload.sub },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        image: true,
-        isActive: true,
-        employmentType: true,
-        hourlyRate: true,
-        monthlySalary: true,
-        birthday: true,
-        startDate: true,
-        luckyWheelAllowed: true,
-        achievements: true,
-      },
+    const user = await getOrSetCache(`user:me:${tokenPayload.sub}`, 120, async () => {
+      return prisma.user.findUnique({
+        where: { id: tokenPayload.sub },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          image: true,
+          isActive: true,
+          employmentType: true,
+          hourlyRate: true,
+          monthlySalary: true,
+          birthday: true,
+          startDate: true,
+          luckyWheelAllowed: true,
+          achievements: true,
+        },
+      });
     });
 
     if (!user || !user.isActive) {

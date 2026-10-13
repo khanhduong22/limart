@@ -41,7 +41,7 @@ export function StaffKpiStatsCards({
                 return (
                   <div
                     key={u.id}
-                    className="flex flex-col md:flex-row items-start md:items-center justify-between p-4 gap-4 hover:bg-slate-50/50 transition-colors"
+                    className="cv-auto-table-row flex flex-col md:flex-row items-start md:items-center justify-between p-4 gap-4 hover:bg-slate-50/50 transition-colors"
                   >
                     <div className="flex items-center gap-3 shrink-0">
                       <div className="h-9 w-9 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold text-xs uppercase shadow-2xs">

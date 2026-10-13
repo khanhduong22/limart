@@ -37,6 +37,7 @@ vi.mock("@checkin/db", () => ({
 vi.mock("../src/lib/cache", () => ({
   checkCacheHealth: vi.fn().mockResolvedValue("connected"),
   getOrSetCache: vi.fn().mockImplementation((_k, _t, fn) => fn()),
+  invalidateCachePattern: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../src/lib/meilisearch", () => ({

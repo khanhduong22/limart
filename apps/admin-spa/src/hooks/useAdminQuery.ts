@@ -68,7 +68,7 @@ export function useAdminQuery<T = any>(
     refetchOnWindowFocus,
     retry,
     staleTime,
-    initialData: options?.fallbackData,
+    placeholderData: options?.fallbackData as any,
   });
 
   // TanStack Query v5 removed onSuccess/onError options on useQuery; handle via effects
@@ -79,11 +79,16 @@ export function useAdminQuery<T = any>(
 
   const prevDataRef = useRef<T | undefined>(undefined);
   useEffect(() => {
-    if (query.isSuccess && query.data !== undefined && query.data !== prevDataRef.current) {
-      prevDataRef.current = query.data;
-      onSuccessRef.current?.(query.data);
+    if (
+      query.isSuccess &&
+      !query.isPlaceholderData &&
+      query.data !== undefined &&
+      (query.data as any) !== prevDataRef.current
+    ) {
+      prevDataRef.current = query.data as T;
+      onSuccessRef.current?.(query.data as T);
     }
-  }, [query.isSuccess, query.data]);
+  }, [query.isSuccess, query.isPlaceholderData, query.data]);
 
   useEffect(() => {
     if (query.isError && query.error) {
@@ -109,7 +114,7 @@ export function useAdminQuery<T = any>(
   );
 
   return {
-    data: query.data,
+    data: query.data as T | undefined,
     error: query.error,
     isLoading: query.isLoading,
     isFetching: query.isFetching,

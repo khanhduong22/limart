@@ -256,6 +256,7 @@ model CheckIn {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, timestamp])
+  @@index([userId, timestamp, type])
   @@index([userId, type, timestamp])
   @@index([timestamp])
   @@index([type, timestamp])
@@ -360,6 +361,7 @@ model UserTask {
 
   @@index([userId])
   @@index([userId, status])
+  @@index([userId, status, submittedAt])
   @@index([userId, createdAt])
   @@index([userId, updatedAt])
   @@index([createdAt])

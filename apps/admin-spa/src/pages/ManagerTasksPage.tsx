@@ -9,7 +9,10 @@ import {
 import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { useManagerTasksStore } from "@/stores/useManagerTasksStore";
 import { UserItem } from "@/types/manager-tasks";
-import { DailyChecklistTab } from "@/components/tasks/manager";
+
+const DailyChecklistTab = React.lazy(() =>
+  import("@/components/tasks/manager").then((m) => ({ default: m.DailyChecklistTab }))
+);
 
 const TemplatesTab = React.lazy(() =>
   import("@/components/tasks/manager").then((m) => ({ default: m.TemplatesTab }))
@@ -153,7 +156,17 @@ export function ManagerTasksPage() {
       </div>
 
       {/* Tab Content (Tasks, templates, and history rendered with .cv-auto-table-row) */}
-      {activeTab === "checklist" && <DailyChecklistTab />}
+      {activeTab === "checklist" && (
+        <React.Suspense
+          fallback={
+            <div className="p-8 text-center text-xs text-muted-foreground animate-pulse">
+              Đang tải checklist...
+            </div>
+          }
+        >
+          <DailyChecklistTab />
+        </React.Suspense>
+      )}
       {activeTab === "templates" && (
         <React.Suspense
           fallback={

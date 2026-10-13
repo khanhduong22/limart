@@ -1141,8 +1141,8 @@ adminRoute.delete("/holidays/:id", handleDeleteHoliday);
 // ============================================================================
 // 4. MANUAL CHECKIN
 // ============================================================================
-// POST /api/admin/manual-checkin
-adminRoute.post("/manual-checkin", async (c) => {
+// POST /api/admin/manual-checkin & POST /api/admin/checkin/manual
+const handleManualCheckin = async (c: any) => {
   try {
     const tokenPayload = c.get("user");
     const body = await c.req.json().catch(() => ({}));
@@ -1155,7 +1155,7 @@ adminRoute.post("/manual-checkin", async (c) => {
       );
     }
 
-    const adminName = tokenPayload.name || "Admin";
+    const adminName = tokenPayload?.name || "Admin";
     const note = `Admin ${adminName} chấm công hộ`;
 
     // Calculate VN day range
@@ -1221,6 +1221,7 @@ adminRoute.post("/manual-checkin", async (c) => {
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("stats:monthly:*"),
       invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("admin:reports:*"),
       invalidateCachePattern(`staff:home:${userId}:*`),
       invalidateCachePattern(`checkin:today:${userId}:*`),
       invalidateCachePattern("checkin:today:all:*"),
@@ -1239,7 +1240,80 @@ adminRoute.post("/manual-checkin", async (c) => {
       500
     );
   }
-});
+};
+
+adminRoute.post("/manual-checkin", handleManualCheckin);
+adminRoute.post("/checkin/manual", handleManualCheckin);
+
+// DELETE /api/admin/checkin/:id & DELETE /api/admin/checkins/:id
+const handleDeleteCheckin = async (c: any) => {
+  try {
+    const tokenPayload = c.get("user");
+    const idParam = c.req.param("id");
+    const checkinId = parseInt(idParam, 10);
+
+    if (isNaN(checkinId)) {
+      return c.json({ success: false, error: "Invalid checkin id" }, 400);
+    }
+
+    const checkin = await prisma.checkIn.findUnique({
+      where: { id: checkinId },
+    });
+
+    if (!checkin) {
+      return c.json({ success: false, error: "Bản ghi chấm công không tồn tại" }, 404);
+    }
+
+    await prisma.checkIn.delete({
+      where: { id: checkinId },
+    });
+
+    const clientIP = getClientIP(c);
+    const userAgent = c.req.header("user-agent") || null;
+    await recordSecureAuditLog({
+      userId: tokenPayload?.sub || null,
+      action: "DELETE_CHECKIN",
+      status: "SUCCESS",
+      ipAddress: clientIP,
+      userAgent: userAgent,
+      device: "Desktop",
+      details: {
+        checkinId,
+        targetUserId: checkin.userId,
+        timestamp: checkin.timestamp,
+        type: checkin.type,
+      },
+      requestId: c.var.requestId || c.get("requestId"),
+    });
+
+    await Promise.all([
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("stats:monthly:*"),
+      invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("admin:reports:*"),
+      invalidateCachePattern(`staff:home:${checkin.userId}:*`),
+      invalidateCachePattern(`checkin:today:${checkin.userId}:*`),
+      invalidateCachePattern("checkin:today:all:*"),
+      invalidateCachePattern("checkin:status:*"),
+      invalidateCachePattern("staff:history:*"),
+      invalidateCachePattern("staff:payroll:*"),
+    ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
+
+    return c.json({
+      success: true,
+      message: "Đã xóa bản ghi chấm công thành công!",
+    });
+  } catch (err: any) {
+    return c.json(
+      { success: false, error: err?.message || "Failed to delete checkin" },
+      500
+    );
+  }
+};
+
+adminRoute.delete("/checkin/:id", handleDeleteCheckin);
+adminRoute.delete("/checkins/:id", handleDeleteCheckin);
 
 // ============================================================================
 // 5. REQUESTS MANAGEMENT
@@ -2240,6 +2314,7 @@ adminRoute.post("/close-all-shifts", async (c) => {
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("checkin:status:*"),
       invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("admin:reports:*"),
       invalidateCachePattern("staff:history:*"),
       invalidateCachePattern("staff:payroll:*"),
     ]).catch(() => {});

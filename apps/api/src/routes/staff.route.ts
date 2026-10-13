@@ -584,7 +584,12 @@ staffRoute.post("/schedule/register", authMiddleware, async (c) => {
       },
     });
 
-    await invalidateShiftDutyCache();
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("shifts:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -641,7 +646,12 @@ staffRoute.post("/schedule/cancel", authMiddleware, async (c) => {
       where: { id: shiftId },
     });
 
-    await invalidateShiftDutyCache();
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("shifts:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -706,7 +716,12 @@ staffRoute.post("/schedule/:id/swap", authMiddleware, async (c) => {
       },
     });
 
-    await invalidateShiftDutyCache().catch(() => {});
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("shifts:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -812,6 +827,10 @@ staffRoute.post("/schedule/:id/take", authMiddleware, async (c) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(userId, shiftId),
       invalidateShiftDutyCache(existing.userId, shiftId),
+      invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
+      invalidateCachePattern(`shifts:my-shifts:${existing.userId}:*`),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("shifts:*"),
     ]).catch(() => {});
 
     return c.json({

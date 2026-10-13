@@ -4,7 +4,7 @@ import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { getVietnamMonthRange } from "../lib/date-utils";
 import { isShiftLocked } from "../lib/schedule-lock";
 import { assertPeriodOpen } from "../lib/payroll-period";
-import { invalidateShiftDutyCache, invalidateCachePattern, getOrSetCache } from "../lib/cache";
+import { invalidateShiftDutyCache, invalidatePayrollCache, invalidateCachePattern, getOrSetCache } from "../lib/cache";
 
 export const scheduleRoute = new Hono<AppEnv>();
 
@@ -105,13 +105,17 @@ const handleMyShifts = async (c: any) => {
 
     let startDate: Date;
     let endDate: Date;
+    let month: number;
+    let year: number;
 
     if (startQuery && endQuery) {
       startDate = new Date(startQuery);
       endDate = new Date(endQuery);
+      month = startDate.getMonth() + 1;
+      year = startDate.getFullYear();
     } else if (monthQuery || yearQuery) {
-      const month = monthQuery ? parseInt(monthQuery, 10) : undefined;
-      const year = yearQuery ? parseInt(yearQuery, 10) : undefined;
+      month = monthQuery ? parseInt(monthQuery, 10) : new Date().getMonth() + 1;
+      year = yearQuery ? parseInt(yearQuery, 10) : new Date().getFullYear();
       const range = getVietnamMonthRange(month, year);
       startDate = range.startDate;
       endDate = range.endDate;
@@ -119,28 +123,33 @@ const handleMyShifts = async (c: any) => {
       const range = getVietnamMonthRange();
       startDate = range.startDate;
       endDate = range.endDate;
+      month = startDate.getMonth() + 1;
+      year = startDate.getFullYear();
     }
 
-    const cacheKey = `shifts:my:${userId}:${startDate.toISOString().slice(0, 10)}:${endDate.toISOString().slice(0, 10)}`;
+    const cacheKey = (startQuery && endQuery)
+      ? `shifts:my:${userId}:${startDate.toISOString().slice(0, 10)}:${endDate.toISOString().slice(0, 10)}`
+      : `shifts:my-shifts:${userId}:${month}:${year}`;
+
     const shifts = await getOrSetCache(cacheKey, 60, async () => {
-      return await prisma.workShift.findMany({
+      const records = await prisma.workShift.findMany({
         where: {
           userId,
           start: { gte: startDate, lte: endDate },
         },
         include: {
           duties: {
-            select: {
-              id: true,
-              title: true,
-              description: true,
-              isCompleted: true,
-              date: true,
-            },
+            where: { userId },
+            orderBy: { createdAt: "asc" },
           },
         },
         orderBy: { start: "asc" },
       });
+
+      return records.map((s: any) => ({
+        ...s,
+        shiftDuties: s.duties || [],
+      }));
     });
 
     return c.json({
@@ -161,6 +170,56 @@ const handleMyShifts = async (c: any) => {
 
 scheduleRoute.get("/my-shifts", authMiddleware, handleMyShifts);
 scheduleRoute.get("/my", authMiddleware, handleMyShifts);
+
+// POST /api/schedule & POST /api/schedule/register
+const handleCreateOrRegisterShift = async (c: any) => {
+  try {
+    const tokenPayload = c.get("user");
+    const userId = tokenPayload.sub;
+    const isAdmin = tokenPayload.role === "ADMIN";
+    const body = await c.req.json().catch(() => ({}));
+    const targetUserId = (isAdmin && body.userId) ? body.userId : userId;
+    const { start, end, shiftType, status } = body;
+
+    if (!start || !end) {
+      return c.json({ success: false, error: "start and end dates are required" }, 400);
+    }
+
+    const shiftStart = new Date(start);
+    const shiftEnd = new Date(end);
+    if (isNaN(shiftStart.getTime()) || isNaN(shiftEnd.getTime()) || shiftStart >= shiftEnd) {
+      return c.json({ success: false, error: "Invalid start or end time" }, 400);
+    }
+
+    await assertPeriodOpen(shiftStart);
+
+    const newShift = await prisma.workShift.create({
+      data: {
+        userId: targetUserId,
+        start: shiftStart,
+        end: shiftEnd,
+        shiftType: shiftType || null,
+        status: status || "APPROVED",
+      },
+    });
+
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidateCachePattern(`shifts:my-shifts:${targetUserId}:*`),
+      invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("shifts:*"),
+      invalidateCachePattern("admin:dashboard*"),
+    ]).catch(() => {});
+
+    return c.json({ success: true, data: newShift }, 201);
+  } catch (err: any) {
+    return c.json({ success: false, error: err?.message || "Failed to create shift" }, 500);
+  }
+};
+
+scheduleRoute.post("/", authMiddleware, handleCreateOrRegisterShift);
+scheduleRoute.post("/register", authMiddleware, handleCreateOrRegisterShift);
 
 // POST /api/schedule/:id/swap
 scheduleRoute.post("/:id/swap", authMiddleware, async (c) => {
@@ -215,6 +274,7 @@ scheduleRoute.post("/:id/swap", authMiddleware, async (c) => {
 
     await Promise.all([
       invalidateShiftDutyCache(),
+      invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("shifts:*"),
       invalidateCachePattern("admin:dashboard*"),
@@ -279,8 +339,10 @@ scheduleRoute.post("/:id/take", authMiddleware, async (c) => {
 
     await Promise.all([
       invalidateShiftDutyCache(),
-      invalidateCachePattern("payroll:*"),
+      invalidatePayrollCache(),
       invalidateCachePattern("stats:*"),
+      invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
+      invalidateCachePattern(`shifts:my-shifts:${existing.userId}:*`),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("shifts:*"),
       invalidateCachePattern("admin:dashboard*"),

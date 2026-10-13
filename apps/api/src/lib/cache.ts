@@ -214,6 +214,7 @@ export async function invalidateScheduleCache(): Promise<void> {
   try {
     await invalidateCachePattern("admin:schedule:*");
     await invalidateCachePattern("shifts:*");
+    await invalidateCachePattern("shifts:my-shifts:*");
     await invalidateCachePattern("shift-duties:*");
     await invalidateCachePattern("staff:schedule:*");
     await invalidateCachePattern("admin:dashboard*");

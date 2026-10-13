@@ -22,7 +22,7 @@ function renderWithClient(ui: React.ReactElement) {
 }
 
 describe("ReportsPage Performance & CLS Audit", () => {
-  it("renders leaderboard cards and summary stats without layout shifting images", () => {
+  it("renders leaderboard cards and summary stats without layout shifting images", async () => {
     vi.spyOn(adminQueryModule, "useAdminQuery").mockReturnValue({
       data: {
         totalPayrollCost: 25000000,
@@ -63,7 +63,7 @@ describe("ReportsPage Performance & CLS Audit", () => {
     renderWithClient(<ReportsPage />);
 
     expect(screen.getByText("Bảng Thành Tích & Báo Cáo")).toBeDefined();
-    expect(screen.getByText("🐝 Top Chăm Chỉ")).toBeDefined();
+    expect(await screen.findByText("🐝 Top Chăm Chỉ")).toBeDefined();
     expect(screen.getByText("🌟 Top Kỷ Luật")).toBeDefined();
     expect(screen.getByText("🔥 Top Cày Cuốc (OT)")).toBeDefined();
     expect(screen.getByText("📦 Vua Đóng Hàng")).toBeDefined();

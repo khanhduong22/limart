@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useAppQuery } from "@/lib/api-query";
-import ScheduleClient from "@/components/schedule/ScheduleClient";
+
+const ScheduleClient = React.lazy(() => import("@/components/schedule/ScheduleClient"));
 
 export const ScheduleView: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -20,14 +21,22 @@ export const ScheduleView: React.FC = () => {
 
   return (
     <div className="pb-24 pt-2 px-3 sm:px-4 max-w-md mx-auto w-full select-none">
-      <ScheduleClient
-        shifts={shifts}
-        currentUserId={currentUserId}
-        viewDate={currentDate}
-        onMonthChange={(newDate) => setCurrentDate(newDate)}
-        onRefresh={() => mutate()}
-        isLoading={isLoading}
-      />
+      <React.Suspense
+        fallback={
+          <div className="h-96 w-full flex items-center justify-center text-xs text-slate-400 animate-pulse bg-slate-50/50 rounded-2xl border border-slate-100">
+            Đang tải lịch làm việc...
+          </div>
+        }
+      >
+        <ScheduleClient
+          shifts={shifts}
+          currentUserId={currentUserId}
+          viewDate={currentDate}
+          onMonthChange={(newDate) => setCurrentDate(newDate)}
+          onRefresh={() => mutate()}
+          isLoading={isLoading}
+        />
+      </React.Suspense>
     </div>
   );
 };

@@ -1,8 +1,8 @@
 import React from "react";
-import IPManager from "@/components/admin/IPManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSettings } from "@/hooks/useAdminData";
 
+const IPManager = React.lazy(() => import("@/components/admin/IPManager"));
 const HolidayManager = React.lazy(() => import("@/components/admin/HolidayManager"));
 const BackupManager = React.lazy(() => import("@/components/admin/BackupManager"));
 
@@ -36,7 +36,9 @@ export function SettingsPage() {
         </div>
 
         <TabsContent value="access" className="space-y-4">
-          <IPManager ips={ips} />
+          <React.Suspense fallback={<div className="h-64 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-xs text-slate-400">Đang tải cấu hình IP...</div>}>
+            <IPManager ips={ips} />
+          </React.Suspense>
         </TabsContent>
 
         <React.Suspense fallback={<div className="p-8 text-center text-muted-foreground">Đang tải...</div>}>

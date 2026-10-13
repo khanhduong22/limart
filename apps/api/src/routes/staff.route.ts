@@ -1361,6 +1361,7 @@ staffRoute.post("/tasks/claim", authMiddleware, async (c) => {
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Nhận việc thành công!", data: userTask });
@@ -1418,6 +1419,7 @@ staffRoute.post("/tasks/start", authMiddleware, async (c) => {
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Bắt đầu nhiệm vụ thành công!", data: userTask });
@@ -1464,6 +1466,7 @@ staffRoute.post("/tasks/submit", authMiddleware, async (c) => {
         invalidateCachePattern("user:tasks:my:" + userId + "*"),
         invalidateCachePattern("admin:tasks:*"),
         invalidateCachePattern("staff:tasks:*"),
+        invalidateCachePattern("staff:rewards:leaderboard:*"),
       ]).catch(() => {});
 
       return c.json({ success: true, message: "Nộp kết quả thành công!", data: updated });
@@ -1501,6 +1504,7 @@ staffRoute.post("/tasks/submit", authMiddleware, async (c) => {
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Nộp kết quả thành công!", data: userTask });
@@ -1677,6 +1681,7 @@ staffRoute.post("/tasks/submit-packing", authMiddleware, async (c) => {
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -1733,6 +1738,7 @@ staffRoute.post("/tasks/submit-carrying", authMiddleware, async (c) => {
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch(() => {});
 
     return c.json({

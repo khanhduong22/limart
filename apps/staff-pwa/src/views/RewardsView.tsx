@@ -1,52 +1,35 @@
 import React, { useState } from "react";
 import { useAppQuery } from "@/lib/api-query";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Trophy,
-  Sparkles,
-  Flame,
-  Award,
-  Package,
-  Layers,
-  Star,
-  ExternalLink,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter, Link } from "@/lib/router";
 import { Button } from "@/components/ui/button";
+import type {
+  LeaderboardData,
+  RewardLeaderboardTab,
+} from "@/components/rewards/RewardLeaderboardContent";
 
-interface LeaderboardUser {
-  id: string;
-  name: string;
-  image?: string | null;
-  points?: number;
-  totalHours?: number;
-  daysWorked?: number;
-  avgOvertime?: number;
-  displayOvertimeHours?: number;
-  overtimeHours?: number;
-  lateCount?: number;
-}
+const RewardLeaderboardContent = React.lazy(
+  () => import("@/components/rewards/RewardLeaderboardContent")
+);
 
-interface LeaderboardData {
-  month: number;
-  year: number;
-  topDiscipline: Array<{
-    user: { id: string; name: string; image?: string | null };
-    daysWorked: number;
-    totalHours: number;
-  }>;
-  topHardworking: LeaderboardUser[];
-  topOvertime: LeaderboardUser[];
-  topPacking: LeaderboardUser[];
-  topCarrying: LeaderboardUser[];
-}
+const TABS: Array<{
+  id: RewardLeaderboardTab;
+  label: string;
+  icon: string;
+}> = [
+  { id: "discipline", label: "Chuyên cần", icon: "🌟" },
+  { id: "hardworking", label: "Chăm chỉ", icon: "⏱️" },
+  { id: "overtime", label: "Tăng ca", icon: "⚡" },
+  { id: "packing", label: "Đóng hàng", icon: "📦" },
+  { id: "carrying", label: "Bưng hàng", icon: "🛗" },
+];
 
 export const RewardsView: React.FC = () => {
   const router = useRouter();
   const now = new Date();
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
+  const [activeTab, setActiveTab] = useState<RewardLeaderboardTab>("discipline");
 
   const { data: res, isLoading } = useAppQuery<{
     success: boolean;
@@ -74,100 +57,6 @@ export const RewardsView: React.FC = () => {
     } else {
       setSelectedMonth((m) => m + 1);
     }
-  };
-
-  const renderPodium = (
-    title: string,
-    subtitle: string,
-    icon: string,
-    badgeColor: string,
-    items: Array<{
-      name: string;
-      image?: string | null;
-      stat: string;
-      subStat?: string;
-    }>
-  ) => {
-    return (
-      <div className="rounded-2xl bg-white border border-stone-200 p-4 shadow-xs space-y-3">
-        <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{icon}</span>
-            <div>
-              <h2 className="text-xs font-bold text-stone-900">{title}</h2>
-              <p className="text-[10px] text-stone-500">{subtitle}</p>
-            </div>
-          </div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badgeColor}`}>
-            Top 3
-          </span>
-        </div>
-
-        {items.length === 0 ? (
-          <div className="py-4 text-center text-xs text-stone-400">
-            Chưa có nhân viên đạt tiêu chuẩn trong tháng này
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {items.map((item, idx) => {
-              const medals = ["🥇", "🥈", "🥉"];
-              const rankBg =
-                idx === 0
-                  ? "bg-amber-50/70 border-amber-200"
-                  : idx === 1
-                  ? "bg-slate-50 border-slate-200"
-                  : "bg-orange-50/50 border-orange-200";
-
-              return (
-                <div
-                  key={idx}
-                  className={`flex items-center justify-between p-2 rounded-xl border ${rankBg}`}
-                >
-                  <div className="flex items-center gap-2.5">
-                    <span className="text-base leading-none">{medals[idx]}</span>
-                    <div className="w-8 h-8 rounded-full overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center shrink-0">
-                      {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          width="32"
-                          height="32"
-                          loading="lazy"
-                          decoding="async"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null;
-                            const target = e.currentTarget;
-                            if (!target.src.endsWith("/capybara_mascot.webp")) {
-                              target.src = "/capybara_mascot.webp";
-                            }
-                          }}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span className="text-xs font-bold text-stone-600">
-                          {item.name?.charAt(0) || "U"}
-                        </span>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-stone-900">{item.name}</p>
-                      {item.subStat && (
-                        <p className="text-[10px] text-stone-500">{item.subStat}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs font-black text-stone-800 font-mono">
-                      {item.stat}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
   };
 
   return (
@@ -239,80 +128,39 @@ export const RewardsView: React.FC = () => {
         </div>
       </Link>
 
-      {/* Leaderboard Sections */}
-      {isLoading ? (
-        <div className="p-12 text-center text-xs text-stone-400">Đang tải bảng xếp hạng...</div>
-      ) : (
-        <div className="space-y-3">
-          {/* 1. Top Chuyên Cần */}
-          {renderPodium(
-            "Top Chuyên Cần",
-            "Không đi trễ phút nào trong tháng",
-            "🌟",
-            "bg-amber-100 text-amber-800",
-            (Array.isArray(leaderboard?.topDiscipline) ? leaderboard.topDiscipline : []).map((d: any) => ({
-              name: d.name || d.user?.name || "Nhân viên",
-              image: d.image || d.user?.image,
-              stat: `${d.daysWorked || d.totalScheduledCheckins || 0} ca`,
-              subStat: d.totalHours ? `${Number(d.totalHours).toFixed(1)} giờ làm việc` : `Đúng giờ ${Math.round(d.punctualityRate || 100)}%`,
-            }))
-          )}
+      {/* Category Tabs */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+        {TABS.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+              activeTab === tab.id
+                ? "bg-amber-500 text-white shadow-xs ring-2 ring-amber-200"
+                : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
+            }`}
+          >
+            <span>{tab.icon}</span>
+            <span>{tab.label}</span>
+          </button>
+        ))}
+      </div>
 
-          {/* 2. Top Chăm Chỉ */}
-          {renderPodium(
-            "Top Chăm Chỉ",
-            "Nhân viên Part-time cống hiến nhiều giờ nhất",
-            "⏱️",
-            "bg-blue-100 text-blue-800",
-            (Array.isArray(leaderboard?.topHardworking) ? leaderboard.topHardworking : []).map((u: any) => ({
-              name: u.name || u.user?.name || "Nhân viên",
-              image: u.image || u.user?.image,
-              stat: `${Number(u.totalHours || 0).toFixed(1)} giờ`,
-              subStat: `${u.daysWorked || 0} ngày làm`,
-            }))
-          )}
-
-          {/* 3. Top Chiến Thần Tăng Ca */}
-          {renderPodium(
-            "Chiến Thần Tăng Ca",
-            "Thời gian tăng ca trung bình cao nhất",
-            "⚡",
-            "bg-purple-100 text-purple-800",
-            (Array.isArray(leaderboard?.topOvertime) ? leaderboard.topOvertime : []).map((u: any) => ({
-              name: u.name || u.user?.name || "Nhân viên",
-              image: u.image || u.user?.image,
-              stat: `+${Number(u.displayOvertimeHours || u.totalHours || 0).toFixed(1)}h OT`,
-              subStat: `TB ${Number(u.avgOvertime || 0).toFixed(1)}h/ngày`,
-            }))
-          )}
-
-          {/* 4. Top Vua Đóng Hàng */}
-          {renderPodium(
-            "Vua Đóng Hàng",
-            "Tích luỹ điểm đóng đơn nhiều nhất (+100K cho Top 1)",
-            "📦",
-            "bg-emerald-100 text-emerald-800",
-            (Array.isArray(leaderboard?.topPacking) ? leaderboard.topPacking : []).map((u: any) => ({
-              name: u.name || u.user?.name || "Nhân viên",
-              image: u.image || u.user?.image,
-              stat: `${u.points || 0} điểm`,
-            }))
-          )}
-
-          {/* 5. Top Chiến Thần Bưng Hàng */}
-          {renderPodium(
-            "Chiến Thần Bưng Hàng",
-            "Bưng hàng lên lầu nhiều nhất (+200K cho Top 1)",
-            "🛗",
-            "bg-amber-100 text-amber-800",
-            (Array.isArray(leaderboard?.topCarrying) ? leaderboard.topCarrying : []).map((u: any) => ({
-              name: u.name || u.user?.name || "Nhân viên",
-              image: u.image || u.user?.image,
-              stat: `${u.points || 0} điểm bưng`,
-            }))
-          )}
-        </div>
-      )}
+      {/* Leaderboard Content */}
+      <React.Suspense
+        fallback={
+          <div className="h-96 w-full flex items-center justify-center text-xs text-slate-400 animate-pulse bg-slate-50/50 rounded-2xl border border-slate-100">
+            Đang tải bảng vinh danh...
+          </div>
+        }
+      >
+        <RewardLeaderboardContent
+          activeTab={activeTab}
+          leaderboard={leaderboard}
+          isLoading={isLoading}
+        />
+      </React.Suspense>
     </div>
   );
 };

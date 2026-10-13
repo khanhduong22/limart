@@ -6,24 +6,33 @@ import { api } from "@/lib/api";
 
 export default function DeletePrizeButton({
   prizeId,
+  id,
+  name,
   onDeleted,
 }: {
-  prizeId: string;
-  onDeleted?: (id: string) => void;
+  prizeId?: string;
+  id?: string;
+  name?: string;
+  onDeleted?: (id?: string) => void;
 }) {
   const [loading, setLoading] = useState(false);
 
+  const targetId = prizeId || id || "";
+
   const handleDelete = async () => {
-    if (!confirm("Bạn có chắc chắn muốn xóa giải thưởng này?")) return;
+    const confirmMsg = name
+      ? `Bạn có chắc chắn muốn xóa giải thưởng "${name}"?`
+      : "Bạn có chắc chắn muốn xóa giải thưởng này?";
+    if (!confirm(confirmMsg)) return;
 
     setLoading(true);
     try {
-      await api.delete(`/api/admin/lucky-wheel/prizes/${prizeId}`);
+      await api.delete(`/api/admin/lucky-wheel/prizes/${targetId}`);
       toast.success("Đã xóa giải thưởng");
-      if (onDeleted) onDeleted(prizeId);
+      if (onDeleted) onDeleted(targetId);
     } catch {
       toast.success("Đã xóa giải thưởng");
-      if (onDeleted) onDeleted(prizeId);
+      if (onDeleted) onDeleted(targetId);
     } finally {
       setLoading(false);
     }

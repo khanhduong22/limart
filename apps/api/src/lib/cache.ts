@@ -218,6 +218,7 @@ export async function invalidateScheduleCache(): Promise<void> {
     await invalidateCachePattern("shift-duties:*");
     await invalidateCachePattern("staff:schedule:*");
     await invalidateCachePattern("admin:dashboard*");
+    await invalidateCachePattern("staff:rewards:leaderboard:*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate schedule cache:", e);
   }

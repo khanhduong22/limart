@@ -214,6 +214,8 @@ model LuckyWheelPrize {
   updatedAt   DateTime            @updatedAt
   value       Float               @default(0)
   history     LuckyWheelHistory[]
+
+  @@index([active, createdAt])
 }
 
 model LuckyWheelHistory {
@@ -538,6 +540,7 @@ model ManagerWeeklyTask {
 
   @@index([assigneeId, weekStart])
   @@index([assigneeId, completed])
+  @@index([assigneeId, completed, weekStart])
   @@index([weekStart])
   @@index([createdAt])
 }
@@ -565,6 +568,7 @@ model ShiftDuty {
   @@index([createdById])
   @@index([date])
   @@index([shiftId])
+  @@index([shiftId, userId])
   @@index([shiftId, isCompleted])
   @@index([date, isCompleted])
 }

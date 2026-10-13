@@ -10,9 +10,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import DeletePrizeButton from "@/components/admin/DeletePrizeButton";
 import { useEmployees } from "@/hooks/useAdminData";
 
+const DeletePrizeButton = React.lazy(
+  () => import("@/components/admin/DeletePrizeButton")
+);
 const AllowedUsersManagerClient = React.lazy(
   () => import("@/components/admin/AllowedUsersManagerClient")
 );
@@ -208,10 +210,13 @@ export function LuckyWheelPage() {
                         <React.Suspense fallback={null}>
                           <PrizeDialog prize={prize} onSaved={() => mutate()} />
                         </React.Suspense>
-                        <DeletePrizeButton
-                          prizeId={prize.id}
-                          onDeleted={() => mutate()}
-                        />
+                        <React.Suspense fallback={null}>
+                          <DeletePrizeButton
+                            id={prize.id}
+                            name={prize.name}
+                            onDeleted={mutate}
+                          />
+                        </React.Suspense>
                       </TableCell>
                     </TableRow>
                   ))

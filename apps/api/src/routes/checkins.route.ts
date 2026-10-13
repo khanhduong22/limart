@@ -283,6 +283,7 @@ async function handleCheckinPost(c: any, forcedType?: "checkin" | "checkout") {
       invalidateCachePattern(`checkin:status:${user.sub}:*`),
       invalidateCachePattern("staff:history:*"),
       invalidateCachePattern("staff:payroll:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
 
     return c.json(
@@ -487,6 +488,7 @@ checkinsRoute.post("/sync-offline", authMiddleware, async (c) => {
         invalidateCachePattern(`checkin:status:${userId}:*`),
         invalidateCachePattern("staff:history:*"),
         invalidateCachePattern("staff:payroll:*"),
+        invalidateCachePattern("staff:rewards:leaderboard:*"),
       ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
     }
 

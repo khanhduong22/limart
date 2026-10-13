@@ -1228,6 +1228,7 @@ const handleManualCheckin = async (c: any) => {
       invalidateCachePattern("checkin:status:*"),
       invalidateCachePattern("staff:history:*"),
       invalidateCachePattern("staff:payroll:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
 
     return c.json({
@@ -1298,6 +1299,7 @@ const handleDeleteCheckin = async (c: any) => {
       invalidateCachePattern("checkin:status:*"),
       invalidateCachePattern("staff:history:*"),
       invalidateCachePattern("staff:payroll:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
 
     return c.json({
@@ -2317,6 +2319,7 @@ adminRoute.post("/close-all-shifts", async (c) => {
       invalidateCachePattern("admin:reports:*"),
       invalidateCachePattern("staff:history:*"),
       invalidateCachePattern("staff:payroll:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -2817,6 +2820,7 @@ adminRoute.post("/tasks/:id/approve", async (c) => {
       invalidateCachePattern("tasks:market:*"),
       invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("task*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã duyệt nhiệm vụ", data: updated });
@@ -2875,6 +2879,7 @@ adminRoute.post("/tasks/:id/reject", async (c) => {
       invalidateCachePattern("tasks:market:*"),
       invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("task*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã từ chối nhiệm vụ", data: updated });
@@ -2941,6 +2946,7 @@ adminRoute.post("/tasks/:id/review", async (c) => {
         invalidateCachePattern("tasks:market:*"),
         invalidateCachePattern("staff:tasks:*"),
         invalidateCachePattern("task*"),
+        invalidateCachePattern("staff:rewards:leaderboard:*"),
       ]).catch(() => {});
 
       return c.json({ success: true, message: "Đã duyệt nhiệm vụ", data: updated });
@@ -2980,6 +2986,7 @@ adminRoute.post("/tasks/:id/review", async (c) => {
         invalidateCachePattern("tasks:market:*"),
         invalidateCachePattern("staff:tasks:*"),
         invalidateCachePattern("task*"),
+        invalidateCachePattern("staff:rewards:leaderboard:*"),
       ]).catch(() => {});
 
       return c.json({ success: true, message: "Đã từ chối nhiệm vụ", data: updated });
@@ -3007,6 +3014,7 @@ adminRoute.delete("/tasks/stale-pending", async (c) => {
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff-tasks:stats:*"),
       invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch(() => {});
     return c.json({
       success: true,
@@ -3036,6 +3044,7 @@ adminRoute.delete("/tasks/:id", async (c) => {
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff-tasks:stats:*"),
       invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("staff:rewards:leaderboard:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa nhiệm vụ thành công" });

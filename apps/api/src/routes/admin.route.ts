@@ -2736,6 +2736,7 @@ adminRoute.post("/tasks/:id/approve", async (c) => {
       invalidateCachePattern("staff-tasks:stats:*"),
       invalidateCachePattern("user:tasks:my:*"),
       invalidateCachePattern("tasks:market:*"),
+      invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("task*"),
     ]).catch(() => {});
 
@@ -2793,6 +2794,7 @@ adminRoute.post("/tasks/:id/reject", async (c) => {
       invalidateCachePattern("staff-tasks:stats:*"),
       invalidateCachePattern("user:tasks:my:*"),
       invalidateCachePattern("tasks:market:*"),
+      invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("task*"),
     ]).catch(() => {});
 
@@ -2858,6 +2860,7 @@ adminRoute.post("/tasks/:id/review", async (c) => {
         invalidateCachePattern("staff-tasks:stats:*"),
         invalidateCachePattern("user:tasks:my:*"),
         invalidateCachePattern("tasks:market:*"),
+        invalidateCachePattern("staff:tasks:*"),
         invalidateCachePattern("task*"),
       ]).catch(() => {});
 
@@ -2896,6 +2899,7 @@ adminRoute.post("/tasks/:id/review", async (c) => {
         invalidateCachePattern("staff-tasks:stats:*"),
         invalidateCachePattern("user:tasks:my:*"),
         invalidateCachePattern("tasks:market:*"),
+        invalidateCachePattern("staff:tasks:*"),
         invalidateCachePattern("task*"),
       ]).catch(() => {});
 
@@ -2923,6 +2927,7 @@ adminRoute.delete("/tasks/stale-pending", async (c) => {
       invalidateCachePattern("task*"),
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff-tasks:stats:*"),
+      invalidateCachePattern("staff:tasks:*"),
     ]).catch(() => {});
     return c.json({
       success: true,
@@ -2951,6 +2956,7 @@ adminRoute.delete("/tasks/:id", async (c) => {
       invalidateCachePattern("task*"),
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff-tasks:stats:*"),
+      invalidateCachePattern("staff:tasks:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa nhiệm vụ thành công" });

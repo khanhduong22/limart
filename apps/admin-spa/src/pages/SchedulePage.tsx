@@ -6,11 +6,17 @@ import {
 } from "lucide-react";
 import { useEmployees } from "@/hooks/useAdminData";
 import { useAdminQuery } from "@/hooks/useAdminQuery";
-import ScheduleCalendar from "@/components/schedule/ScheduleCalendar";
-import UploadScheduleButton from "@/components/schedule/UploadScheduleButton";
-import ScheduleColumnsView from "@/components/schedule/ScheduleColumnsView";
 import { useAdminSchedulePageStore } from "@/stores/useAdminSchedulePageStore";
 
+const ScheduleCalendar = React.lazy(
+  () => import("@/components/schedule/ScheduleCalendar")
+);
+const ScheduleColumnsView = React.lazy(
+  () => import("@/components/schedule/ScheduleColumnsView")
+);
+const UploadScheduleButton = React.lazy(
+  () => import("@/components/schedule/UploadScheduleButton")
+);
 const ShiftHistoryDialog = React.lazy(
   () => import("@/components/admin/ShiftHistoryDialog")
 );
@@ -89,27 +95,37 @@ export function SchedulePage() {
             <React.Suspense fallback={null}>
               <ShiftHistoryDialog />
             </React.Suspense>
-            <UploadScheduleButton onSuccess={mutate} />
+            <React.Suspense fallback={null}>
+              <UploadScheduleButton onSuccess={mutate} />
+            </React.Suspense>
           </div>
         </div>
       </div>
 
       {/* Main Body */}
-      {viewMode === "calendar" ? (
-        <ScheduleCalendar
-          initialEvents={events}
-          userId={currentUser?.id || "admin"}
-          isAdmin={true}
-          users={employees}
-          onEventsChange={mutate}
-        />
-      ) : (
-        <ScheduleColumnsView
-          events={events}
-          onDeleteShift={(shiftId) => openDeleteModal(shiftId)}
-          onAddShift={() => openAddModal()}
-        />
-      )}
+      <React.Suspense
+        fallback={
+          <div className="p-12 text-center text-sm text-muted-foreground animate-pulse">
+            Đang tải giao diện lịch làm việc...
+          </div>
+        }
+      >
+        {viewMode === "calendar" ? (
+          <ScheduleCalendar
+            initialEvents={events}
+            userId={currentUser?.id || "admin"}
+            isAdmin={true}
+            users={employees}
+            onEventsChange={mutate}
+          />
+        ) : (
+          <ScheduleColumnsView
+            events={events}
+            onDeleteShift={(shiftId) => openDeleteModal(shiftId)}
+            onAddShift={() => openAddModal()}
+          />
+        )}
+      </React.Suspense>
 
       {/* Dialogs for Columns View */}
       <React.Suspense fallback={null}>

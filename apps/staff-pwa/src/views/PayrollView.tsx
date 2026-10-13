@@ -1,8 +1,8 @@
 import React, { useState, Suspense, lazy } from "react";
 import { useAppQuery } from "@/lib/api-query";
-import PayrollDetailView from "@/components/PayrollDetailView";
 import PayrollMonthSelector from "@/components/PayrollMonthSelector";
 const PayrollExplanationModal = lazy(() => import("@/components/PayrollExplanationModal"));
+const PayrollDetailView = lazy(() => import("@/components/PayrollDetailView"));
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/lib/router";
@@ -104,12 +104,20 @@ export const PayrollView: React.FC = () => {
                 Đang tải dữ liệu kỳ lương...
               </div>
             ) : (
-              <PayrollDetailView
-                stats={stats}
-                monthStr={`${selectedMonth}/${selectedYear}`}
-                userName="Bạn"
-                isClosed={isClosed}
-              />
+              <Suspense
+                fallback={
+                  <div className="py-12 text-center text-xs text-slate-400 animate-pulse">
+                    Đang tải chi tiết bảng lương...
+                  </div>
+                }
+              >
+                <PayrollDetailView
+                  stats={stats}
+                  monthStr={`${selectedMonth}/${selectedYear}`}
+                  userName="Bạn"
+                  isClosed={isClosed}
+                />
+              </Suspense>
             )}
           </div>
         </div>

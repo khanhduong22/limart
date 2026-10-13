@@ -254,6 +254,7 @@ model CheckIn {
   @@index([userId, timestamp])
   @@index([userId, type, timestamp])
   @@index([timestamp])
+  @@index([type, timestamp])
 }
 
 model AllowedIP {
@@ -300,6 +301,9 @@ model TaskDefinition {
   updatedAt   DateTime   @updatedAt
   tasks       UserTask[]
   taskItems   TaskItem[]
+
+  @@index([unit, active])
+  @@index([active])
 }
 
 model TaskItem {
@@ -319,6 +323,8 @@ model TaskItem {
 
   @@index([taskDefId])
   @@index([assigneeId])
+  @@index([assigneeId, status])
+  @@index([status])
   @@index([status, createdAt])
   @@index([createdAt])
 }

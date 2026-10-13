@@ -193,14 +193,16 @@ export async function deleteDefinitionHandler(c: any) {
 
 export async function getTaskItemsHandler(c: any) {
   try {
-    const items = await prisma.taskItem.findMany({
-      include: {
-        taskDefinition: true,
-        assignee: {
-          select: { id: true, name: true, email: true, image: true },
+    const items = await getOrSetCache("tasks:items:all", 60, async () => {
+      return await prisma.taskItem.findMany({
+        include: {
+          taskDefinition: true,
+          assignee: {
+            select: { id: true, name: true, email: true, image: true },
+          },
         },
-      },
-      orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: "desc" },
+      });
     });
     return c.json({ success: true, data: items });
   } catch (err: any) {
@@ -248,7 +250,10 @@ export async function createTaskItemHandler(c: any) {
       },
     });
 
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json(
       { success: true, message: "Tạo nhiệm vụ kho việc thành công", data: item },
@@ -307,7 +312,10 @@ export async function updateTaskItemHandler(c: any) {
       },
     });
 
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -357,7 +365,10 @@ export async function updateTaskItemStatusHandler(c: any) {
       },
     });
 
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -397,7 +408,10 @@ export async function resetTaskItemHandler(c: any) {
       },
     });
 
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -436,7 +450,10 @@ export async function closeTaskItemHandler(c: any) {
       },
     });
 
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -466,7 +483,10 @@ export async function deleteTaskItemHandler(c: any) {
       where: { id },
     });
 
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa nhiệm vụ kho việc" });
   } catch (err: any) {

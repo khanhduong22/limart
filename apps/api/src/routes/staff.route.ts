@@ -1333,6 +1333,7 @@ staffRoute.post("/tasks/claim", authMiddleware, async (c) => {
       invalidateCachePattern("tasks:market:*"),
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("staff:tasks:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Nhận việc thành công!", data: userTask });
@@ -1389,6 +1390,7 @@ staffRoute.post("/tasks/start", authMiddleware, async (c) => {
       invalidateCachePattern("tasks:market:*"),
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("staff:tasks:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Bắt đầu nhiệm vụ thành công!", data: userTask });
@@ -1434,6 +1436,7 @@ staffRoute.post("/tasks/submit", authMiddleware, async (c) => {
         invalidateCachePattern("tasks:market:*"),
         invalidateCachePattern("user:tasks:my:" + userId + "*"),
         invalidateCachePattern("admin:tasks:*"),
+        invalidateCachePattern("staff:tasks:*"),
       ]).catch(() => {});
 
       return c.json({ success: true, message: "Nộp kết quả thành công!", data: updated });
@@ -1470,6 +1473,7 @@ staffRoute.post("/tasks/submit", authMiddleware, async (c) => {
       invalidateCachePattern("tasks:market:*"),
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("staff:tasks:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Nộp kết quả thành công!", data: userTask });
@@ -1485,49 +1489,54 @@ staffRoute.get("/tasks/packing-summary", authMiddleware, async (c) => {
     const userId = tokenPayload.sub;
     const { startDate, endDate } = getVietnamMonthRange();
 
-    const [priceList, userTasks] = await Promise.all([
-      getOrSetCache("meta:task-definitions:packing", 600, () =>
-        prisma.taskDefinition.findMany({
-          where: { unit: "điểm", active: true },
-          orderBy: { baseReward: "asc" },
-        })
-      ),
-      prisma.userTask.findMany({
-        where: {
-          userId,
-          taskDefinition: { unit: "điểm" },
-        },
-        include: { taskDefinition: true },
-        orderBy: { createdAt: "desc" },
-        take: 100,
-      }),
-    ]);
+    const cacheKey = `staff:tasks:packing-summary:${userId}`;
+    const data = await getOrSetCache(cacheKey, 60, async () => {
+      const [priceList, userTasks] = await Promise.all([
+        getOrSetCache("meta:task-definitions:packing", 600, () =>
+          prisma.taskDefinition.findMany({
+            where: { unit: "điểm", active: true },
+            orderBy: { baseReward: "asc" },
+          })
+        ),
+        prisma.userTask.findMany({
+          where: {
+            userId,
+            taskDefinition: { unit: "điểm" },
+          },
+          include: { taskDefinition: true },
+          orderBy: { createdAt: "desc" },
+          take: 100,
+        }),
+      ]);
 
-    let totalPoints = 0;
-    let approvedCount = 0;
-    let pendingCount = 0;
+      let totalPoints = 0;
+      let approvedCount = 0;
+      let pendingCount = 0;
 
-    for (const t of userTasks) {
-      const taskDate = new Date(t.submittedAt || t.createdAt);
-      if (taskDate >= startDate && taskDate <= endDate) {
-        if (t.status === "APPROVED") {
-          totalPoints += t.finalAmount || t.quantity || 0;
-          approvedCount++;
-        } else if (t.status === "PENDING" || t.status === "SUBMITTED") {
-          pendingCount++;
+      for (const t of userTasks) {
+        const taskDate = new Date(t.submittedAt || t.createdAt);
+        if (taskDate >= startDate && taskDate <= endDate) {
+          if (t.status === "APPROVED") {
+            totalPoints += t.finalAmount || t.quantity || 0;
+            approvedCount++;
+          } else if (t.status === "PENDING" || t.status === "SUBMITTED") {
+            pendingCount++;
+          }
         }
       }
-    }
 
-    return c.json({
-      success: true,
-      data: {
+      return {
         totalPoints,
         approvedCount,
         pendingCount,
         priceList,
         history: userTasks,
-      },
+      };
+    });
+
+    return c.json({
+      success: true,
+      data,
     });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to fetch packing summary" }, 500);
@@ -1541,49 +1550,56 @@ staffRoute.get("/tasks/carrying-summary", authMiddleware, async (c) => {
     const userId = tokenPayload.sub;
     const { startDate, endDate } = getVietnamMonthRange();
 
-    const [conversionList, userTasks] = await Promise.all([
-      getOrSetCache("meta:task-definitions:carrying", 600, () =>
-        prisma.taskDefinition.findMany({
-          where: { unit: "điểm-bưng", active: true },
-          orderBy: { baseReward: "asc" },
-        })
-      ),
-      prisma.userTask.findMany({
-        where: {
-          userId,
-          taskDefinition: { unit: "điểm-bưng" },
-        },
-        include: { taskDefinition: true },
-        orderBy: { createdAt: "desc" },
-        take: 100,
-      }),
-    ]);
+    const cacheKey = `staff:tasks:carrying-summary:${userId}`;
+    const data = await getOrSetCache(cacheKey, 60, async () => {
+      const [conversionList, userTasks] = await Promise.all([
+        getOrSetCache("meta:task-definitions:carrying", 600, () =>
+          prisma.taskDefinition.findMany({
+            where: { unit: "điểm-bưng", active: true },
+            orderBy: { baseReward: "asc" },
+          })
+        ),
+        prisma.userTask.findMany({
+          where: {
+            userId,
+            taskDefinition: { unit: "điểm-bưng" },
+          },
+          include: { taskDefinition: true },
+          orderBy: { createdAt: "desc" },
+          take: 100,
+        }),
+      ]);
 
-    let totalPoints = 0;
-    let approvedCount = 0;
-    let pendingCount = 0;
+      let totalPoints = 0;
+      let approvedCount = 0;
+      let pendingCount = 0;
 
-    for (const t of userTasks) {
-      const taskDate = new Date(t.submittedAt || t.createdAt);
-      if (taskDate >= startDate && taskDate <= endDate) {
-        if (t.status === "APPROVED") {
-          totalPoints += t.finalAmount || t.quantity || 0;
-          approvedCount++;
-        } else if (t.status === "PENDING" || t.status === "SUBMITTED") {
-          pendingCount++;
+      for (const t of userTasks) {
+        const taskDate = new Date(t.submittedAt || t.createdAt);
+        if (taskDate >= startDate && taskDate <= endDate) {
+          if (t.status === "APPROVED") {
+            totalPoints += t.finalAmount || t.quantity || 0;
+            approvedCount++;
+          } else if (t.status === "PENDING" || t.status === "SUBMITTED") {
+            pendingCount++;
+          }
         }
       }
-    }
 
-    return c.json({
-      success: true,
-      data: {
+      const totalTrips = totalPoints;
+      return {
         totalPoints,
+        totalTrips,
         approvedCount,
         pendingCount,
         conversionList,
         history: userTasks,
-      },
+      };
+    });
+
+    return c.json({
+      success: true,
+      data,
     });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to fetch carrying summary" }, 500);
@@ -1633,6 +1649,7 @@ staffRoute.post("/tasks/submit-packing", authMiddleware, async (c) => {
       invalidateCachePattern("tasks:market:*"),
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("staff:tasks:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -1688,6 +1705,7 @@ staffRoute.post("/tasks/submit-carrying", authMiddleware, async (c) => {
       invalidateCachePattern("tasks:market:*"),
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("staff:tasks:*"),
     ]).catch(() => {});
 
     return c.json({

@@ -47,6 +47,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile }) => {
             decoding="async"
             className="w-full h-full object-cover rounded-full"
             onError={(e) => {
+              e.currentTarget.onerror = null;
               const target = e.currentTarget;
               if (!target.src.endsWith("/capybara_mascot.webp")) {
                 target.src = "/capybara_mascot.webp";

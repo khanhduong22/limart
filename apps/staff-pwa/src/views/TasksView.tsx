@@ -15,12 +15,19 @@ import {
   UserTaskRecord,
   SubmittingWfhTask,
   MarketTaskList,
-  GeneralTaskList,
-  UserTaskHistoryList,
-  WfhTaskSubmitModal,
   WfhTaskTabs,
   WfhTabType,
 } from "@/components/tasks";
+
+const GeneralTaskList = React.lazy(() =>
+  import("@/components/tasks").then((m) => ({ default: m.GeneralTaskList }))
+);
+const UserTaskHistoryList = React.lazy(() =>
+  import("@/components/tasks").then((m) => ({ default: m.UserTaskHistoryList }))
+);
+const WfhTaskSubmitModal = React.lazy(() =>
+  import("@/components/tasks").then((m) => ({ default: m.WfhTaskSubmitModal }))
+);
 
 export const TasksView: React.FC = () => {
   const router = useRouter();
@@ -195,31 +202,37 @@ export const TasksView: React.FC = () => {
       )}
 
       {activeTab === "general" && (
-        <GeneralTaskList
-          tasks={generalTasks}
-          isLoading={loadingAvailable}
-          isProcessing={isProcessing}
-          onStart={handleStart}
-        />
+        <React.Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Đang tải danh sách...</div>}>
+          <GeneralTaskList
+            tasks={generalTasks}
+            isLoading={loadingAvailable}
+            isProcessing={isProcessing}
+            onStart={handleStart}
+          />
+        </React.Suspense>
       )}
 
       {activeTab === "history" && (
-        <UserTaskHistoryList
-          tasks={myTasks}
-          isLoading={loadingMyTasks}
-          onOpenSubmit={openSubmitModal}
-        />
+        <React.Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Đang tải danh sách...</div>}>
+          <UserTaskHistoryList
+            tasks={myTasks}
+            isLoading={loadingMyTasks}
+            onOpenSubmit={openSubmitModal}
+          />
+        </React.Suspense>
       )}
 
-      <WfhTaskSubmitModal
-        task={submittingTask}
-        initialQuantity={initialQuantity}
-        initialEvidence={initialEvidence}
-        initialNote={initialNote}
-        isProcessing={isProcessing}
-        onClose={() => setSubmittingTask(null)}
-        onSubmit={handleSubmitTask}
-      />
+      <React.Suspense fallback={null}>
+        <WfhTaskSubmitModal
+          task={submittingTask}
+          initialQuantity={initialQuantity}
+          initialEvidence={initialEvidence}
+          initialNote={initialNote}
+          isProcessing={isProcessing}
+          onClose={() => setSubmittingTask(null)}
+          onSubmit={handleSubmitTask}
+        />
+      </React.Suspense>
     </div>
   );
 };

@@ -4,7 +4,7 @@ import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { getVietnamMonthRange } from "../lib/date-utils";
 import { isShiftLocked } from "../lib/schedule-lock";
 import { assertPeriodOpen } from "../lib/payroll-period";
-import { invalidateShiftDutyCache, invalidateCachePattern } from "../lib/cache";
+import { invalidateShiftDutyCache, invalidateCachePattern, getOrSetCache } from "../lib/cache";
 
 export const scheduleRoute = new Hono<AppEnv>();
 
@@ -47,30 +47,33 @@ scheduleRoute.get("/", authMiddleware, async (c) => {
       where.userId = targetUserId;
     }
 
-    const shifts = await prisma.workShift.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            image: true,
-            role: true,
-            employmentType: true,
+    const cacheKey = `shifts:schedule:${targetUserId || "all"}:${startDate.toISOString().slice(0, 10)}:${endDate.toISOString().slice(0, 10)}`;
+    const shifts = await getOrSetCache(cacheKey, 60, async () => {
+      return await prisma.workShift.findMany({
+        where,
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+              role: true,
+              employmentType: true,
+            },
+          },
+          duties: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              isCompleted: true,
+              date: true,
+            },
           },
         },
-        duties: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            isCompleted: true,
-            date: true,
-          },
-        },
-      },
-      orderBy: { start: "asc" },
+        orderBy: { start: "asc" },
+      });
     });
 
     return c.json({
@@ -89,8 +92,8 @@ scheduleRoute.get("/", authMiddleware, async (c) => {
   }
 });
 
-// GET /api/schedule/my-shifts
-scheduleRoute.get("/my-shifts", authMiddleware, async (c) => {
+// GET /api/schedule/my-shifts & /api/schedule/my
+const handleMyShifts = async (c: any) => {
   try {
     const tokenPayload = c.get("user");
     const userId = tokenPayload.sub;
@@ -118,23 +121,26 @@ scheduleRoute.get("/my-shifts", authMiddleware, async (c) => {
       endDate = range.endDate;
     }
 
-    const shifts = await prisma.workShift.findMany({
-      where: {
-        userId,
-        start: { gte: startDate, lte: endDate },
-      },
-      include: {
-        duties: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            isCompleted: true,
-            date: true,
+    const cacheKey = `shifts:my:${userId}:${startDate.toISOString().slice(0, 10)}:${endDate.toISOString().slice(0, 10)}`;
+    const shifts = await getOrSetCache(cacheKey, 60, async () => {
+      return await prisma.workShift.findMany({
+        where: {
+          userId,
+          start: { gte: startDate, lte: endDate },
+        },
+        include: {
+          duties: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              isCompleted: true,
+              date: true,
+            },
           },
         },
-      },
-      orderBy: { start: "asc" },
+        orderBy: { start: "asc" },
+      });
     });
 
     return c.json({
@@ -151,7 +157,10 @@ scheduleRoute.get("/my-shifts", authMiddleware, async (c) => {
       500
     );
   }
-});
+};
+
+scheduleRoute.get("/my-shifts", authMiddleware, handleMyShifts);
+scheduleRoute.get("/my", authMiddleware, handleMyShifts);
 
 // POST /api/schedule/:id/swap
 scheduleRoute.post("/:id/swap", authMiddleware, async (c) => {

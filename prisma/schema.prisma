@@ -85,6 +85,7 @@ model User {
 
   @@index([isActive])
   @@index([role, isActive])
+  @@index([role, employmentType])
 }
 
 model WorkShift {
@@ -151,6 +152,9 @@ model Announcement {
   type      String   @default("INFO")
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
+
+  @@index([active, createdAt])
+  @@index([createdAt])
 }
 
 model AnnouncementRead {

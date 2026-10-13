@@ -10,10 +10,12 @@ import {
 } from "@/lib/payrollExport";
 import { api } from "@/lib/api";
 import { usePayrollAdminStore } from "@/stores/usePayrollAdminStore";
-import {
-  PayrollAdjustmentDialog,
-  PayrollExportModal,
-} from "./payroll";
+const PayrollAdjustmentDialog = React.lazy(() =>
+  import("./payroll/PayrollAdjustmentDialog").then((m) => ({ default: m.PayrollAdjustmentDialog }))
+);
+const PayrollExportModal = React.lazy(() =>
+  import("./payroll/PayrollExportModal").then((m) => ({ default: m.PayrollExportModal }))
+);
 
 export interface PayrollAdminClientProps {
   data?: any[];
@@ -587,25 +589,29 @@ export default function PayrollAdminClient({
       </div>
 
       {/* Modular Modals */}
-      <PayrollAdjustmentDialog
-        open={isAdjustmentOpen}
-        employee={selectedEmployee}
-        month={month}
-        year={year}
-        onClose={closeAdjustment}
-        onSuccess={onRefresh}
-      />
+      <React.Suspense fallback={null}>
+        <PayrollAdjustmentDialog
+          open={isAdjustmentOpen}
+          employee={selectedEmployee}
+          month={month}
+          year={year}
+          onClose={closeAdjustment}
+          onSuccess={onRefresh}
+        />
+      </React.Suspense>
 
-      <PayrollExportModal
-        open={isExportOpen}
-        data={filteredData}
-        month={month}
-        year={year}
-        closedState={closedState}
-        bonusPercent={bonusPercent}
-        bonusTargets={bonusTargets}
-        onClose={closeExport}
-      />
+      <React.Suspense fallback={null}>
+        <PayrollExportModal
+          open={isExportOpen}
+          data={filteredData}
+          month={month}
+          year={year}
+          closedState={closedState}
+          bonusPercent={bonusPercent}
+          bonusTargets={bonusTargets}
+          onClose={closeExport}
+        />
+      </React.Suspense>
     </div>
   );
 }

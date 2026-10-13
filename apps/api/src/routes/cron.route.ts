@@ -3,6 +3,7 @@ import { prisma } from "@checkin/db";
 import { runBirthdayBonus, runCarryingBonus, runPackingBonus } from "@checkin/shared";
 import { autoScheduleAdminNa } from "../lib/auto-schedule";
 import { closePayrollMonth } from "../lib/payroll-close";
+import { invalidatePayrollCache, invalidateCachePattern } from "../lib/cache";
 
 export const cronRoute = new Hono();
 
@@ -53,6 +54,11 @@ cronRoute.get("/auto-schedule", async (c) => {
 cronRoute.get("/birthday-bonus", async (c) => {
   try {
     await runBirthdayBonus(prisma);
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("staff:payroll:*"),
+      invalidateCachePattern("stats:*"),
+    ]).catch(() => {});
     return c.json({
       success: true,
       message: "Birthday bonus check executed successfully",
@@ -70,6 +76,11 @@ cronRoute.get("/birthday-bonus", async (c) => {
 cronRoute.get("/carrying-bonus", async (c) => {
   try {
     await runCarryingBonus(prisma);
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("staff:payroll:*"),
+      invalidateCachePattern("stats:*"),
+    ]).catch(() => {});
     return c.json({
       success: true,
       message: "Carrying bonus check executed successfully",
@@ -87,6 +98,11 @@ cronRoute.get("/carrying-bonus", async (c) => {
 cronRoute.get("/packing-bonus", async (c) => {
   try {
     await runPackingBonus(prisma);
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("staff:payroll:*"),
+      invalidateCachePattern("stats:*"),
+    ]).catch(() => {});
     return c.json({
       success: true,
       message: "Packing bonus check executed successfully",
@@ -99,9 +115,10 @@ cronRoute.get("/packing-bonus", async (c) => {
 
 /**
  * GET /api/cron/payroll-close
+ * POST /api/cron/payroll-close
  * Tự động chốt bảng lương vào ngày cuối tháng lúc 17:00 UTC (00:00 ICT ngày 1 tháng sau)
  */
-cronRoute.get("/payroll-close", async (c) => {
+const handlePayrollClose = async (c: any) => {
   try {
     const isForce = c.req.query("force") === "true";
     const now = new Date();
@@ -145,6 +162,12 @@ cronRoute.get("/payroll-close", async (c) => {
       excludedBonusUsers
     );
 
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("staff:payroll:*"),
+      invalidateCachePattern("stats:*"),
+    ]).catch(() => {});
+
     return c.json({
       success: true,
       result,
@@ -153,7 +176,10 @@ cronRoute.get("/payroll-close", async (c) => {
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed payroll close" }, 500);
   }
-});
+};
+
+cronRoute.get("/payroll-close", handlePayrollClose);
+cronRoute.post("/payroll-close", handlePayrollClose);
 
 /**
  * GET /api/cron/all
@@ -188,6 +214,12 @@ cronRoute.get("/all", async (c) => {
   } catch (e: any) {
     results.packingBonus = { error: e.message };
   }
+
+  await Promise.all([
+    invalidatePayrollCache(),
+    invalidateCachePattern("staff:payroll:*"),
+    invalidateCachePattern("stats:*"),
+  ]).catch(() => {});
 
   return c.json({
     success: true,

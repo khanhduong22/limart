@@ -994,10 +994,12 @@ staffRoute.get("/lucky-wheel", authMiddleware, async (c) => {
         where: { id: userId },
         select: { id: true, role: true, luckyWheelAllowed: true },
       }),
-      prisma.luckyWheelPrize.findMany({
-        where: { active: true },
-        orderBy: { createdAt: "asc" },
-      }),
+      getOrSetCache("meta:lucky-wheel:prizes", 300, () =>
+        prisma.luckyWheelPrize.findMany({
+          where: { active: true },
+          orderBy: { createdAt: "asc" },
+        })
+      ),
       prisma.checkIn.findFirst({
         where: {
           userId,
@@ -1010,19 +1012,21 @@ staffRoute.get("/lucky-wheel", authMiddleware, async (c) => {
           createdAt: { gte: startOfDay, lte: endOfDay },
         },
       }),
-      prisma.luckyWheelHistory.findMany({
-        take: 20,
-        orderBy: { createdAt: "desc" },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
+      getOrSetCache("meta:lucky-wheel:recent-winners", 60, () =>
+        prisma.luckyWheelHistory.findMany({
+          take: 20,
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+              },
             },
           },
-        },
-      }),
+        })
+      ),
     ]);
 
     const isAllowed = user?.role === "ADMIN" || Boolean(user?.luckyWheelAllowed);
@@ -1055,8 +1059,8 @@ staffRoute.get("/lucky-wheel", authMiddleware, async (c) => {
   }
 });
 
-// POST /api/staff/gacha
-staffRoute.post("/gacha", authMiddleware, async (c) => {
+// POST /api/staff/gacha & POST /api/staff/lucky-wheel/spin
+const handleStaffGachaSpin = async (c: any) => {
   try {
     const tokenPayload = c.get("user");
     const body = await c.req.json().catch(() => ({}));
@@ -1185,6 +1189,7 @@ staffRoute.post("/gacha", authMiddleware, async (c) => {
     await invalidateCachePattern("payroll:*").catch(() => {});
     await invalidateCachePattern("stats:*").catch(() => {});
     await invalidateCachePattern("gacha:status:" + user.id + ":*").catch(() => {});
+    await invalidateCachePattern("meta:lucky-wheel:recent-winners").catch(() => {});
     await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
     await invalidateCachePattern("admin:lucky-wheel:*").catch(() => {});
 
@@ -1203,7 +1208,10 @@ staffRoute.post("/gacha", authMiddleware, async (c) => {
       500
     );
   }
-});
+};
+
+staffRoute.post("/gacha", authMiddleware, handleStaffGachaSpin);
+staffRoute.post("/lucky-wheel/spin", authMiddleware, handleStaffGachaSpin);
 
 // POST /api/staff/duties/:id/toggle
 staffRoute.post("/duties/:id/toggle", authMiddleware, async (c) => {

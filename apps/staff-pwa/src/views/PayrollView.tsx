@@ -1,6 +1,6 @@
 import React, { useState, Suspense, lazy } from "react";
 import { useAppQuery } from "@/lib/api-query";
-import PayrollMonthSelector from "@/components/PayrollMonthSelector";
+const PayrollMonthSelector = lazy(() => import("@/components/PayrollMonthSelector"));
 const PayrollExplanationModal = lazy(() => import("@/components/PayrollExplanationModal"));
 const PayrollDetailView = lazy(() => import("@/components/PayrollDetailView"));
 import { ChevronLeft } from "lucide-react";
@@ -73,11 +73,13 @@ export const PayrollView: React.FC = () => {
           <label className="text-xs text-muted-foreground font-semibold mb-2 block uppercase tracking-wider">
             Kỳ lương
           </label>
-          <PayrollMonthSelector
-            current={`${selectedYear}-${selectedMonth}`}
-            options={monthOptions}
-            onSelect={handleMonthChange}
-          />
+          <Suspense fallback={<div className="h-9 w-full bg-slate-100 rounded-md animate-pulse" />}>
+            <PayrollMonthSelector
+              current={`${selectedYear}-${selectedMonth}`}
+              options={monthOptions}
+              onSelect={handleMonthChange}
+            />
+          </Suspense>
         </div>
 
         {/* Main Payroll Container */}

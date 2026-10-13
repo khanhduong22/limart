@@ -1,7 +1,10 @@
 import React, { useState } from "react";
-import PayrollAdminClient from "@/components/admin/PayrollAdminClient";
 import { usePayroll } from "@/hooks/useAdminData";
 import { BulkSendPayslipButton } from "@/components/admin/BulkSendPayslipButton";
+
+const PayrollAdminClient = React.lazy(
+  () => import("@/components/admin/PayrollAdminClient")
+);
 
 export function PayrollPage() {
   const now = new Date();
@@ -41,20 +44,28 @@ export function PayrollPage() {
         )}
       </div>
 
-      <PayrollAdminClient
-        data={payroll}
-        month={selectedMonth}
-        year={selectedYear}
-        isClosed={isClosed}
-        initialBonusPercent={bonusPercent}
-        initialBonusTargets={bonusTargets}
-        initialExcludedUsers={excludedBonusUsers}
-        onMonthChange={(m, y) => {
-          setSelectedMonth(m);
-          setSelectedYear(y);
-        }}
-        onRefresh={mutate}
-      />
+      <React.Suspense
+        fallback={
+          <div className="h-64 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-xs text-slate-400">
+            Đang tải bảng tính lương...
+          </div>
+        }
+      >
+        <PayrollAdminClient
+          data={payroll}
+          month={selectedMonth}
+          year={selectedYear}
+          isClosed={isClosed}
+          initialBonusPercent={bonusPercent}
+          initialBonusTargets={bonusTargets}
+          initialExcludedUsers={excludedBonusUsers}
+          onMonthChange={(m, y) => {
+            setSelectedMonth(m);
+            setSelectedYear(y);
+          }}
+          onRefresh={mutate}
+        />
+      </React.Suspense>
     </div>
   );
 }

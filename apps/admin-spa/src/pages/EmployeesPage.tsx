@@ -1,6 +1,7 @@
 import React from "react";
-import UserManager from "@/components/admin/UserManager";
 import { useEmployees } from "@/hooks/useAdminData";
+
+const UserManager = React.lazy(() => import("@/components/admin/UserManager"));
 
 export function EmployeesPage() {
   const { employees, mutate } = useEmployees();
@@ -19,7 +20,15 @@ export function EmployeesPage() {
       </div>
 
       {/* Employee list rows rendered via UserManager -> UserCard with .cv-auto-table-row */}
-      <UserManager users={employees} onRefresh={mutate} />
+      <React.Suspense
+        fallback={
+          <div className="h-64 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-xs text-slate-400">
+            Đang tải danh sách nhân sự...
+          </div>
+        }
+      >
+        <UserManager users={employees} onRefresh={mutate} />
+      </React.Suspense>
     </div>
   );
 }

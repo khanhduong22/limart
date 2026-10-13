@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useAppQuery } from "@/lib/api-query";
 import {
   ChevronLeft,
@@ -8,12 +8,10 @@ import {
   Plus,
   Sparkles,
 } from "lucide-react";
-import { toast } from "sonner";
 import { useRouter } from "@/lib/router";
 import { Button } from "@/components/ui/button";
-import {
-  submitCarryingTask,
-} from "@/lib/api-client";
+
+const CarryingSubmitModal = React.lazy(() => import("@/components/carrying/CarryingSubmitModal"));
 
 interface CarryingPriceItem {
   id: string;
@@ -91,48 +89,9 @@ export const CarryingView: React.FC = () => {
 
   // Submission modal state
   const [selectedTaskDef, setSelectedTaskDef] = useState<CarryingPriceItem | null>(null);
-  const [quantity, setQuantity] = useState("1");
-  const [note, setNote] = useState("");
-  const [evidenceLink, setEvidenceLink] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleOpenModal = (item: CarryingPriceItem) => {
     setSelectedTaskDef(item);
-    setQuantity("1");
-    setNote("");
-    setEvidenceLink("");
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedTaskDef) return;
-
-    const q = parseInt(quantity, 10);
-    if (isNaN(q) || q <= 0) {
-      toast.error("Vui lòng nhập số lượng hợp lệ (> 0)");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const result = await submitCarryingTask({
-        taskDefId: selectedTaskDef.id,
-        quantity: q,
-        note: note.trim() || undefined,
-        evidenceLink: evidenceLink.trim() || undefined,
-      });
-
-      if (result.success) {
-        toast.success("🛗 Khai báo bưng hàng lên lầu thành công! Chờ Admin duyệt.");
-        setSelectedTaskDef(null);
-        mutate();
-        setActiveTab("history");
-      } else {
-        toast.error(result.error || "Không thể gửi khai báo");
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   return (
@@ -371,79 +330,17 @@ export const CarryingView: React.FC = () => {
 
       {/* SUBMISSION MODAL */}
       {selectedTaskDef && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-xl border border-stone-200 animate-in fade-in zoom-in-95 duration-200">
-            <div>
-              <h2 className="text-sm font-bold text-stone-900">
-                Khai báo: {selectedTaskDef.name || selectedTaskDef.title || "Bưng hàng"}
-              </h2>
-              <p className="text-xs text-stone-500 mt-0.5">
-                Nhập số lượt hoặc số thùng đã bưng lên lầu trong ca làm
-              </p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
-                  Số lượng ({selectedTaskDef.unit})
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  required
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full h-9 px-3 rounded-lg border border-stone-200 text-sm focus:outline-amber-500 font-mono"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
-                  Link ảnh hoặc bằng chứng (nếu có)
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={evidenceLink}
-                  onChange={(e) => setEvidenceLink(e.target.value)}
-                  className="w-full h-9 px-3 rounded-lg border border-stone-200 text-sm focus:outline-amber-500"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">
-                  Ghi chú (loại thùng hàng / ca bưng)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Ví dụ: Bưng 2 kiện hàng áo thun lên kho lầu 2..."
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="w-full p-2.5 rounded-lg border border-stone-200 text-xs focus:outline-amber-500"
-                />
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={isSubmitting}
-                  onClick={() => setSelectedTaskDef(null)}
-                  className="flex-1 h-9 text-xs font-bold cursor-pointer"
-                >
-                  Hủy
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="flex-1 h-9 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white cursor-pointer"
-                >
-                  {isSubmitting ? "Đang gửi..." : "Gửi khai báo"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <Suspense fallback={null}>
+          <CarryingSubmitModal
+            taskDef={selectedTaskDef}
+            onClose={() => setSelectedTaskDef(null)}
+            onSuccess={() => {
+              setSelectedTaskDef(null);
+              mutate();
+              setActiveTab("history");
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

@@ -182,6 +182,7 @@ model StickyNote {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([userId, createdAt])
 }
 
 model PayrollAdjustment {
@@ -419,6 +420,7 @@ model DocumentChunk {
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@index([documentId])
+  @@index([documentId, createdAt])
 }
 
 model ManagerTask {
@@ -443,6 +445,7 @@ model ManagerTask {
 
   @@index([assigneeId])
   @@index([assigneeId, status])
+  @@index([assigneeId, createdAt])
   @@index([status])
   @@index([status, deadline])
   @@index([createdById])

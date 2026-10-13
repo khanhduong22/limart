@@ -264,6 +264,7 @@ luckyWheelRoute.post("/spin", authMiddleware, luckyWheelRateLimiter, async (c) =
     });
 
     await Promise.all([
+      invalidateCachePattern("meta:lucky-wheel:recent-winners"),
       invalidateCachePattern("meta:lucky-wheel:*"),
       invalidateCachePattern("admin:lucky-wheel:*"),
     ]).catch(() => {});

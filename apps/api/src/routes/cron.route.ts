@@ -62,6 +62,7 @@ cronRoute.get("/birthday-bonus", async (c) => {
       invalidatePayrollCache(),
       invalidateCachePattern("staff:payroll:*"),
       invalidateCachePattern("stats:*"),
+      invalidateCachePattern("admin:dashboard*"),
     ]).catch(() => {});
     return c.json({
       success: true,
@@ -84,6 +85,7 @@ cronRoute.get("/carrying-bonus", async (c) => {
       invalidatePayrollCache(),
       invalidateCachePattern("staff:payroll:*"),
       invalidateCachePattern("stats:*"),
+      invalidateCachePattern("admin:dashboard*"),
     ]).catch(() => {});
     return c.json({
       success: true,
@@ -106,6 +108,7 @@ cronRoute.get("/packing-bonus", async (c) => {
       invalidatePayrollCache(),
       invalidateCachePattern("staff:payroll:*"),
       invalidateCachePattern("stats:*"),
+      invalidateCachePattern("admin:dashboard*"),
     ]).catch(() => {});
     return c.json({
       success: true,
@@ -170,6 +173,7 @@ const handlePayrollClose = async (c: any) => {
       invalidatePayrollCache(),
       invalidateCachePattern("staff:payroll:*"),
       invalidateCachePattern("stats:*"),
+      invalidateCachePattern("admin:dashboard*"),
     ]).catch(() => {});
 
     return c.json({
@@ -225,6 +229,7 @@ cronRoute.get("/all", async (c) => {
     invalidateCachePattern("stats:*"),
     invalidateCachePattern("shifts:*"),
     invalidateCachePattern("admin:schedule:*"),
+    invalidateCachePattern("admin:dashboard*"),
   ]).catch(() => {});
 
   return c.json({

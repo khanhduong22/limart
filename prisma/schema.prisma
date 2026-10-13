@@ -337,6 +337,8 @@ model UserTask {
 
   @@index([userId])
   @@index([userId, status])
+  @@index([userId, createdAt])
+  @@index([createdAt])
   @@index([taskDefId])
   @@index([taskItemId])
   @@index([status, updatedAt])

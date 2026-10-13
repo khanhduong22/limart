@@ -249,3 +249,5 @@ export function TaskDefinitionDialogs({
     </>
   );
 }
+
+export default TaskDefinitionDialogs;

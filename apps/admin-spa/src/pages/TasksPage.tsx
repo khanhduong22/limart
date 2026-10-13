@@ -17,12 +17,19 @@ import {
   TaskHistoryTab,
   TaskDefinitionsTab,
   MarketplaceTab,
-  ReviewSubmissionDialog,
-  TaskDefinitionDialogs,
-  MarketplaceDialogs,
   computeOverduePenalty,
   filterReviewedTasks,
 } from "@/components/tasks/wfh";
+
+const ReviewSubmissionDialog = React.lazy(
+  () => import("@/components/tasks/wfh/ReviewSubmissionDialog")
+);
+const TaskDefinitionDialogs = React.lazy(
+  () => import("@/components/tasks/wfh/TaskDefinitionDialogs")
+);
+const MarketplaceDialogs = React.lazy(
+  () => import("@/components/tasks/wfh/MarketplaceDialogs")
+);
 
 export function TasksPage() {
   const { tasks, approveTask, reviewTask } = useTasks();
@@ -318,46 +325,49 @@ export function TasksPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Review Dialog */}
-      <ReviewSubmissionDialog
-        reviewingTask={reviewingTask}
-        bonusPenalty={bonusPenalty}
-        onBonusPenaltyChange={setBonusPenalty}
-        adminNote={adminNote}
-        onAdminNoteChange={setAdminNote}
-        isSubmittingReview={isSubmittingReview}
-        onClose={() => setReviewingTask(null)}
-        onSubmitReview={handleReviewSubmit}
-      />
+      {/* Lazy Overlays */}
+      <React.Suspense fallback={null}>
+        {/* Review Dialog */}
+        <ReviewSubmissionDialog
+          reviewingTask={reviewingTask}
+          bonusPenalty={bonusPenalty}
+          onBonusPenaltyChange={setBonusPenalty}
+          adminNote={adminNote}
+          onAdminNoteChange={setAdminNote}
+          isSubmittingReview={isSubmittingReview}
+          onClose={() => setReviewingTask(null)}
+          onSubmitReview={handleReviewSubmit}
+        />
 
-      {/* Task Definition Create & Edit Dialogs */}
-      <TaskDefinitionDialogs
-        isCreateOpen={isCreateOpen}
-        onCloseCreate={() => setIsCreateOpen(false)}
-        createForm={createForm}
-        onCreateFormChange={setCreateForm}
-        isSubmittingCreate={isSubmittingCreate}
-        onSubmitCreate={handleCreateDef}
-        editingDef={editingDef}
-        onCloseEdit={() => setEditingDef(null)}
-        editForm={editForm}
-        onEditFormChange={setEditForm}
-        isSubmittingEdit={isSubmittingEdit}
-        onSubmitEdit={handleUpdateDef}
-      />
+        {/* Task Definition Create & Edit Dialogs */}
+        <TaskDefinitionDialogs
+          isCreateOpen={isCreateOpen}
+          onCloseCreate={() => setIsCreateOpen(false)}
+          createForm={createForm}
+          onCreateFormChange={setCreateForm}
+          isSubmittingCreate={isSubmittingCreate}
+          onSubmitCreate={handleCreateDef}
+          editingDef={editingDef}
+          onCloseEdit={() => setEditingDef(null)}
+          editForm={editForm}
+          onEditFormChange={setEditForm}
+          isSubmittingEdit={isSubmittingEdit}
+          onSubmitEdit={handleUpdateDef}
+        />
 
-      {/* Post Task Item & View Task Item Dialogs */}
-      <MarketplaceDialogs
-        isCreateItemOpen={isCreateItemOpen}
-        onCloseCreateItem={() => setIsCreateItemOpen(false)}
-        createItemForm={createItemForm}
-        onCreateItemFormChange={setCreateItemForm}
-        definitions={definitions}
-        isSubmittingCreateItem={isSubmittingCreateItem}
-        onSubmitCreateItem={handleCreateItem}
-        viewingItem={viewingItem}
-        onCloseViewingItem={() => setViewingItem(null)}
-      />
+        {/* Post Task Item & View Task Item Dialogs */}
+        <MarketplaceDialogs
+          isCreateItemOpen={isCreateItemOpen}
+          onCloseCreateItem={() => setIsCreateItemOpen(false)}
+          createItemForm={createItemForm}
+          onCreateItemFormChange={setCreateItemForm}
+          definitions={definitions}
+          isSubmittingCreateItem={isSubmittingCreateItem}
+          onSubmitCreateItem={handleCreateItem}
+          viewingItem={viewingItem}
+          onCloseViewingItem={() => setViewingItem(null)}
+        />
+      </React.Suspense>
     </div>
   );
 }

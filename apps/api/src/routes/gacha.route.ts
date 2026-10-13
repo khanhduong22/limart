@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { prisma } from "@checkin/db";
 import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { getVietnamDayRange } from "../lib/date-utils";
-import { invalidateCachePattern } from "../lib/cache";
+import { getOrSetCache, invalidateCachePattern } from "../lib/cache";
 
 export const gachaRoute = new Hono<AppEnv>();
 
@@ -13,46 +13,55 @@ gachaRoute.get("/", authMiddleware, async (c) => {
     const userId = tokenPayload.sub;
     const { startOfDay } = getVietnamDayRange();
 
-    const [user, checkinToday, existingRoll, history, activePrizesCount] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, role: true },
-      }),
-      prisma.checkIn.findFirst({
-        where: {
-          userId,
-          timestamp: { gte: startOfDay },
-          type: "checkin",
-        },
-      }),
-      prisma.payrollAdjustment.findFirst({
-        where: {
-          userId,
-          date: { gte: startOfDay },
-          reason: { contains: "[Gacha]" },
-        },
-      }),
-      prisma.luckyWheelHistory.findMany({
-        where: { userId },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-      }),
-      prisma.luckyWheelPrize.count({
-        where: { active: true, remaining: { gt: 0 } },
-      }),
-    ]);
+    const cacheKey = "gacha:status:" + userId + ":" + startOfDay.toISOString().slice(0, 10);
+    const statusData = await getOrSetCache(cacheKey, 30, async () => {
+      const [user, checkinToday, existingRoll, history, activePrizesCount] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, role: true },
+        }),
+        prisma.checkIn.findFirst({
+          where: {
+            userId,
+            timestamp: { gte: startOfDay },
+            type: "checkin",
+          },
+        }),
+        prisma.payrollAdjustment.findFirst({
+          where: {
+            userId,
+            date: { gte: startOfDay },
+            reason: { contains: "[Gacha]" },
+          },
+        }),
+        prisma.luckyWheelHistory.findMany({
+          where: { userId },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        }),
+        getOrSetCache("meta:lucky-wheel:active-count", 120, () =>
+          prisma.luckyWheelPrize.count({
+            where: { active: true, remaining: { gt: 0 } },
+          })
+        ),
+      ]);
 
-    const hasCheckedIn = Boolean(checkinToday);
-    const hasRolled = Boolean(existingRoll);
-    const canRoll = user?.role === "ADMIN" || (hasCheckedIn && !hasRolled && activePrizesCount > 0);
+      const hasCheckedIn = Boolean(checkinToday);
+      const hasRolled = Boolean(existingRoll);
+      const canRoll = user?.role === "ADMIN" || (hasCheckedIn && !hasRolled && activePrizesCount > 0);
+
+      return {
+        hasCheckedIn,
+        hasRolled,
+        canRoll,
+        remainingPrizes: activePrizesCount,
+        history,
+      };
+    });
 
     return c.json({
       success: true,
-      hasCheckedIn,
-      hasRolled,
-      canRoll,
-      remainingPrizes: activePrizesCount,
-      history,
+      ...statusData,
     });
   } catch (err: any) {
     return c.json(
@@ -62,8 +71,8 @@ gachaRoute.get("/", authMiddleware, async (c) => {
   }
 });
 
-// POST /api/gacha/spin
-gachaRoute.post("/spin", authMiddleware, async (c) => {
+// POST /api/gacha/spin & POST /api/gacha/roll
+const handleGachaRoll = async (c: any) => {
   try {
     const tokenPayload = c.get("user");
     const userId = tokenPayload.sub;
@@ -198,6 +207,8 @@ gachaRoute.post("/spin", authMiddleware, async (c) => {
 
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("stats:*");
+    await invalidateCachePattern("gacha:status:" + userId + ":*");
+    await invalidateCachePattern("meta:lucky-wheel:*");
 
     return c.json({
       success: true,
@@ -221,4 +232,7 @@ gachaRoute.post("/spin", authMiddleware, async (c) => {
       500
     );
   }
-});
+};
+
+gachaRoute.post("/spin", authMiddleware, handleGachaRoll);
+gachaRoute.post("/roll", authMiddleware, handleGachaRoll);

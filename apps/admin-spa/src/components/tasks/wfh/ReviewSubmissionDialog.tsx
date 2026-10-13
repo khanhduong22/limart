@@ -186,3 +186,5 @@ export function ReviewSubmissionDialog({
     </Dialog>
   );
 }
+
+export default ReviewSubmissionDialog;

@@ -69,7 +69,10 @@ requestsRoute.post("/", authMiddleware, async (c) => {
       },
     });
 
-    await invalidateCachePattern("user:requests:" + userId);
+    await Promise.all([
+      invalidateCachePattern("user:requests:" + userId),
+      invalidateCachePattern("admin:requests:*"),
+    ]).catch(() => {});
 
     return c.json(
       {

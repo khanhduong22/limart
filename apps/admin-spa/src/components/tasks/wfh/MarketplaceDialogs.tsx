@@ -241,3 +241,5 @@ export function MarketplaceDialogs({
     </>
   );
 }
+
+export default MarketplaceDialogs;

@@ -1165,6 +1165,11 @@ staffRoute.post("/gacha", authMiddleware, async (c) => {
       });
     }
 
+    await invalidateCachePattern("payroll:*").catch(() => {});
+    await invalidateCachePattern("stats:*").catch(() => {});
+    await invalidateCachePattern("gacha:status:" + user.id + ":*").catch(() => {});
+    await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
+
     return c.json({
       success: true,
       prize: selectedPrize,
@@ -1388,6 +1393,7 @@ staffRoute.post("/tasks/submit", authMiddleware, async (c) => {
         include: { taskDefinition: true, taskItem: true },
       });
 
+      await invalidateCachePattern("admin:tasks:*").catch(() => {});
       return c.json({ success: true, message: "Nộp kết quả thành công!", data: updated });
     }
 
@@ -1418,6 +1424,8 @@ staffRoute.post("/tasks/submit", authMiddleware, async (c) => {
       include: { taskDefinition: true },
     });
 
+    await invalidateCachePattern("admin:tasks:*").catch(() => {});
+
     return c.json({ success: true, message: "Nộp kết quả thành công!", data: userTask });
   } catch (error: any) {
     return c.json({ success: false, error: error?.message || "Failed to submit task" }, 500);
@@ -1432,10 +1440,12 @@ staffRoute.get("/tasks/packing-summary", authMiddleware, async (c) => {
     const { startDate, endDate } = getVietnamMonthRange();
 
     const [priceList, userTasks] = await Promise.all([
-      prisma.taskDefinition.findMany({
-        where: { unit: "điểm", active: true },
-        orderBy: { baseReward: "asc" },
-      }),
+      getOrSetCache("meta:task-definitions:packing", 600, () =>
+        prisma.taskDefinition.findMany({
+          where: { unit: "điểm", active: true },
+          orderBy: { baseReward: "asc" },
+        })
+      ),
       prisma.userTask.findMany({
         where: {
           userId,
@@ -1486,10 +1496,12 @@ staffRoute.get("/tasks/carrying-summary", authMiddleware, async (c) => {
     const { startDate, endDate } = getVietnamMonthRange();
 
     const [conversionList, userTasks] = await Promise.all([
-      prisma.taskDefinition.findMany({
-        where: { unit: "điểm-bưng", active: true },
-        orderBy: { baseReward: "asc" },
-      }),
+      getOrSetCache("meta:task-definitions:carrying", 600, () =>
+        prisma.taskDefinition.findMany({
+          where: { unit: "điểm-bưng", active: true },
+          orderBy: { baseReward: "asc" },
+        })
+      ),
       prisma.userTask.findMany({
         where: {
           userId,

@@ -130,6 +130,16 @@ export const RewardsView: React.FC = () => {
                         <img
                           src={item.image}
                           alt={item.name}
+                          width="32"
+                          height="32"
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (!target.src.endsWith("/capybara_mascot.webp")) {
+                              target.src = "/capybara_mascot.webp";
+                            }
+                          }}
                           className="w-full h-full object-cover"
                         />
                       ) : (

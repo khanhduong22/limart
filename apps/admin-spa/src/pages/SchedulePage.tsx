@@ -8,11 +8,18 @@ import { useEmployees } from "@/hooks/useAdminData";
 import { useAdminQuery } from "@/hooks/useAdminQuery";
 import ScheduleCalendar from "@/components/schedule/ScheduleCalendar";
 import UploadScheduleButton from "@/components/schedule/UploadScheduleButton";
-import ShiftHistoryDialog from "@/components/admin/ShiftHistoryDialog";
 import ScheduleColumnsView from "@/components/schedule/ScheduleColumnsView";
-import ScheduleAddShiftModal from "@/components/schedule/ScheduleAddShiftModal";
-import ScheduleDeleteShiftDialog from "@/components/schedule/ScheduleDeleteShiftDialog";
 import { useAdminSchedulePageStore } from "@/stores/useAdminSchedulePageStore";
+
+const ShiftHistoryDialog = React.lazy(
+  () => import("@/components/admin/ShiftHistoryDialog")
+);
+const ScheduleAddShiftModal = React.lazy(
+  () => import("@/components/schedule/ScheduleAddShiftModal")
+);
+const ScheduleDeleteShiftDialog = React.lazy(
+  () => import("@/components/schedule/ScheduleDeleteShiftDialog")
+);
 
 export function SchedulePage() {
   const { viewMode, setViewMode, openAddModal, openDeleteModal } =
@@ -79,7 +86,9 @@ export function SchedulePage() {
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <ShiftHistoryDialog />
+            <React.Suspense fallback={null}>
+              <ShiftHistoryDialog />
+            </React.Suspense>
             <UploadScheduleButton onSuccess={mutate} />
           </div>
         </div>
@@ -103,8 +112,10 @@ export function SchedulePage() {
       )}
 
       {/* Dialogs for Columns View */}
-      <ScheduleAddShiftModal employees={employees} onSuccess={mutate} />
-      <ScheduleDeleteShiftDialog onSuccess={mutate} />
+      <React.Suspense fallback={null}>
+        <ScheduleAddShiftModal employees={employees} onSuccess={mutate} />
+        <ScheduleDeleteShiftDialog onSuccess={mutate} />
+      </React.Suspense>
     </div>
   );
 }

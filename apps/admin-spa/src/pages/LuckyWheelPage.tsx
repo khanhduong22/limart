@@ -10,11 +10,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import PrizeDialog from "@/components/admin/PrizeDialog";
 import DeletePrizeButton from "@/components/admin/DeletePrizeButton";
 import AllowedUsersManagerClient from "@/components/admin/AllowedUsersManagerClient";
 import LuckyWheelHistoryClient from "@/components/admin/LuckyWheelHistoryClient";
 import { useEmployees } from "@/hooks/useAdminData";
+
+const PrizeDialog = React.lazy(
+  () => import("@/components/admin/PrizeDialog")
+);
 
 export function LuckyWheelPage() {
   const { employees } = useEmployees();
@@ -46,11 +49,13 @@ export function LuckyWheelPage() {
           </p>
         </div>
         <div className="w-full sm:w-auto flex justify-end">
-          <PrizeDialog
-            onSaved={() => {
-              mutate();
-            }}
-          />
+          <React.Suspense fallback={null}>
+            <PrizeDialog
+              onSaved={() => {
+                mutate();
+              }}
+            />
+          </React.Suspense>
         </div>
       </div>
 
@@ -194,7 +199,9 @@ export function LuckyWheelPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right space-x-1">
-                        <PrizeDialog prize={prize} onSaved={() => mutate()} />
+                        <React.Suspense fallback={null}>
+                          <PrizeDialog prize={prize} onSaved={() => mutate()} />
+                        </React.Suspense>
                         <DeletePrizeButton
                           prizeId={prize.id}
                           onDeleted={() => mutate()}

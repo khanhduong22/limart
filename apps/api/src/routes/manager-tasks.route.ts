@@ -97,44 +97,50 @@ managerTasksRoute.get("/checklist", authMiddleware, async (c) => {
 
     const dateStr = c.req.query("date") || toVNDateString(new Date());
 
-    await ensureChecklistTemplatesSeeded(targetUserId);
+    const checklist = await getOrSetCache(
+      "manager-tasks:checklist:" + targetUserId + ":" + dateStr,
+      60,
+      async () => {
+        await ensureChecklistTemplatesSeeded(targetUserId);
 
-    // 1. Get checklist templates active/scheduled for this specific date
-    const templates = await prisma.managerChecklistTask.findMany({
-      where: {
-        assigneeId: targetUserId,
-        OR: [
-          { targetDate: null },
-          { targetDate: "" },
-          { targetDate: dateStr },
-        ],
-      },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-    });
+        // 1. Get checklist templates active/scheduled for this specific date
+        const templates = await prisma.managerChecklistTask.findMany({
+          where: {
+            assigneeId: targetUserId,
+            OR: [
+              { targetDate: null },
+              { targetDate: "" },
+              { targetDate: dateStr },
+            ],
+          },
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        });
 
-    // 2. Fetch completions for the selected date
-    const completions = await prisma.managerChecklistCompletion.findMany({
-      where: {
-        date: dateStr,
-        task: { assigneeId: targetUserId },
-      },
-    });
+        // 2. Fetch completions for the selected date
+        const completions = await prisma.managerChecklistCompletion.findMany({
+          where: {
+            date: dateStr,
+            task: { assigneeId: targetUserId },
+          },
+        });
 
-    // 3. Map template tasks with completion status
-    const checklist = templates.map((task) => {
-      const comp = completions.find((c) => c.taskId === task.id);
-      return {
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        active: task.active,
-        targetDate: task.targetDate,
-        order: task.order,
-        createdAt: task.createdAt,
-        completed: comp ? comp.completed : false,
-        completedAt: comp ? comp.completedAt : null,
-      };
-    });
+        // 3. Map template tasks with completion status
+        return templates.map((task) => {
+          const comp = completions.find((c) => c.taskId === task.id);
+          return {
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            active: task.active,
+            targetDate: task.targetDate,
+            order: task.order,
+            createdAt: task.createdAt,
+            completed: comp ? comp.completed : false,
+            completedAt: comp ? comp.completedAt : null,
+          };
+        });
+      }
+    );
 
     return c.json({ success: true, data: checklist });
   } catch (err: any) {
@@ -146,13 +152,16 @@ managerTasksRoute.get("/checklist", authMiddleware, async (c) => {
 });
 
 /**
- * POST /api/manager-tasks/checklist/toggle
- * Body: { taskId, date, completed }
+ * Handler: POST /api/manager-tasks/checklist/toggle & /checklist/:taskId/toggle
+ * Body: { taskId?, date, completed }
  */
-managerTasksRoute.post("/checklist/toggle", authMiddleware, async (c) => {
+const handleChecklistToggle = async (c: any) => {
   try {
+    const tokenPayload = c.get("user");
+    const callerId = tokenPayload?.sub;
     const body = await c.req.json().catch(() => ({}));
-    const { taskId, date, completed } = body;
+    const taskId = c.req.param("taskId") || body.taskId;
+    const { date, completed } = body;
 
     if (!taskId) {
       return c.json({ success: false, error: "Thiếu taskId" }, 400);
@@ -185,6 +194,8 @@ managerTasksRoute.post("/checklist/toggle", authMiddleware, async (c) => {
       },
     });
 
+    const targetUserId = task.assigneeId || callerId;
+    await invalidateCachePattern("manager-tasks:checklist:" + (targetUserId || callerId) + ":*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("payroll:*");
 
@@ -195,13 +206,15 @@ managerTasksRoute.post("/checklist/toggle", authMiddleware, async (c) => {
       500
     );
   }
-});
+};
+
+managerTasksRoute.post("/checklist/toggle", authMiddleware, handleChecklistToggle);
+managerTasksRoute.post("/checklist/:taskId/toggle", authMiddleware, handleChecklistToggle);
 
 /**
- * POST /api/manager-tasks/checklist
- * Body: { title, description, assigneeId, targetDate }
+ * Template Task CRUD Handlers
  */
-managerTasksRoute.post("/checklist", authMiddleware, async (c) => {
+const handleCreateChecklistTask = async (c: any) => {
   try {
     const tokenPayload = c.get("user");
     const role = tokenPayload.role;
@@ -230,6 +243,8 @@ managerTasksRoute.post("/checklist", authMiddleware, async (c) => {
       },
     });
 
+    await invalidateCachePattern("manager-tasks:templates:*");
+    await invalidateCachePattern("manager-tasks:checklist:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("payroll:*");
 
@@ -240,13 +255,9 @@ managerTasksRoute.post("/checklist", authMiddleware, async (c) => {
       500
     );
   }
-});
+};
 
-/**
- * PATCH /api/manager-tasks/checklist/:id
- * Body: { title, description, active, targetDate }
- */
-managerTasksRoute.patch("/checklist/:id", authMiddleware, async (c) => {
+const handleUpdateChecklistTask = async (c: any) => {
   try {
     const tokenPayload = c.get("user");
     const role = tokenPayload.role;
@@ -278,6 +289,8 @@ managerTasksRoute.patch("/checklist/:id", authMiddleware, async (c) => {
       data,
     });
 
+    await invalidateCachePattern("manager-tasks:templates:*");
+    await invalidateCachePattern("manager-tasks:checklist:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("payroll:*");
 
@@ -288,12 +301,9 @@ managerTasksRoute.patch("/checklist/:id", authMiddleware, async (c) => {
       500
     );
   }
-});
+};
 
-/**
- * DELETE /api/manager-tasks/checklist/:id
- */
-managerTasksRoute.delete("/checklist/:id", authMiddleware, async (c) => {
+const handleDeleteChecklistTask = async (c: any) => {
   try {
     const tokenPayload = c.get("user");
     const role = tokenPayload.role;
@@ -316,6 +326,8 @@ managerTasksRoute.delete("/checklist/:id", authMiddleware, async (c) => {
       where: { id },
     });
 
+    await invalidateCachePattern("manager-tasks:templates:*");
+    await invalidateCachePattern("manager-tasks:checklist:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("payroll:*");
 
@@ -326,13 +338,9 @@ managerTasksRoute.delete("/checklist/:id", authMiddleware, async (c) => {
       500
     );
   }
-});
+};
 
-/**
- * POST /api/manager-tasks/checklist/reorder
- * Body: { userId, taskIds }
- */
-managerTasksRoute.post("/checklist/reorder", authMiddleware, async (c) => {
+const handleReorderChecklistTasks = async (c: any) => {
   try {
     const tokenPayload = c.get("user");
     const role = tokenPayload.role;
@@ -357,6 +365,11 @@ managerTasksRoute.post("/checklist/reorder", authMiddleware, async (c) => {
       )
     );
 
+    await invalidateCachePattern("manager-tasks:templates:*");
+    await invalidateCachePattern("manager-tasks:checklist:*");
+    await invalidateCachePattern("stats:*");
+    await invalidateCachePattern("payroll:*");
+
     return c.json({ success: true });
   } catch (err: any) {
     return c.json(
@@ -364,7 +377,17 @@ managerTasksRoute.post("/checklist/reorder", authMiddleware, async (c) => {
       500
     );
   }
-});
+};
+
+managerTasksRoute.post("/checklist", authMiddleware, handleCreateChecklistTask);
+managerTasksRoute.patch("/checklist/:id", authMiddleware, handleUpdateChecklistTask);
+managerTasksRoute.delete("/checklist/:id", authMiddleware, handleDeleteChecklistTask);
+managerTasksRoute.post("/checklist/reorder", authMiddleware, handleReorderChecklistTasks);
+
+managerTasksRoute.post("/templates", authMiddleware, handleCreateChecklistTask);
+managerTasksRoute.put("/templates/:id", authMiddleware, handleUpdateChecklistTask);
+managerTasksRoute.patch("/templates/:id", authMiddleware, handleUpdateChecklistTask);
+managerTasksRoute.delete("/templates/:id", authMiddleware, handleDeleteChecklistTask);
 
 /**
  * GET /api/manager-tasks/templates
@@ -383,12 +406,17 @@ managerTasksRoute.get("/templates", authMiddleware, async (c) => {
       return c.json({ success: false, error: "Unauthorized access" }, 403);
     }
 
-    await ensureChecklistTemplatesSeeded(targetUserId);
-
-    const templates = await prisma.managerChecklistTask.findMany({
-      where: { assigneeId: targetUserId },
-      orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-    });
+    const templates = await getOrSetCache(
+      "manager-tasks:templates:" + targetUserId,
+      600,
+      async () => {
+        await ensureChecklistTemplatesSeeded(targetUserId);
+        return prisma.managerChecklistTask.findMany({
+          where: { assigneeId: targetUserId },
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+        });
+      }
+    );
 
     return c.json({ success: true, data: templates });
   } catch (err: any) {

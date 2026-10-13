@@ -1212,13 +1212,15 @@ adminRoute.post("/manual-checkin", async (c) => {
 // GET /api/admin/requests
 adminRoute.get("/requests", async (c) => {
   try {
-    const requests = await prisma.request.findMany({
-      include: {
-        user: {
-          select: { id: true, name: true, email: true, image: true, role: true },
+    const requests = await getOrSetCache("admin:requests:all", 60, async () => {
+      return await prisma.request.findMany({
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, image: true, role: true },
+          },
         },
-      },
-      orderBy: { createdAt: "desc" },
+        orderBy: { createdAt: "desc" },
+      });
     });
 
     return c.json({ success: true, data: requests });
@@ -1257,6 +1259,7 @@ adminRoute.post("/requests/:id/action", async (c) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(),
       invalidateCachePattern("user:requests:*"),
+      invalidateCachePattern("admin:requests:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -1289,6 +1292,7 @@ adminRoute.post("/requests/:id/approve", async (c) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(),
       invalidateCachePattern("user:requests:*"),
+      invalidateCachePattern("admin:requests:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -1322,6 +1326,7 @@ adminRoute.post("/requests/:id/reject", async (c) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(),
       invalidateCachePattern("user:requests:*"),
+      invalidateCachePattern("admin:requests:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -2544,60 +2549,62 @@ adminRoute.delete("/tasks/items/:id", deleteTaskItemHandler);
 // GET /api/admin/tasks
 adminRoute.get("/tasks", async (c) => {
   try {
-    const tasks = await (prisma as any).userTask.findMany({
-      include: {
-        user: {
-          select: { id: true, name: true, email: true, image: true },
+    const formattedTasks = await getOrSetCache("admin:tasks:all", 60, async () => {
+      const tasks = await (prisma as any).userTask.findMany({
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, image: true },
+          },
+          taskDefinition: true,
+          taskItem: true,
         },
-        taskDefinition: true,
-        taskItem: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      });
 
-    const formattedTasks = tasks.map((t: any) => ({
-      id: t.id,
-      userId: t.userId,
-      user: {
-        id: t.user?.id,
-        name: t.user?.name,
-        email: t.user?.email,
-        image: t.user?.image,
-      },
-      title: t.taskItem?.title || t.taskDefinition?.name || t.note || "Nhiệm vụ được giao",
-      type: t.taskDefinition?.type || "PACKAGING",
-      unit: t.taskDefinition?.unit || "điểm",
-      taskDefinition: t.taskDefinition
-        ? {
-            id: t.taskDefinition.id,
-            name: t.taskDefinition.name,
-            unit: t.taskDefinition.unit,
-            baseReward: t.taskDefinition.baseReward,
-          }
-        : undefined,
-      taskItem: t.taskItem
-        ? {
-            id: t.taskItem.id,
-            title: t.taskItem.title,
-          }
-        : undefined,
-      quantity: t.quantity ?? 1,
-      ratePerUnit: t.unitPrice ?? t.taskDefinition?.baseReward ?? 0,
-      totalReward:
-        t.finalAmount != null
-          ? t.finalAmount
-          : (t.quantity || 1) * (t.unitPrice || 0) + (t.bonusPenalty || 0),
-      bonusPenalty: t.bonusPenalty ?? 0,
-      adminNote: t.adminNote ?? null,
-      proofUrl: t.evidenceLink,
-      evidenceLink: t.evidenceLink,
-      notes: t.note,
-      note: t.note,
-      status: t.status,
-      startedAt: t.startedAt ? t.startedAt.toISOString() : undefined,
-      submittedAt: t.submittedAt ? t.submittedAt.toISOString() : t.createdAt.toISOString(),
-      reviewedAt: t.reviewedAt ? t.reviewedAt.toISOString() : undefined,
-    }));
+      return tasks.map((t: any) => ({
+        id: t.id,
+        userId: t.userId,
+        user: {
+          id: t.user?.id,
+          name: t.user?.name,
+          email: t.user?.email,
+          image: t.user?.image,
+        },
+        title: t.taskItem?.title || t.taskDefinition?.name || t.note || "Nhiệm vụ được giao",
+        type: t.taskDefinition?.type || "PACKAGING",
+        unit: t.taskDefinition?.unit || "điểm",
+        taskDefinition: t.taskDefinition
+          ? {
+              id: t.taskDefinition.id,
+              name: t.taskDefinition.name,
+              unit: t.taskDefinition.unit,
+              baseReward: t.taskDefinition.baseReward,
+            }
+          : undefined,
+        taskItem: t.taskItem
+          ? {
+              id: t.taskItem.id,
+              title: t.taskItem.title,
+            }
+          : undefined,
+        quantity: t.quantity ?? 1,
+        ratePerUnit: t.unitPrice ?? t.taskDefinition?.baseReward ?? 0,
+        totalReward:
+          t.finalAmount != null
+            ? t.finalAmount
+            : (t.quantity || 1) * (t.unitPrice || 0) + (t.bonusPenalty || 0),
+        bonusPenalty: t.bonusPenalty ?? 0,
+        adminNote: t.adminNote ?? null,
+        proofUrl: t.evidenceLink,
+        evidenceLink: t.evidenceLink,
+        notes: t.note,
+        note: t.note,
+        status: t.status,
+        startedAt: t.startedAt ? (typeof t.startedAt === "string" ? t.startedAt : t.startedAt.toISOString()) : undefined,
+        submittedAt: t.submittedAt ? (typeof t.submittedAt === "string" ? t.submittedAt : t.submittedAt.toISOString()) : (typeof t.createdAt === "string" ? t.createdAt : t.createdAt?.toISOString?.() ?? undefined),
+        reviewedAt: t.reviewedAt ? (typeof t.reviewedAt === "string" ? t.reviewedAt : t.reviewedAt.toISOString()) : undefined,
+      }));
+    });
 
     return c.json({ success: true, data: formattedTasks });
   } catch (err: any) {
@@ -2652,7 +2659,12 @@ adminRoute.post("/tasks/:id/approve", async (c) => {
       });
     }
 
-    await invalidatePayrollCache().catch(() => {});
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("staff-tasks:stats:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã duyệt nhiệm vụ", data: updated });
   } catch (err: any) {
@@ -2702,7 +2714,12 @@ adminRoute.post("/tasks/:id/reject", async (c) => {
       }
     }
 
-    await invalidatePayrollCache().catch(() => {});
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("staff-tasks:stats:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã từ chối nhiệm vụ", data: updated });
   } catch (err: any) {
@@ -2760,7 +2777,12 @@ adminRoute.post("/tasks/:id/review", async (c) => {
         });
       }
 
-      await invalidatePayrollCache().catch(() => {});
+      await Promise.all([
+        invalidatePayrollCache(),
+        invalidateCachePattern("admin:tasks:*"),
+        invalidateCachePattern("staff-tasks:stats:*"),
+        invalidateCachePattern("task*"),
+      ]).catch(() => {});
 
       return c.json({ success: true, message: "Đã duyệt nhiệm vụ", data: updated });
     } else {
@@ -2791,7 +2813,12 @@ adminRoute.post("/tasks/:id/review", async (c) => {
         }
       }
 
-      await invalidatePayrollCache().catch(() => {});
+      await Promise.all([
+        invalidatePayrollCache(),
+        invalidateCachePattern("admin:tasks:*"),
+        invalidateCachePattern("staff-tasks:stats:*"),
+        invalidateCachePattern("task*"),
+      ]).catch(() => {});
 
       return c.json({ success: true, message: "Đã từ chối nhiệm vụ", data: updated });
     }
@@ -2813,7 +2840,11 @@ adminRoute.delete("/tasks/stale-pending", async (c) => {
       },
     });
 
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("task*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("staff-tasks:stats:*"),
+    ]).catch(() => {});
     return c.json({
       success: true,
       message: `Đã xóa ${deleted.count} task cũ trước tháng 6/2026 thành công`,
@@ -2837,7 +2868,11 @@ adminRoute.delete("/tasks/:id", async (c) => {
     }
 
     await prisma.userTask.delete({ where: { id } });
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("task*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("staff-tasks:stats:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa nhiệm vụ thành công" });
   } catch (err: any) {

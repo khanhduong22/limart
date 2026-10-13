@@ -1,22 +1,12 @@
 import React, { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, Plus } from "lucide-react";
 import { Link } from "@/lib/router";
-import { submitRequest } from "@/lib/api-client";
-import { toast } from "sonner";
+import { REQUEST_TYPES } from "./request-constants";
 
-const TYPES = [
-  { value: "LATE", label: "Xin đi muộn" },
-  { value: "EARLY", label: "Xin về sớm" },
-  { value: "MISSING", label: "Quên Check-in/out" },
-  { value: "LEAVE", label: "Xin nghỉ phép" },
-  { value: "WFH", label: "Xin làm từ xa (WFH)" },
-  { value: "OTHER", label: "Khác" },
-];
+const CreateRequestModal = React.lazy(() => import("./CreateRequestModal"));
 
 export default function RequestListClient({
   requests = [],
@@ -26,32 +16,6 @@ export default function RequestListClient({
   onRefresh?: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Form state
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [type, setType] = useState<string>("LATE");
-  const [reason, setReason] = useState("");
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reason.trim()) {
-      toast.error("Vui lòng nhập lý do giải trình");
-      return;
-    }
-    setIsSubmitting(true);
-    const res = await submitRequest(date, type, reason);
-    setIsSubmitting(false);
-
-    if (res.success) {
-      toast.success("✅ Đã gửi yêu cầu thành công!");
-      setIsOpen(false);
-      setReason("");
-      if (onRefresh) onRefresh();
-    } else {
-      toast.error(res.message || "Gửi yêu cầu thất bại");
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -69,6 +33,8 @@ export default function RequestListClient({
           id="create-request-btn"
           size="sm"
           onClick={() => setIsOpen(true)}
+          onMouseEnter={() => import("./CreateRequestModal")}
+          onTouchStart={() => import("./CreateRequestModal")}
           className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs h-8 cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 mr-1" />
@@ -91,7 +57,7 @@ export default function RequestListClient({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="text-[10px] font-bold">
-                      {TYPES.find((t) => t.value === r.type)?.label || r.type}
+                      {REQUEST_TYPES.find((t) => t.value === r.type)?.label || r.type}
                     </Badge>
                     <span className="text-xs text-muted-foreground font-mono">
                       {new Date(r.date).toLocaleDateString("vi-VN")}
@@ -125,70 +91,16 @@ export default function RequestListClient({
 
       {/* Create Request Modal */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden p-5 space-y-4 animate-in zoom-in-95 duration-200">
-            <h3 className="text-base font-bold text-gray-900">Gửi yêu cầu / giải trình</h3>
-
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="space-y-1">
-                <Label className="text-xs">Ngày áp dụng</Label>
-                <Input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  className="h-9 text-xs"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs">Loại yêu cầu</Label>
-                <select
-                  value={type}
-                  onChange={(e) => setType(e.target.value)}
-                  className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  {TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs">Lý do cụ thể</Label>
-                <textarea
-                  className="flex min-h-[70px] w-full rounded-md border border-input bg-background px-3 py-2 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  placeholder="Nhập lý do chi tiết..."
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div className="flex gap-2 justify-end pt-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsOpen(false)}
-                  className="text-xs"
-                >
-                  Hủy
-                </Button>
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={isSubmitting}
-                  className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs"
-                >
-                  {isSubmitting ? "Đang gửi..." : "Gửi yêu cầu"}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <React.Suspense fallback={null}>
+          <CreateRequestModal
+            isOpen={isOpen}
+            onClose={() => setIsOpen(false)}
+            onSuccess={() => {
+              setIsOpen(false);
+              onRefresh?.();
+            }}
+          />
+        </React.Suspense>
       )}
     </div>
   );

@@ -126,6 +126,8 @@ model ShiftAuditLog {
   @@index([userId])
   @@index([changedById])
   @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([shiftId, createdAt])
 }
 
 model Request {
@@ -391,6 +393,8 @@ model Document {
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
   chunks    DocumentChunk[]
+
+  @@index([createdAt])
 }
 
 model DocumentChunk {

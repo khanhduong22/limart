@@ -263,7 +263,10 @@ luckyWheelRoute.post("/spin", authMiddleware, luckyWheelRateLimiter, async (c) =
       return prize;
     });
 
-    await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("meta:lucky-wheel:*"),
+      invalidateCachePattern("admin:lucky-wheel:*"),
+    ]).catch(() => {});
 
     if (selectedPrize.type === "MONEY" && selectedPrize.value > 0) {
       await invalidateCachePattern("payroll:*");

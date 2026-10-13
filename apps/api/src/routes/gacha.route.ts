@@ -209,6 +209,7 @@ const handleGachaRoll = async (c: any) => {
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("gacha:status:" + userId + ":*");
     await invalidateCachePattern("meta:lucky-wheel:*");
+    await invalidateCachePattern("admin:lucky-wheel:*");
 
     return c.json({
       success: true,

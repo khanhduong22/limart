@@ -1186,6 +1186,7 @@ staffRoute.post("/gacha", authMiddleware, async (c) => {
     await invalidateCachePattern("stats:*").catch(() => {});
     await invalidateCachePattern("gacha:status:" + user.id + ":*").catch(() => {});
     await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
+    await invalidateCachePattern("admin:lucky-wheel:*").catch(() => {});
 
     return c.json({
       success: true,

@@ -621,33 +621,38 @@ adminRoute.get("/employees/:id", async (c) => {
     const targetDate = new Date(year, month - 1, 1);
     const { startDate, endDate } = getVietnamMonthRange(month, year);
 
-    const user = await prisma.user.findUnique({
-      where: { id },
-      include: {
-        achievements: true,
-        adjustments: {
-          where: { date: { gte: startDate, lte: endDate } },
-          orderBy: { date: "desc" },
+    const cacheKey = `admin:employee-detail:${id}:${month}:${year}`;
+    const data = await getOrSetCache(cacheKey, 60, async () => {
+      const user = await prisma.user.findUnique({
+        where: { id },
+        include: {
+          achievements: true,
+          adjustments: {
+            where: { date: { gte: startDate, lte: endDate } },
+            orderBy: { date: "desc" },
+          },
+          requests: {
+            orderBy: { createdAt: "desc" },
+            take: 20,
+          },
         },
-        requests: {
-          orderBy: { createdAt: "desc" },
-          take: 20,
-        },
-      },
+      });
+
+      if (!user) {
+        return null;
+      }
+
+      const stats = await calculateUserMonthlyStats(user.id, targetDate);
+      return { user, stats };
     });
 
-    if (!user) {
+    if (!data) {
       return c.json({ success: false, error: "Không tìm thấy nhân viên" }, 404);
     }
 
-    const stats = await calculateUserMonthlyStats(user.id, targetDate);
-
     return c.json({
       success: true,
-      data: {
-        user,
-        stats,
-      },
+      data,
     });
   } catch (err: any) {
     return c.json(
@@ -676,6 +681,7 @@ const handleUpdateUserStatus = async (c: any) => {
 
     await Promise.all([
       invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("admin:employee-detail:*"),
       invalidateCachePattern("admin:manager-tasks:*"),
       invalidateCachePattern("user:me:" + id),
       invalidateSpecialDaysCache(),
@@ -877,8 +883,10 @@ const handleUpdateUser = async (c: any) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(id),
       invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("admin:employee-detail:*"),
       invalidateCachePattern("admin:manager-tasks:*"),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:history:*"),
       invalidateCachePattern("user:me:" + id),
       invalidateSpecialDaysCache(),
     ]).catch(() => {});
@@ -906,6 +914,7 @@ const handleDeleteUser = async (c: any) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(id),
       invalidateCachePattern("admin:employees:*"),
+      invalidateCachePattern("admin:employee-detail:*"),
       invalidateCachePattern("admin:manager-tasks:*"),
       invalidateCachePattern("user:me:" + id),
       invalidateSpecialDaysCache(),
@@ -1610,6 +1619,7 @@ adminRoute.post("/schedule", async (c) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(shift.userId, shift.id),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:history:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, data: event, id: shift.id }, 201);
@@ -1682,6 +1692,7 @@ adminRoute.put("/schedule/:id", async (c) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(existing.userId, id),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:history:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, data: event });
@@ -1719,6 +1730,7 @@ adminRoute.delete("/schedule/:id", async (c) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(existing.userId, id),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:history:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa ca trực" });
@@ -1746,6 +1758,7 @@ const clearUserScheduleHandler = async (c: any) => {
       invalidatePayrollCache(),
       invalidateCachePattern("shifts:*"),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:history:*"),
       invalidateShiftDutyCache(userId),
     ]).catch(() => {});
 
@@ -1843,6 +1856,7 @@ adminRoute.patch("/schedule/:id/senior", async (c) => {
       invalidateCachePattern("payroll:*"),
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:history:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, data: updated, isSenior, message, unsetShiftIds });
@@ -1967,6 +1981,7 @@ adminRoute.post("/schedule/upload", async (c) => {
       invalidatePayrollCache(),
       invalidateShiftDutyCache(),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:history:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message, count: createdShifts.length });
@@ -1996,21 +2011,25 @@ adminRoute.get("/schedule/history", async (c) => {
       }
     }
 
-    const [logs, total] = await Promise.all([
-      prisma.shiftAuditLog.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take: pageSize,
-        skip: (page - 1) * pageSize,
-        include: {
-          user: { select: { id: true, name: true, email: true } },
-          changedBy: { select: { id: true, name: true, email: true } },
-        },
-      }),
-      prisma.shiftAuditLog.count({ where }),
-    ]);
+    const cacheKey = `admin:schedule:history:${page}:${pageSize}:${startDate || "all"}:${endDate || "all"}`;
+    const result = await getOrSetCache(cacheKey, 60, async () => {
+      const [logs, total] = await Promise.all([
+        prisma.shiftAuditLog.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take: pageSize,
+          skip: (page - 1) * pageSize,
+          include: {
+            user: { select: { id: true, name: true, email: true } },
+            changedBy: { select: { id: true, name: true, email: true } },
+          },
+        }),
+        prisma.shiftAuditLog.count({ where }),
+      ]);
+      return { logs, total };
+    });
 
-    return c.json({ success: true, data: logs, logs, total });
+    return c.json({ success: true, data: result.logs, logs: result.logs, total: result.total });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to fetch shift history" }, 500);
   }
@@ -2157,6 +2176,7 @@ const takeShiftHandler = async (c: any) => {
       invalidateCachePattern("payroll:*"),
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:history:*"),
       invalidateCachePattern("shifts:*"),
     ]).catch(() => {});
 
@@ -2928,35 +2948,36 @@ adminRoute.delete("/tasks/:id", async (c) => {
 // GET /api/admin/lucky-wheel
 adminRoute.get("/lucky-wheel", async (c) => {
   try {
-    const [prizes, history] = await Promise.all([
-      prisma.luckyWheelPrize.findMany({
-        orderBy: { createdAt: "asc" },
-      }),
-      prisma.luckyWheelHistory.findMany({
-        take: 100,
-        orderBy: { createdAt: "desc" },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              role: true,
-              image: true,
+    const cacheKey = "admin:lucky-wheel:all";
+    const result = await getOrSetCache(cacheKey, 60, async () => {
+      const [prizes, history] = await Promise.all([
+        prisma.luckyWheelPrize.findMany({
+          orderBy: { createdAt: "asc" },
+        }),
+        prisma.luckyWheelHistory.findMany({
+          take: 100,
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                image: true,
+              },
             },
           },
-        },
-      }),
-    ]);
+        }),
+      ]);
+      return { prizes, history };
+    });
 
     return c.json({
       success: true,
-      data: {
-        prizes,
-        history,
-      },
-      prizes,
-      history,
+      data: result,
+      prizes: result.prizes,
+      history: result.history,
     });
   } catch (err: any) {
     return c.json(
@@ -2986,7 +3007,10 @@ adminRoute.post("/lucky-wheel/prizes", async (c) => {
       },
     });
 
-    await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("meta:lucky-wheel:*"),
+      invalidateCachePattern("admin:lucky-wheel:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: prize }, 201);
   } catch (err: any) {
@@ -3014,7 +3038,10 @@ adminRoute.put("/lucky-wheel/prizes/:id", async (c) => {
       },
     });
 
-    await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("meta:lucky-wheel:*"),
+      invalidateCachePattern("admin:lucky-wheel:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: updated });
   } catch (err: any) {
@@ -3028,7 +3055,10 @@ adminRoute.delete("/lucky-wheel/prizes/:id", async (c) => {
     const id = c.req.param("id");
     await prisma.luckyWheelPrize.delete({ where: { id } });
 
-    await invalidateCachePattern("meta:lucky-wheel:*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("meta:lucky-wheel:*"),
+      invalidateCachePattern("admin:lucky-wheel:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, message: "Prize deleted" });
   } catch (err: any) {

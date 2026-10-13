@@ -14,12 +14,17 @@ import {
   type RoleFilter,
   type EmploymentFilter,
 } from "@/stores/useUserManagerStore";
-import {
-  AddEmployeeDialog,
-  EditEmployeeDatesDialog,
-  DeleteEmployeeDialog,
-  UserCard,
-} from "./user-manager";
+import { UserCard } from "./user-manager";
+
+const AddEmployeeDialog = React.lazy(() =>
+  import("./user-manager").then((m) => ({ default: m.AddEmployeeDialog }))
+);
+const EditEmployeeDatesDialog = React.lazy(() =>
+  import("./user-manager").then((m) => ({ default: m.EditEmployeeDatesDialog }))
+);
+const DeleteEmployeeDialog = React.lazy(() =>
+  import("./user-manager").then((m) => ({ default: m.DeleteEmployeeDialog }))
+);
 
 export interface UserManagerProps {
   users?: any[];
@@ -382,25 +387,31 @@ export default function UserManager({
       </Card>
 
       {/* Modular Dialogs */}
-      <AddEmployeeDialog
-        open={isAddOpen}
-        onClose={closeAddEmployee}
-        onCreated={onRefresh}
-      />
+      <React.Suspense fallback={null}>
+        <AddEmployeeDialog
+          open={isAddOpen}
+          onClose={closeAddEmployee}
+          onCreated={onRefresh}
+        />
+      </React.Suspense>
 
-      <EditEmployeeDatesDialog
-        open={isEditDatesOpen}
-        user={selectedUser}
-        onClose={closeEditDates}
-        onUpdated={handleUserUpdate}
-      />
+      <React.Suspense fallback={null}>
+        <EditEmployeeDatesDialog
+          open={isEditDatesOpen}
+          user={selectedUser}
+          onClose={closeEditDates}
+          onUpdated={handleUserUpdate}
+        />
+      </React.Suspense>
 
-      <DeleteEmployeeDialog
-        open={isDeleteOpen}
-        user={selectedUser}
-        onClose={closeDeleteUser}
-        onDeleted={handleUserDelete}
-      />
+      <React.Suspense fallback={null}>
+        <DeleteEmployeeDialog
+          open={isDeleteOpen}
+          user={selectedUser}
+          onClose={closeDeleteUser}
+          onDeleted={handleUserDelete}
+        />
+      </React.Suspense>
     </>
   );
 }

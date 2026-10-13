@@ -439,8 +439,30 @@ adminRoute.get("/export", async (c) => {
       }
     }
 
+    const checkinWhere = Object.keys(dateFilter).length > 0 ? { timestamp: dateFilter } : {};
+    const shiftWhere = Object.keys(dateFilter).length > 0 ? { start: dateFilter } : {};
+    const requestWhere = Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {};
+
+    const [users, checkins, shifts, requests] = await Promise.all([
+      prisma.user.findMany({ orderBy: { name: "asc" } }),
+      prisma.checkIn.findMany({
+        where: checkinWhere,
+        include: { user: true },
+        orderBy: { timestamp: "desc" },
+      }),
+      prisma.workShift.findMany({
+        where: shiftWhere,
+        include: { user: true },
+        orderBy: { start: "desc" },
+      }),
+      prisma.request.findMany({
+        where: requestWhere,
+        include: { user: true },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
     // 1. Users
-    const users = await prisma.user.findMany({ orderBy: { name: "asc" } });
     const userRows = users.map((u: any) => ({
       ID: u.id,
       Name: u.name,
@@ -453,12 +475,6 @@ adminRoute.get("/export", async (c) => {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(userRows), "Users");
 
     // 2. CheckIns
-    const checkinWhere = Object.keys(dateFilter).length > 0 ? { timestamp: dateFilter } : {};
-    const checkins = await prisma.checkIn.findMany({
-      where: checkinWhere,
-      include: { user: true },
-      orderBy: { timestamp: "desc" },
-    });
     const checkinRows = checkins.map((ck: any) => ({
       ID: ck.id,
       User: ck.user?.name,
@@ -471,12 +487,6 @@ adminRoute.get("/export", async (c) => {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(checkinRows), "CheckIns");
 
     // 3. Shifts
-    const shiftWhere = Object.keys(dateFilter).length > 0 ? { start: dateFilter } : {};
-    const shifts = await prisma.workShift.findMany({
-      where: shiftWhere,
-      include: { user: true },
-      orderBy: { start: "desc" },
-    });
     const shiftRows = shifts.map((s: any) => ({
       ID: s.id,
       User: s.user?.name,
@@ -490,12 +500,6 @@ adminRoute.get("/export", async (c) => {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(shiftRows), "WorkShifts");
 
     // 4. Requests
-    const requestWhere = Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {};
-    const requests = await prisma.request.findMany({
-      where: requestWhere,
-      include: { user: true },
-      orderBy: { createdAt: "desc" },
-    });
     const requestRows = requests.map((r: any) => ({
       ID: r.id,
       User: r.user?.name,
@@ -3169,8 +3173,13 @@ adminRoute.post("/payroll/bonus", async (c) => {
       },
     });
 
-    await invalidateCachePattern("payroll:*");
-    await invalidateCachePattern("stats:*");
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("staff:payroll:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -3230,8 +3239,13 @@ adminRoute.post("/payroll/reopen", async (c) => {
       data: { status: "OPEN" },
     });
 
-    await invalidateCachePattern("payroll:*");
-    await invalidateCachePattern("stats:*");
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("staff:payroll:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,

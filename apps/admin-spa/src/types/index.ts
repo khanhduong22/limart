@@ -164,4 +164,4 @@ export interface MarketplaceTaskItem {
   } | null;
 }
 
-
+export type { DocumentItem } from "@/components/help/types";

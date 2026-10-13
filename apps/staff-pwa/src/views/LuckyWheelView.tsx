@@ -1,9 +1,10 @@
-import React from "react";
+import React, { lazy } from "react";
 import { useAppQuery } from "@/lib/api-query";
-import LuckyWheelGame from "@/components/LuckyWheelGame";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Sparkles } from "lucide-react";
 import { Link } from "@/lib/router";
+
+const LuckyWheelGame = lazy(() => import("@/components/LuckyWheelGame"));
 
 export const LuckyWheelView: React.FC = () => {
   const { data: response } = useAppQuery<{ success: boolean; prizes: any[] }>(
@@ -34,7 +35,15 @@ export const LuckyWheelView: React.FC = () => {
           <p className="text-xs text-muted-foreground mb-4">
             Mỗi nhân viên có 1 lượt quay may mắn mỗi ngày sau khi đã hoàn thành Check-in.
           </p>
-          <LuckyWheelGame prizes={prizes} />
+          <React.Suspense
+            fallback={
+              <div className="h-64 w-full flex items-center justify-center text-xs text-stone-400 animate-pulse">
+                Đang tải vòng quay may mắn...
+              </div>
+            }
+          >
+            <LuckyWheelGame prizes={prizes} />
+          </React.Suspense>
         </div>
       </div>
     );

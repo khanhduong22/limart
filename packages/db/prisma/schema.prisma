@@ -229,6 +229,7 @@ model LuckyWheelHistory {
   @@index([userId, createdAt])
   @@index([createdAt])
   @@index([prizeId])
+  @@index([prizeId, createdAt])
 }
 
 model UserAchievement {
@@ -242,6 +243,7 @@ model UserAchievement {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, code])
+  @@index([userId, unlockedAt])
 }
 
 model CheckIn {
@@ -272,6 +274,8 @@ model Holiday {
   name       String
   multiplier Float    @default(1.0)
   createdAt  DateTime @default(now())
+
+  @@index([date, multiplier])
 }
 
 enum UserRole {

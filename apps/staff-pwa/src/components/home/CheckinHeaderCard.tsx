@@ -79,11 +79,14 @@ export const CheckinHeaderCard: React.FC<CheckinHeaderCardProps> = ({
         <div className="flex items-center gap-3">
           <div className="relative h-12 w-12 rounded-2xl bg-amber-50 border border-amber-200/80 overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
             <img
-              src={user?.image || "/capybara_mascot.png"}
+              src={user?.image || "/capybara_mascot.webp"}
               alt="Mascot Capybara"
+              width="48"
+              height="48"
+              decoding="async"
               className="h-full w-full object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = "/capybara_mascot.png";
+                (e.target as HTMLImageElement).src = "/capybara_mascot.webp";
               }}
             />
             {isWorking && (
@@ -153,6 +156,9 @@ export const CheckinHeaderCard: React.FC<CheckinHeaderCardProps> = ({
           <img
             src="/logo.png"
             alt="LimArt"
+            width="40"
+            height="40"
+            decoding="async"
             className="h-full w-full object-cover"
             onError={(e) => {
               (e.target as any).src = "/icon-192.png";

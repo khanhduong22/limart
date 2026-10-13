@@ -97,3 +97,13 @@
   z-index: 50 !important;
 }
 
+/* Lighthouse Main-Thread & Rendering Optimization */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 80px;
+}
+.cv-auto-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 140px;
+}
+

@@ -3,12 +3,13 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import SpecialDaysWidget from "@/components/home/SpecialDaysWidget";
-import ChangelogPopup from "@/components/admin/ChangelogPopup";
 import ManualCheckInForm from "@/components/admin/ManualCheckInForm";
 import { LATEST_VERSION, CHANGELOGS } from "@/lib/changelogs";
 import { useDashboardStats, useAttendanceFeed, useEmployees } from "@/hooks/useAdminData";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+
+const ChangelogPopup = React.lazy(() => import("@/components/admin/ChangelogPopup"));
 
 const GRACE_PERIOD_MINUTES = 5;
 
@@ -384,6 +385,10 @@ export function DashboardPage() {
                           <img
                             src={shift.user.image}
                             alt={shift.user.name || "Avatar"}
+                            width="24"
+                            height="24"
+                            decoding="async"
+                            loading="lazy"
                             className="h-6 w-6 rounded-full object-cover shrink-0"
                           />
                         ) : (
@@ -426,12 +431,16 @@ export function DashboardPage() {
       />
 
       {/* Changelog popup */}
-      <ChangelogPopup
-        open={showChangelog}
-        onOpenChange={setShowChangelog}
-        latestVersion={LATEST_VERSION}
-        changelog={CHANGELOGS[0]}
-      />
+      {showChangelog && (
+        <React.Suspense fallback={null}>
+          <ChangelogPopup
+            open={showChangelog}
+            onOpenChange={setShowChangelog}
+            latestVersion={LATEST_VERSION}
+            changelog={CHANGELOGS[0]}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 }

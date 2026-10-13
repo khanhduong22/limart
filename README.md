@@ -25,6 +25,7 @@ Hệ thống hiện đang vận hành song song trên hạ tầng **Contabo VPS*
 
 - 🤖 **[AGENTS.md](file:///Users/kido/checkin-app/AGENTS.md)**: Bản đồ hạ tầng, topology dịch vụ, quy tắc an toàn bảo vệ maintainer, lệnh chẩn đoán & phục hồi sự cố khẩn cấp (PITR).
 - 🚀 **[DEPLOY.md](file:///Users/kido/checkin-app/DEPLOY.md)**: Chi tiết cấu hình CI/CD GitHub Actions, quy trình deploy Staging Blue-Green và Production.
+- 📐 **[ADR 004](file:///Users/kido/checkin-app/docs/adr/0004-bun-migration-and-deferred-telemetry.md)**: Quyết định kiến trúc chuyển đổi toàn diện Bun 1.3, Deferred Telemetry (0ms TBT), và Server-Timing APM.
 
 ---
 
@@ -34,14 +35,17 @@ Hệ thống hiện đang vận hành song song trên hạ tầng **Contabo VPS*
 checkin-app/
 ├── apps/
 │   ├── admin-spa/            # Web quản trị dành cho Admin (Vite + React SPA)
-│   ├── api/                  # Backend REST API hiệu năng cao (Bun/Node + Hono, Port 4000)
+│   ├── api/                  # Backend REST API hiệu năng cao (Bun 1.3 + Hono, Port 4000)
 │   └── staff-pwa/            # Ứng dụng PWA dành cho nhân viên chấm công (Vite + React PWA)
 ├── packages/
 │   ├── audit-trail/          # Thư viện ghi vết kiểm toán mật mã SHA-256 (@checkin/audit-trail)
 │   ├── db/                   # Prisma Client, schema và cấu hình kết nối DB dùng chung (@checkin/db)
+│   ├── deferred-telemetry/   # Zero-TBT interaction-driven deferred telemetry & analytics (@checkin/deferred-telemetry)
 │   ├── shared/               # Kiểu dữ liệu (Types), DTOs, hằng số và tiện ích dùng chung (@checkin/shared)
+│   ├── spa-version-guard/    # Tự động đồng bộ phiên bản SPA và xoá cache client (@checkin/spa-version-guard)
 │   └── zero-downtime-deploy/ # Bộ điều phối deploy Blue-Green và Graceful Shutdown
-├── src/                      # Source code hệ thống Next.js Monolith v1 (Lưu trữ lịch sử)
+├── docs/
+│   └── adr/                  # Kiến trúc & Quyết định kỹ thuật (Architecture Decision Records)
 ├── prisma/                   # Root Prisma schema
 ├── docker/                   # Dockerfile tùy chỉnh (PostgreSQL 17 + pgBackRest)
 ├── scripts/                  # Scripts deploy, backup, sync database
@@ -56,13 +60,14 @@ checkin-app/
 ## 🚀 Hướng Dẫn Phát Triển Cục Bộ (Local Development)
 
 ### 1. Yêu Cầu Cài Đặt
-- **Node.js**: v20+
-- **pnpm**: v10+ (`corepack enable && corepack prepare pnpm@latest --activate`)
+- **Bun**: v1.3+ (`curl -fsSL https://bun.sh/install | bash`)
+- **Node.js**: v20+ / **pnpm**: v10+ (Hỗ trợ kép)
 - **Docker & Docker Compose**: (Tùy chọn nếu chạy DB cục bộ)
 
 ### 2. Cài Đặt Dependencies
 ```bash
-pnpm install
+bun install
+# hoặc pnpm install
 ```
 
 ### 3. Cấu Hình Môi Trường (.env)
@@ -74,17 +79,14 @@ cp .env.example .env.local
 ### 4. Khởi Chạy Local Dev
 - **Chạy toàn bộ Monorepo v2**:
   ```bash
-  pnpm dev
+  bun run dev
+  # hoặc pnpm dev
   ```
 - **Chạy riêng từng ứng dụng**:
   ```bash
-  pnpm --filter @checkin/api dev       # Chạy API backend (Port 4000)
-  pnpm --filter @checkin/admin-spa dev # Chạy Admin SPA (Port 3001)
-  pnpm --filter @checkin/staff-pwa dev # Chạy Staff PWA (Port 3002)
-  ```
-- **Chạy hệ thống Next.js Monolith v1 (Legacy Archive)**:
-  ```bash
-  npm run dev                          # Port 3000
+  bun --filter @checkin/api dev       # Chạy API backend (Port 4000)
+  bun --filter @checkin/admin-spa dev # Chạy Admin SPA (Port 3001)
+  bun --filter @checkin/staff-pwa dev # Chạy Staff PWA (Port 3002)
   ```
 
 ---
@@ -94,14 +96,17 @@ cp .env.example .env.local
 Trước khi commit hoặc deploy, luôn đảm bảo tất cả test cases đều pass:
 
 ```bash
-# Chạy toàn bộ test suites trong monorepo (Turbo cache)
+# Chạy toàn bộ test suites trong monorepo (Bun / Vitest Turbo cache)
+bun test
 pnpm test
 
 # Chạy test riêng cho từng package
+bun test packages/deferred-telemetry
+pnpm --filter @checkin/api test
+pnpm --filter @checkin/admin-spa test
+pnpm --filter @checkin/staff-pwa test
 pnpm --filter @checkin/shared test
 pnpm --filter @checkin/audit-trail test
-pnpm --filter @checkin/api test
-pnpm --filter @checkin/staff-pwa test
 
 # Chạy End-to-End (E2E) tests với Playwright
 npm run test:e2e

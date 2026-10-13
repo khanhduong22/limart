@@ -23,7 +23,7 @@
     "build": "tsup",
     "dev": "tsup --watch",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "bun test"
   },
   "peerDependencies": {
     "react": ">=18",

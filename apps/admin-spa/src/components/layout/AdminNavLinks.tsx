@@ -64,6 +64,10 @@ export default function AdminNavLinks({
               <img
                 src={link.icon}
                 alt={link.label}
+                width="40"
+                height="40"
+                decoding="async"
+                loading="lazy"
                 className="w-full h-full object-contain"
                 onError={(e) => {
                   (e.currentTarget as HTMLImageElement).src =

@@ -7,12 +7,13 @@ export { documentsRoute } from "./routes/documents.route";
 export { staffTasksRoute } from "./routes/staff-tasks.route";
 export { managerTasksRoute } from "./routes/manager-tasks.route";
 export { tasksRoute } from "./routes/tasks.route";
+export { specialDaysRoute } from "./routes/special-days.route";
 export { cronRoute } from "./routes/cron.route";
 
 const port = Number(process.env.PORT) || 4000;
 let server: ServerType | null = null;
 
-if (typeof (globalThis as any).Bun === "undefined") {
+if (typeof (globalThis as any).Bun === "undefined" && process.env.NODE_ENV !== "test") {
   import("@hono/node-server").then(({ serve }) => {
     server = serve({
       fetch: app.fetch,

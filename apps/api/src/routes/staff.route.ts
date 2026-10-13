@@ -14,7 +14,12 @@ import {
   calculateMonthlyPayrollSummary,
   calculateUserMonthlyStats,
 } from "../lib/payroll-calculator";
-import { invalidateShiftDutyCache, invalidatePayrollCache, invalidateCachePattern } from "../lib/cache";
+import {
+  getOrSetCache,
+  invalidateShiftDutyCache,
+  invalidatePayrollCache,
+  invalidateCachePattern,
+} from "../lib/cache";
 import { assertPeriodOpen } from "../lib/payroll-period";
 import { isShiftLocked } from "../lib/schedule-lock";
 import { applyLateSchedulePenalty } from "../lib/schedule-penalty";
@@ -63,259 +68,259 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
     const isViewAsMode = Boolean(tokenPayload.role === "ADMIN" && viewAsUserId);
     const userId = isViewAsMode ? viewAsUserId! : callerUserId;
 
-    const { startOfDay, endOfDay } = getVietnamDayRange();
+    const { startOfDay, endOfDay, dateStr } = getVietnamDayRange();
+    const cacheKey = `staff:home:${userId}:${dateStr}`;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        image: true,
-        isActive: true,
-        employmentType: true,
-        hourlyRate: true,
-        monthlySalary: true,
-        birthday: true,
-        startDate: true,
-        luckyWheelAllowed: true,
-        staffTasksAllowed: true,
-        achievements: true,
-      },
-    });
+    const cachedData = await getOrSetCache(cacheKey, 60, async () => {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          role: true,
+          image: true,
+          isActive: true,
+          employmentType: true,
+          hourlyRate: true,
+          monthlySalary: true,
+          birthday: true,
+          startDate: true,
+          luckyWheelAllowed: true,
+          staffTasksAllowed: true,
+          achievements: true,
+        },
+      });
 
-    if (!user || !user.isActive) {
-      return c.json({ success: false, error: "User not found or inactive" }, 404);
-    }
+      if (!user || !user.isActive) {
+        return null;
+      }
 
-    const targetDate = new Date();
-    const [
-      todayShifts,
-      todayCheckins,
-      announcements,
-      specialDays,
-      recentCheckins,
-      recentLeaves,
-      ipStatus,
-      stats,
-      allTodayDuties,
-      swapCount,
-      rejectedStaffTasks,
-      rejectedUserTasks,
-    ] = await Promise.all([
-      prisma.workShift.findMany({
-        where: {
-          userId,
-          start: { gte: startOfDay, lte: endOfDay },
-        },
-        orderBy: { start: "asc" },
-      }),
-      prisma.checkIn.findMany({
-        where: {
-          userId,
-          timestamp: { gte: startOfDay, lte: endOfDay },
-        },
-        orderBy: { timestamp: "desc" },
-      }),
-      prisma.announcement.findMany({
-        where: { active: true },
-        orderBy: { createdAt: "desc" },
-      }),
-      getSpecialDays(),
-      prisma.checkIn.findMany({
-        where: { userId, type: "checkin" },
-        orderBy: { timestamp: "desc" },
-        take: 60,
-      }),
-      prisma.request.findMany({
-        where: { userId, type: "LEAVE", status: "APPROVED" },
-        orderBy: { date: "desc" },
-        take: 40,
-      }),
-      getIPStatus(c),
-      calculateUserMonthlyStats(userId, targetDate),
-      prisma.shiftDuty.findMany({
-        where: {
-          OR: [
-            { date: { gte: startOfDay, lte: endOfDay } },
-            { shift: { start: { gte: startOfDay, lte: endOfDay } } },
-          ],
-        },
-        include: {
-          shift: true,
-          createdBy: { select: { id: true, name: true } },
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              image: true,
-              role: true,
-              isActive: true,
+      const targetDate = new Date();
+      const [
+        todayShifts,
+        todayCheckins,
+        announcements,
+        specialDays,
+        recentCheckins,
+        recentLeaves,
+        ipStatus,
+        stats,
+        allTodayDuties,
+        swapCount,
+        rejectedStaffTasks,
+        rejectedUserTasks,
+      ] = await Promise.all([
+        prisma.workShift.findMany({
+          where: {
+            userId,
+            start: { gte: startOfDay, lte: endOfDay },
+          },
+          orderBy: { start: "asc" },
+        }),
+        prisma.checkIn.findMany({
+          where: {
+            userId,
+            timestamp: { gte: startOfDay, lte: endOfDay },
+          },
+          orderBy: { timestamp: "desc" },
+        }),
+        prisma.announcement.findMany({
+          where: { active: true },
+          orderBy: { createdAt: "desc" },
+        }),
+        getSpecialDays(),
+        prisma.checkIn.findMany({
+          where: { userId, type: "checkin" },
+          orderBy: { timestamp: "desc" },
+          take: 60,
+        }),
+        prisma.request.findMany({
+          where: { userId, type: "LEAVE", status: "APPROVED" },
+          orderBy: { date: "desc" },
+          take: 40,
+        }),
+        getIPStatus(c),
+        calculateUserMonthlyStats(userId, targetDate),
+        prisma.shiftDuty.findMany({
+          where: {
+            OR: [
+              { date: { gte: startOfDay, lte: endOfDay } },
+              { shift: { start: { gte: startOfDay, lte: endOfDay } } },
+            ],
+          },
+          include: {
+            shift: true,
+            createdBy: { select: { id: true, name: true } },
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+                role: true,
+                isActive: true,
+              },
             },
           },
-        },
-        orderBy: { createdAt: "asc" },
-      }),
-      prisma.workShift.count({
-        where: {
-          isOpenForSwap: true,
-          userId: { not: userId },
-          start: { gte: new Date() },
-        },
-      }),
-      prisma.staffTask.findMany({
-        where: { assigneeId: userId, status: "REJECTED" },
-        select: {
-          id: true,
-          title: true,
-          adminNote: true,
-          submittedAt: true,
-          createdAt: true,
-        },
-      }),
-      prisma.userTask.findMany({
-        where: { userId, status: "REJECTED" },
-        select: {
-          id: true,
-          quantity: true,
-          unitPrice: true,
-          note: true,
-          evidenceLink: true,
-          adminNote: true,
-          submittedAt: true,
-          createdAt: true,
-          taskDefinition: {
-            select: { id: true, name: true, unit: true, baseReward: true },
+          orderBy: { createdAt: "asc" },
+        }),
+        prisma.workShift.count({
+          where: {
+            isOpenForSwap: true,
+            userId: { not: userId },
+            start: { gte: new Date() },
           },
-          taskItem: {
-            select: { id: true, title: true },
+        }),
+        prisma.staffTask.findMany({
+          where: { assigneeId: userId, status: "REJECTED" },
+          select: {
+            id: true,
+            title: true,
+            adminNote: true,
+            submittedAt: true,
+            createdAt: true,
           },
-        },
-      }),
-    ]);
+        }),
+        prisma.userTask.findMany({
+          where: { userId, status: "REJECTED" },
+          select: {
+            id: true,
+            quantity: true,
+            unitPrice: true,
+            note: true,
+            evidenceLink: true,
+            adminNote: true,
+            submittedAt: true,
+            createdAt: true,
+            taskDefinition: {
+              select: { id: true, name: true, unit: true, baseReward: true },
+            },
+            taskItem: {
+              select: { id: true, title: true },
+            },
+          },
+        }),
+      ]);
 
-    const streak = calculateStreak(recentCheckins, recentLeaves);
-    const hasCheckedInToday = todayCheckins.some((ch) => ch.type === "checkin");
-    const todayShift = todayShifts[0] || null;
+      const streak = calculateStreak(recentCheckins, recentLeaves);
+      const hasCheckedInToday = todayCheckins.some((ch) => ch.type === "checkin");
+      const todayShift = todayShifts[0] || null;
 
-    const todayDuties = allTodayDuties.filter((d) => d.userId === userId);
+      const todayDuties = allTodayDuties.filter((d) => d.userId === userId);
 
-    const userDutiesMap = new Map<
-      string,
-      {
-        id: string;
-        name: string | null;
-        email: string | null;
-        image: string | null;
-        role: string;
-        duties: Array<{
+      const userDutiesMap = new Map<
+        string,
+        {
           id: string;
-          shiftId: number | null;
-          userId: string;
-          createdById: string;
-          date: Date;
-          title: string;
-          description: string | null;
-          isCompleted: boolean;
-          completedAt: Date | null;
-          createdAt: Date;
-          shift?: any;
-          createdBy?: { id: string; name: string | null } | null;
-        }>;
-      }
-    >();
+          name: string | null;
+          email: string | null;
+          image: string | null;
+          role: string;
+          duties: Array<{
+            id: string;
+            shiftId: number | null;
+            userId: string;
+            createdById: string;
+            date: Date;
+            title: string;
+            description: string | null;
+            isCompleted: boolean;
+            completedAt: Date | null;
+            createdAt: Date;
+            shift?: any;
+            createdBy?: { id: string; name: string | null } | null;
+          }>;
+        }
+      >();
 
-    for (const duty of allTodayDuties) {
-      if (!duty.user || (duty.user as any).isActive === false) continue;
-      const u = duty.user;
-      if (!userDutiesMap.has(u.id)) {
-        userDutiesMap.set(u.id, {
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          image: u.image,
-          role: u.role,
-          duties: [],
+      for (const duty of allTodayDuties) {
+        if (!duty.user || (duty.user as any).isActive === false) continue;
+        const u = duty.user;
+        if (!userDutiesMap.has(u.id)) {
+          userDutiesMap.set(u.id, {
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            image: u.image,
+            role: u.role,
+            duties: [],
+          });
+        }
+        userDutiesMap.get(u.id)!.duties.push({
+          id: duty.id,
+          shiftId: duty.shiftId,
+          userId: duty.userId,
+          createdById: duty.createdById,
+          date: duty.date,
+          title: duty.title,
+          description: duty.description,
+          isCompleted: duty.isCompleted,
+          completedAt: duty.completedAt,
+          createdAt: duty.createdAt,
+          shift: duty.shift,
+          createdBy: duty.createdBy,
         });
       }
-      userDutiesMap.get(u.id)!.duties.push({
-        id: duty.id,
-        shiftId: duty.shiftId,
-        userId: duty.userId,
-        createdById: duty.createdById,
-        date: duty.date,
-        title: duty.title,
-        description: duty.description,
-        isCompleted: duty.isCompleted,
-        completedAt: duty.completedAt,
-        createdAt: duty.createdAt,
-        shift: duty.shift,
-        createdBy: duty.createdBy,
-      });
-    }
 
-    const activeUsers = Array.from(userDutiesMap.values()).sort((a, b) =>
-      (a.name || "").localeCompare(b.name || "")
-    );
+      const activeUsers = Array.from(userDutiesMap.values()).sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "")
+      );
 
-    const rejectedTasks = [
-      ...rejectedStaffTasks.map((t) => ({
-        id: t.id,
-        type: "STAFF_TASK" as const,
-        title: t.title,
-        reason: (t as any).rejectReason || t.adminNote || "Admin yêu cầu cập nhật lại kết quả",
-        date: t.submittedAt || t.createdAt,
-        link: "/staff-tasks",
-      })),
-      ...rejectedUserTasks.map((t) => {
-        const unit = t.taskDefinition?.unit;
-        let link = "/tasks?tab=history";
-        if (unit === "điểm") link = "/packing?tab=history";
-        else if (unit === "điểm-bưng") link = "/carrying?tab=history";
-        const title = t.taskItem?.title || t.taskDefinition?.name || t.note || "Nhiệm vụ";
-        return {
+      const rejectedTasks = [
+        ...rejectedStaffTasks.map((t) => ({
           id: t.id,
-          type: unit === "điểm" ? ("PACKING" as const) : unit === "điểm-bưng" ? ("CARRYING" as const) : ("WFH" as const),
-          title,
+          type: "STAFF_TASK" as const,
+          title: t.title,
           reason: (t as any).rejectReason || t.adminNote || "Admin yêu cầu cập nhật lại kết quả",
           date: t.submittedAt || t.createdAt,
-          link,
-        };
-      }),
-    ];
-    const rejectedTasksCount = rejectedTasks.length;
+          link: "/staff-tasks",
+        })),
+        ...rejectedUserTasks.map((t) => {
+          const unit = t.taskDefinition?.unit;
+          let link = "/tasks?tab=history";
+          if (unit === "điểm") link = "/packing?tab=history";
+          else if (unit === "điểm-bưng") link = "/carrying?tab=history";
+          const title = t.taskItem?.title || t.taskDefinition?.name || t.note || "Nhiệm vụ";
+          return {
+            id: t.id,
+            type: unit === "điểm" ? ("PACKING" as const) : unit === "điểm-bưng" ? ("CARRYING" as const) : ("WFH" as const),
+            title,
+            reason: (t as any).rejectReason || t.adminNote || "Admin yêu cầu cập nhật lại kết quả",
+            date: t.submittedAt || t.createdAt,
+            link,
+          };
+        }),
+      ];
+      const rejectedTasksCount = rejectedTasks.length;
 
-    let readAnnouncementIds = new Set<string>();
-    try {
-      await ensureAnnouncementReadTable();
-      if ((prisma as any).announcementRead?.findMany) {
-        const userReads = await (prisma as any).announcementRead.findMany({
-          where: { userId },
-          select: { announcementId: true },
-        });
-        readAnnouncementIds = new Set(userReads.map((r: any) => r.announcementId));
-      } else if ((prisma as any).$queryRaw) {
-        const rawReads = await (prisma as any).$queryRaw`
-          SELECT "announcementId" FROM "AnnouncementRead" WHERE "userId" = ${userId}
-        `;
-        if (Array.isArray(rawReads)) {
-          readAnnouncementIds = new Set(rawReads.map((r: any) => r.announcementId));
+      let readAnnouncementIds = new Set<string>();
+      try {
+        await ensureAnnouncementReadTable();
+        if ((prisma as any).announcementRead?.findMany) {
+          const userReads = await (prisma as any).announcementRead.findMany({
+            where: { userId },
+            select: { announcementId: true },
+          });
+          readAnnouncementIds = new Set(userReads.map((r: any) => r.announcementId));
+        } else if ((prisma as any).$queryRaw) {
+          const rawReads = await (prisma as any).$queryRaw`
+            SELECT "announcementId" FROM "AnnouncementRead" WHERE "userId" = ${userId}
+          `;
+          if (Array.isArray(rawReads)) {
+            readAnnouncementIds = new Set(rawReads.map((r: any) => r.announcementId));
+          }
         }
+      } catch (readErr) {
+        console.warn("[staff.route] Could not query announcement reads:", readErr);
       }
-    } catch (readErr) {
-      console.warn("[staff.route] Could not query announcement reads:", readErr);
-    }
 
-    const announcementsWithReadStatus = (announcements || []).map((a) => ({
-      ...a,
-      isRead: readAnnouncementIds.has(a.id),
-    }));
+      const announcementsWithReadStatus = (announcements || []).map((a) => ({
+        ...a,
+        isRead: readAnnouncementIds.has(a.id),
+      }));
 
-    return c.json({
-      success: true,
-      data: {
+      return {
         user,
         isViewAsMode,
         todayShifts,
@@ -344,7 +349,16 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
           dailyDetails: [],
         },
         ipStatus,
-      },
+      };
+    });
+
+    if (!cachedData) {
+      return c.json({ success: false, error: "User not found or inactive" }, 404);
+    }
+
+    return c.json({
+      success: true,
+      data: cachedData,
     });
   } catch (err: any) {
     return c.json(
@@ -408,6 +422,8 @@ staffRoute.post("/announcements/read", authMiddleware, async (c) => {
         console.warn(`[staff.route] Error recording read announcement ${annId}:`, insertErr);
       }
     }
+
+    await invalidateCachePattern(`staff:home:${userId}:*`).catch(() => {});
 
     return c.json({ success: true, count: ids.length });
   } catch (err: any) {

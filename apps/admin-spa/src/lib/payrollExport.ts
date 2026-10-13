@@ -4,7 +4,7 @@
  * - Full payroll export (Sheet 1: summary, Sheet 2..N: per-employee daily details)
  * - Single-employee export (Sheet 1: summary card, Sheet 2: daily details)
  */
-import * as XLSX from 'xlsx';
+import type * as XLSXTypes from 'xlsx';
 
 const VND = (n: number) => Math.round(n);
 
@@ -55,7 +55,7 @@ const fmtDate = (d: string | Date) =>
  * Apply Excel number format '#,##0' (e.g. 71,577) to all numeric cells
  * in the given 0-based column indices, skipping the header rows.
  */
-function applyNumberFormat(ws: XLSX.WorkSheet, colIndices: number[], skipRows: number) {
+function applyNumberFormat(ws: XLSXTypes.WorkSheet, colIndices: number[], skipRows: number, XLSX: typeof XLSXTypes) {
   const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
   for (let R = range.s.r + skipRows; R <= range.e.r; R++) {
     for (const C of colIndices) {
@@ -79,8 +79,9 @@ function buildSummarySheet(
   year: number,
   isClosed: boolean,
   bonusPercent: number,
-  bonusTargets: string[]
-): XLSX.WorkSheet {
+  bonusTargets: string[],
+  XLSX: typeof XLSXTypes
+): XLSXTypes.WorkSheet {
   const title = `Tháng ${month}/${year}${isClosed ? ' (Đã chốt)' : ' (Tạm tính)'}`;
 
   const headers = [
@@ -154,7 +155,7 @@ function buildSummarySheet(
     { wch: 12 }, { wch: 20 }, { wch: 20 }, { wch: 20 }, { wch: 20 }
   ];
 
-  applyNumberFormat(ws, [6, 7, 8, 9], 3);
+  applyNumberFormat(ws, [6, 7, 8, 9], 3, XLSX);
 
   return ws;
 }
@@ -168,8 +169,9 @@ function buildEmployeeDetailSheet(
   year: number,
   isClosed: boolean,
   bonusPercent: number,
-  bonusTargets: string[]
-): XLSX.WorkSheet {
+  bonusTargets: string[],
+  XLSX: typeof XLSXTypes
+): XLSXTypes.WorkSheet {
   const isThuKpiSalary = (user.email === 'cuccung123456789@gmail.com' || user.name === 'Thư') && (year > 2026 || (year === 2026 && month >= 6));
   const shouldApplyBonus = !isClosed && (bonusTargets.includes(user.stats.employmentType) || (isThuKpiSalary && bonusTargets.includes('PART_TIME')));
   const bonusAmt = isClosed
@@ -241,9 +243,9 @@ function buildEmployeeDetailSheet(
     { wch: 8 }, { wch: 20 }, { wch: 25 }
   ];
 
-  applyNumberFormat(ws, [1], 3);
-  applyNumberFormat(ws, [5], 10);
-  applyNumberFormat(ws, [2], 10);
+  applyNumberFormat(ws, [1], 3, XLSX);
+  applyNumberFormat(ws, [5], 10, XLSX);
+  applyNumberFormat(ws, [2], 10, XLSX);
 
   return ws;
 }
@@ -253,7 +255,7 @@ function buildEmployeeDetailSheet(
 /**
  * Export full payroll: Sheet 1 summary + one sheet per employee with daily details.
  */
-export function exportFullPayrollXLSX(
+export async function exportFullPayrollXLSX(
   users: PayrollExportUser[],
   month: number,
   year: number,
@@ -261,15 +263,16 @@ export function exportFullPayrollXLSX(
   bonusPercent: number,
   bonusTargets: string[]
 ) {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
   // Sheet 1: Summary
-  const summaryWs = buildSummarySheet(users, month, year, isClosed, bonusPercent, bonusTargets);
+  const summaryWs = buildSummarySheet(users, month, year, isClosed, bonusPercent, bonusTargets, XLSX);
   XLSX.utils.book_append_sheet(wb, summaryWs, `Tổng hợp ${month}-${year}`);
 
   // Sheet per employee
   for (const user of users) {
-    const ws = buildEmployeeDetailSheet(user, month, year, isClosed, bonusPercent, bonusTargets);
+    const ws = buildEmployeeDetailSheet(user, month, year, isClosed, bonusPercent, bonusTargets, XLSX);
     const sheetName = (user.name || 'NV').replace(/[\\/:?*[\]]/g, '').slice(0, 28);
     XLSX.utils.book_append_sheet(wb, ws, sheetName);
   }
@@ -280,7 +283,7 @@ export function exportFullPayrollXLSX(
 /**
  * Export single-employee payroll slip.
  */
-export function exportSingleEmployeeXLSX(
+export async function exportSingleEmployeeXLSX(
   user: PayrollExportUser,
   month: number,
   year: number,
@@ -288,9 +291,10 @@ export function exportSingleEmployeeXLSX(
   bonusPercent: number = 0,
   bonusTargets: string[] = []
 ) {
+  const XLSX = await import('xlsx');
   const wb = XLSX.utils.book_new();
 
-  const ws = buildEmployeeDetailSheet(user, month, year, isClosed, bonusPercent, bonusTargets);
+  const ws = buildEmployeeDetailSheet(user, month, year, isClosed, bonusPercent, bonusTargets, XLSX);
   XLSX.utils.book_append_sheet(wb, ws, `Phiếu lương`);
 
   const safeName = (user.name || 'NV').replace(/[^a-zA-Z0-9_\u00C0-\u024F\u1E00-\u1EFF]/g, '_').slice(0, 20);

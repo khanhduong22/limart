@@ -553,6 +553,66 @@ describe("Admin Routes", () => {
       expect(data.total).toBe(1);
       expect(data.logs).toHaveLength(1);
     });
+
+    it("applies action, status, and search filters correctly", async () => {
+      mockSessionAuditLogCount.mockResolvedValue(1);
+      mockSessionAuditLogFindMany.mockResolvedValue([
+        {
+          id: "log-2",
+          action: "CHECKIN",
+          status: "SUCCESS",
+          ipAddress: "192.168.1.1",
+          user: { id: "u-2", name: "Bob" },
+        },
+      ]);
+
+      const res = await app.request(
+        "/api/auth/audit-logs?page=2&limit=25&action=CHECKIN&status=SUCCESS&search=Bob",
+        {
+          headers: { Cookie: `access_token=${adminToken}` },
+        }
+      );
+
+      expect(res.status).toBe(200);
+      const data = await res.json();
+      expect(data.success).toBe(true);
+      expect(data.page).toBe(2);
+      expect(data.limit).toBe(25);
+      expect(mockSessionAuditLogFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 25,
+          skip: 25,
+          where: expect.objectContaining({
+            action: "CHECKIN",
+            status: "SUCCESS",
+            OR: expect.arrayContaining([
+              { ipAddress: { contains: "Bob", mode: "insensitive" } },
+            ]),
+          }),
+        })
+      );
+    });
+
+    it("ignores action=ALL, status=ALL, and empty search string", async () => {
+      mockSessionAuditLogCount.mockResolvedValue(0);
+      mockSessionAuditLogFindMany.mockResolvedValue([]);
+
+      const res = await app.request(
+        "/api/auth/audit-logs?page=1&limit=25&action=ALL&status=ALL&search=",
+        {
+          headers: { Cookie: `access_token=${adminToken}` },
+        }
+      );
+
+      expect(res.status).toBe(200);
+      expect(mockSessionAuditLogFindMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 25,
+          skip: 0,
+          where: {},
+        })
+      );
+    });
   });
 
   describe("GET /api/admin/payroll", () => {

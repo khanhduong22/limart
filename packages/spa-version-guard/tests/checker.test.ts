@@ -32,6 +32,19 @@ class MockStorage implements Storage {
   }
 }
 
+// Setup environment polyfills for headless/native Bun runtime
+if (typeof window === 'undefined') {
+  (globalThis as any).window = globalThis;
+}
+if (typeof document === 'undefined') {
+  (globalThis as any).document = {
+    visibilityState: 'visible',
+  };
+}
+if (typeof navigator === 'undefined') {
+  (globalThis as any).navigator = {};
+}
+
 describe('Version Guard - Checker & Anti-Loop Logic', () => {
   const originalFetch = globalThis.fetch;
   const mockClientVersion = '2026.10.10.v1.0.0';

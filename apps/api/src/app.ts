@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { cors } from "hono/cors";
+import { etag } from "hono/etag";
 import { requestId } from "hono/request-id";
 import { secureHeaders } from "hono/secure-headers";
 import { healthRoute } from "./routes/health.route";
@@ -19,8 +20,10 @@ import { documentsRoute } from "./routes/documents.route";
 import { staffTasksRoute } from "./routes/staff-tasks.route";
 import { managerTasksRoute } from "./routes/manager-tasks.route";
 import { tasksRoute } from "./routes/tasks.route";
+import { specialDaysRoute } from "./routes/special-days.route";
 import { cronRoute } from "./routes/cron.route";
 import { authMiddleware, AppEnv } from "./middleware/auth.middleware";
+import { serverTiming } from "./middleware/server-timing.middleware";
 import { prisma } from "@checkin/db";
 
 export function createApp() {
@@ -62,9 +65,16 @@ export function createApp() {
       origin: (origin) => origin || "*",
       credentials: true,
       allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type", "Authorization", "Cookie", "X-Request-Id"],
+      allowHeaders: ["Content-Type", "Authorization", "Cookie", "X-Request-Id", "If-None-Match"],
+      exposeHeaders: ["ETag", "Server-Timing"],
     })
   );
+
+  // 5. Server-Timing APM & Network Waterfall Visibility
+  app.use("*", serverTiming());
+
+  // 6. ETag & HTTP Response Optimization (RFC 7232 304 Not Modified)
+  app.use("*", etag());
 
   // Global Error Handler
   app.onError((err, c) => {
@@ -170,6 +180,7 @@ export function createApp() {
   app.route("/api/shift-duties", shiftsRoute);
   app.route("/api/payroll", payrollRoute);
   app.route("/api/requests", requestsRoute);
+  app.route("/api/special-days", specialDaysRoute);
 
   // Admin Routes
   app.route("/api/admin", adminRoute);

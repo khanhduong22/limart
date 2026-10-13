@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, Suspense, lazy } from "react";
 import { useAppQuery } from "@/lib/api-query";
 import PayrollDetailView from "@/components/PayrollDetailView";
 import PayrollMonthSelector from "@/components/PayrollMonthSelector";
-import PayrollExplanationModal from "@/components/PayrollExplanationModal";
+const PayrollExplanationModal = lazy(() => import("@/components/PayrollExplanationModal"));
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/lib/router";
@@ -63,7 +63,9 @@ export const PayrollView: React.FC = () => {
           </Button>
         </Link>
         <h1 className="text-base font-bold text-stone-900 tracking-tight flex-1">Chi tiết lương</h1>
-        <PayrollExplanationModal />
+        <Suspense fallback={null}>
+          <PayrollExplanationModal />
+        </Suspense>
       </div>
 
         {/* Period Selector Card */}

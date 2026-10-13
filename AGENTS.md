@@ -12,14 +12,14 @@
 ### Active Environment & Domain Inventory
 | Environment | Domain / URL | Branch / Compose | Active Containers | Architecture |
 | :--- | :--- | :--- | :--- | :--- |
-| 🚀 **Production** | `https://limart.khanhdp.com`<br>`https://limart2.khanhdp.com` (Canary) | `main` (`/opt/limart`) | `limart-api` (:4000)<br>`limart-admin` (:3001)<br>`limart-staff` (:3002) | Monorepo 3-Tier (Hono RESTful API + Vite Admin SPA + Vite Staff PWA) |
+| 🚀 **Production** | `https://limart.khanhdp.com`<br>`https://limart2.khanhdp.com` (Canary) | `main` (`/opt/limart`) | `limart-api` (:4000, Bun `oven/bun:1-alpine`)<br>`limart-admin` (:3001)<br>`limart-staff` (:3002) | Monorepo 3-Tier (Bun 1.3 + Hono REST API + Vite Admin SPA + Vite Staff PWA) |
 | 🔄 **Backup Domain** | `https://limart3.khanhdp.com` | Caddy Redirect | None | Permanent HTTP 301 redirect ➔ `https://limart.khanhdp.com/` |
 | 📦 **Legacy V1 Archive Branch** | N/A | `backup/legacy-v1-main` | None | Remote archive of original Next.js 16 monolith standalone |
 | 🛑 **Legacy Monolith Directory** | N/A | `/opt/checkin-app -> /opt/limart` | None | **Decommissioned & Symlinked** (~280 MiB RAM saved) |
 
 ### Shared Backing Services
 - 🗄️ **PostgreSQL 17** (`limart-db` on port 5432): Database `checkin_db`. Backed by volume `checkin-app_checkin_pgdata`. Continuous WAL archiving via pgBackRest into volume `checkin_pgbackrest_data`.
-- ⚡ **Valkey 8 Cache** (`limart-valkey` on port 6389:6379): 64MB LRU cache, singleflight anti-stampede protection.
+- ⚡ **Valkey 8 Cache** (`limart-valkey` on port 6389:6379): 64MB LRU cache, singleflight anti-stampede protection, jittered TTL.
 - 🔍 **Meilisearch** (`meilisearch` on port 7700): Sub-50ms typo-tolerant search for unaccented Vietnamese names & tasks.
 
 ================================================================================
@@ -29,11 +29,12 @@
 limart/
 ├── apps/
 │   ├── admin-spa/            # Admin management dashboard (Vite + React SPA, Nginx container)
-│   ├── api/                  # High-performance RESTful API (Bun/Node + Hono, Port 4000)
+│   ├── api/                  # High-performance RESTful API (Bun 1.3 runtime + Hono, Port 4000)
 │   └── staff-pwa/            # Staff attendance & tasks (Vite + React PWA, offline service worker)
 ├── packages/
 │   ├── audit-trail/          # Cryptographic SHA-256 chained audit logger (@checkin/audit-trail)
 │   ├── db/                   # Centralized Prisma client singleton & schema (@checkin/db)
+│   ├── deferred-telemetry/   # Zero-TBT interaction-driven deferred telemetry & analytics (@checkin/deferred-telemetry)
 │   ├── shared/               # Shared DTOs, types, helpers, and constants (@checkin/shared)
 │   ├── spa-version-guard/    # Automatic SPA version checker, cache buster & service worker reloader (@checkin/spa-version-guard)
 │   └── zero-downtime-deploy/ # Blue-green deployment swap orchestrator (@checkin/zero-downtime-deploy)
@@ -63,7 +64,7 @@ limart/
    - 🚫 **NEVER** delete raw database records without explicit user confirmation.
    - All schema changes must be non-destructive and backward-compatible, executed via `pnpm prisma db push --skip-generate` in production CI/CD.
 4. **Test Evidence Gate (Real Passing Test Output Required)**:
-   - 🚫 **NEVER** declare a task complete or push a commit without running the native test suite (`pnpm test`) and displaying real passing test output in the session.
+   - 🚫 **NEVER** declare a task complete or push a commit without running the native test suite (`bun test` or `pnpm test`) and displaying real passing test output in the session.
    - Never suppress errors with empty `catch {}` blocks or silence types with `@ts-ignore` or unchecked `any`.
 5. **1-Commit Rule (Single Conventional Commit)**:
    - Every PR, bugfix, or feature branch merged to `main` MUST contain **EXACTLY ONE single commit** adhering to the Conventional Commits specification (e.g., `feat: Add QR code scanner`, `fix: Resolve token expiration edge case`).
@@ -84,7 +85,7 @@ limart/
   - **Trunk-Based Trigger**: Push commit or merge to `main` (or manual trigger via `workflow_dispatch`).
   - **Automated Pipeline Stages**:
     1. **Path Filter Change Detection**: Detects which apps (`api`, `admin-spa`, `staff-pwa`) or packages were modified to build only affected targets.
-    2. **Test & Quality Gate**: Executes monorepo unit tests (`pnpm test`) and verifies builds across shared packages before triggering any container builds.
+    2. **Test & Quality Gate**: Executes monorepo unit tests (`bun test` / `pnpm test`) and verifies builds across shared packages before triggering any container builds.
     3. **Parallel Docker Image Builds**: Builds Docker images in parallel and pushes to GHCR (`ghcr.io/khanhduong22/limart/*:latest` and `:${{ github.sha }}`).
     4. **Blue-Green Zero-Downtime Container Swap on Port 4000**:
        - SSH invokes `scripts/deploy-monorepo.sh deploy`.
@@ -102,16 +103,22 @@ limart/
 5. ESSENTIAL COMMANDS CHEATSHEET
 ================================================================================
 
-### Local Testing & Development
+### Local Testing, Building & Development (Bun 1.3 / pnpm)
 ```bash
-# Run all unit tests across the monorepo (Turbo cached)
+# Run unit tests across the monorepo (Bun / Vitest Turbo cached)
+bun test
 pnpm test
 
 # Run tests for specific packages
+bun test packages/deferred-telemetry
 pnpm --filter @checkin/shared test
 pnpm --filter @checkin/audit-trail test
 pnpm --filter @checkin/api test
 pnpm --filter @checkin/staff-pwa test
+
+# Monorepo Build & Dependency Management
+bun run build                 # Turbo monorepo build
+bun install                   # Blazing-fast dependency sync (bun.lock)
 
 # Run Playwright E2E browser tests
 npm run test:e2e
@@ -204,3 +211,4 @@ The LimArt monorepo maintains modular, service-scoped agent rule files. Each ser
 | [`packages/audit-trail/AGENTS.md`](file://packages/audit-trail/AGENTS.md) | Cryptographic Audit Trail | Cryptographic SHA-256 chained audit logs, Merkle batch shift anchoring, fraud detection |
 | [`packages/zero-downtime-deploy/AGENTS.md`](file://packages/zero-downtime-deploy/AGENTS.md) | Deployment Automation | Blue-green container swap orchestrator, HTTP socket drain, candidate health verification |
 | [`packages/spa-version-guard/AGENTS.md`](file://packages/spa-version-guard/AGENTS.md) | Client Version Synchronization | SPA update version guard, proactive cache clearing, Service Worker auto-update prompt |
+| [`packages/deferred-telemetry/README.md`](file://packages/deferred-telemetry/README.md) | Zero-TBT Deferred Telemetry | Interaction-driven analytics loader, 0ms TBT, lossless event queues (GA4, GTM, Clarity, Pixel, Sentry) |

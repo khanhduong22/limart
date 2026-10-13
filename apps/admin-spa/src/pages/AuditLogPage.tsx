@@ -10,12 +10,15 @@ import {
   Search,
   Filter,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import {
   createColumnHelper,
   flexRender,
   getCoreRowModel,
-  getFilteredRowModel,
   getPaginationRowModel,
   useReactTable,
 } from "@tanstack/react-table";
@@ -43,40 +46,48 @@ interface AuditLog {
   createdAt: string;
 }
 
+interface AuditLogResponse {
+  success: boolean;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  logs: AuditLog[];
+}
+
 const columnHelper = createColumnHelper<AuditLog>();
 
 export function AuditLogPage() {
-  const [globalFilter, setGlobalFilter] = useState("");
-  const [actionFilter, setActionFilter] = useState("ALL");
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const [filterAction, setFilterAction] = useState("ALL");
+  const [filterStatus, setFilterStatus] = useState("ALL");
+  const [search, setSearch] = useState("");
+  const [jumpPage, setJumpPage] = useState("1");
 
-  const { data, isValidating, mutate } = useAdminQuery<{
-    success: boolean;
-    logs: AuditLog[];
-  }>("/api/auth/audit-logs", {
-    fallbackData: {
-      success: true,
-      logs: [],
-    },
-  });
+  React.useEffect(() => {
+    setJumpPage(String(pageIndex + 1));
+  }, [pageIndex]);
+
+  const queryUrl = `/api/auth/audit-logs?page=${pageIndex + 1}&limit=${pageSize}&action=${filterAction}&status=${filterStatus}&search=${encodeURIComponent(search.trim())}`;
+
+  const { data, isValidating, mutate } = useAdminQuery<AuditLogResponse>(
+    queryUrl,
+    {
+      fallbackData: {
+        success: true,
+        total: 0,
+        page: 1,
+        limit: pageSize,
+        totalPages: 1,
+        logs: [],
+      },
+    }
+  );
 
   const logs = data?.logs || [];
-
-  const filteredLogs = React.useMemo(() => {
-    let result = logs;
-    if (actionFilter !== "ALL") {
-      result = result.filter((log) => log.action === actionFilter);
-    }
-    if (globalFilter.trim()) {
-      const q = globalFilter.toLowerCase();
-      result = result.filter(
-        (log) =>
-          log.user?.name?.toLowerCase().includes(q) ||
-          log.user?.email?.toLowerCase().includes(q) ||
-          log.ipAddress?.toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }, [logs, actionFilter, globalFilter]);
+  const totalPages = data?.totalPages || 1;
+  const totalCount = data?.total ?? logs.length;
 
   const columns = React.useMemo(
     () => [
@@ -224,18 +235,40 @@ export function AuditLogPage() {
     []
   );
 
+  const pagination = React.useMemo(
+    () => ({
+      pageIndex,
+      pageSize,
+    }),
+    [pageIndex, pageSize]
+  );
+
   const table = useReactTable({
-    data: filteredLogs,
+    data: logs,
     columns,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: {
-      pagination: {
-        pageSize: 15,
-      },
+    pageCount: totalPages,
+    state: {
+      pagination,
     },
+    onPaginationChange: (updater) => {
+      const nextPagination =
+        typeof updater === "function" ? updater(pagination) : updater;
+      setPageIndex(nextPagination.pageIndex);
+      setPageSize(nextPagination.pageSize);
+    },
+    manualPagination: true,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   });
+
+  const handleJump = () => {
+    const p = parseInt(jumpPage, 10);
+    if (!isNaN(p) && p >= 1 && p <= totalPages) {
+      table.setPageIndex(p - 1);
+    } else {
+      setJumpPage(String(pageIndex + 1));
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -269,25 +302,49 @@ export function AuditLogPage() {
           <input
             type="text"
             placeholder="Tìm theo tên, email, IP..."
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPageIndex(0);
+            }}
             className="w-full pl-9 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-base sm:text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-primary min-h-[38px] h-10 sm:h-9"
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+            <select
+              aria-label="Lọc theo hành động"
+              value={filterAction}
+              onChange={(e) => {
+                setFilterAction(e.target.value);
+                setPageIndex(0);
+              }}
+              className="w-full sm:w-auto bg-white border border-gray-200 rounded-lg text-base sm:text-xs text-slate-700 px-3 py-2 focus:outline-none focus:border-primary cursor-pointer min-h-[38px] h-10 sm:h-9"
+            >
+              <option value="ALL">Tất cả hành động</option>
+              <option value="LOGIN">🔑 Đăng nhập</option>
+              <option value="LOGOUT">🚪 Đăng xuất</option>
+              <option value="CHECKIN">🟢 Vào ca</option>
+              <option value="CHECKOUT">👋 Tan ca</option>
+              <option value="MANUAL_CHECKIN">✍️ Chấm công hộ</option>
+              <option value="FAILED_LOGIN">⚠️ Sai mật khẩu</option>
+            </select>
+          </div>
+
           <select
-            value={actionFilter}
-            onChange={(e) => setActionFilter(e.target.value)}
+            aria-label="Lọc theo trạng thái"
+            value={filterStatus}
+            onChange={(e) => {
+              setFilterStatus(e.target.value);
+              setPageIndex(0);
+            }}
             className="w-full sm:w-auto bg-white border border-gray-200 rounded-lg text-base sm:text-xs text-slate-700 px-3 py-2 focus:outline-none focus:border-primary cursor-pointer min-h-[38px] h-10 sm:h-9"
           >
-            <option value="ALL">Tất cả hành động</option>
-            <option value="LOGIN">🔑 Đăng nhập</option>
-            <option value="LOGOUT">🚪 Đăng xuất</option>
-            <option value="CHECKIN">🟢 Vào ca</option>
-            <option value="CHECKOUT">👋 Tan ca</option>
-            <option value="MANUAL_CHECKIN">✍️ Chấm công hộ</option>
+            <option value="ALL">Tất cả trạng thái</option>
+            <option value="SUCCESS">✅ Thành công</option>
+            <option value="FAILED">❌ Thất bại</option>
           </select>
         </div>
       </div>
@@ -342,34 +399,106 @@ export function AuditLogPage() {
         </div>
 
         {/* Pagination */}
-        {table.getPageCount() > 1 && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-3 border-t bg-gray-50/50 text-xs text-slate-600">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 border-t bg-gray-50/50 text-xs text-slate-600">
+          <div className="flex flex-wrap items-center gap-3">
             <div>
-              Trang <span className="font-semibold text-slate-900">{table.getState().pagination.pageIndex + 1}</span> /{" "}
-              <span className="font-semibold text-slate-900">{table.getPageCount()}</span> (Tổng {filteredLogs.length} sự kiện)
+              Trang <span className="font-semibold text-slate-900">{pageIndex + 1}</span> /{" "}
+              <span className="font-semibold text-slate-900">{totalPages}</span> (Tổng {totalCount} sự kiện)
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-                className="h-9 min-h-[36px] px-3 text-xs"
+
+            <div className="flex items-center gap-1.5 text-xs text-slate-600">
+              <span className="text-slate-500">Hiển thị:</span>
+              <select
+                aria-label="Số dòng mỗi trang"
+                value={pageSize}
+                onChange={(e) => {
+                  const newSize = Number(e.target.value);
+                  table.setPageSize(newSize);
+                  setPageIndex(0);
+                }}
+                className="bg-white border border-gray-200 rounded-md px-2 py-1 text-xs text-slate-700 focus:outline-none focus:border-primary cursor-pointer h-8"
               >
-                Trước
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-                className="h-9 min-h-[36px] px-3 text-xs"
-              >
-                Tiếp theo
-              </Button>
+                <option value={10}>10 / trang</option>
+                <option value={25}>25 / trang</option>
+                <option value={50}>50 / trang</option>
+                <option value={100}>100 / trang</option>
+              </select>
             </div>
           </div>
-        )}
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+              className="h-8 px-2 text-xs"
+              title="Trang đầu"
+              aria-label="Trang đầu"
+            >
+              <ChevronsLeft className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+              className="h-8 px-2.5 text-xs gap-1"
+              aria-label="Trang trước"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Trước</span>
+            </Button>
+
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={jumpPage}
+                onChange={(e) => setJumpPage(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleJump();
+                  }
+                }}
+                className="w-12 h-8 px-1.5 border border-gray-200 rounded-md text-xs text-center focus:outline-none focus:border-primary"
+                aria-label="Nhập số trang"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleJump}
+                className="h-8 px-2 text-xs"
+              >
+                Nhảy
+              </Button>
+            </div>
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+              className="h-8 px-2.5 text-xs gap-1"
+              aria-label="Trang sau"
+            >
+              <span>Tiếp theo</span>
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => table.setPageIndex(totalPages - 1)}
+              disabled={!table.getCanNextPage()}
+              className="h-8 px-2 text-xs"
+              title="Trang cuối"
+              aria-label="Trang cuối"
+            >
+              <ChevronsRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -273,7 +273,7 @@ scheduleRoute.post("/:id/take", authMiddleware, async (c) => {
 // GET /api/schedule/:id/duties
 scheduleRoute.get("/:id/duties", authMiddleware, async (c) => {
   try {
-    const shiftId = parseInt(c.req.param("id"), 10);
+    const shiftId = parseInt(c.req.param("id") || "", 10);
     if (isNaN(shiftId)) return c.json({ success: false, error: "Invalid shift id" }, 400);
     const duties = await prisma.shiftDuty.findMany({
       where: { shiftId },

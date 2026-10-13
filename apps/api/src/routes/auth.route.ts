@@ -240,11 +240,19 @@ authRoute.get("/audit-logs", authMiddleware, adminMiddleware, async (c) => {
   const action = c.req.query("action");
   const status = c.req.query("status");
   const userId = c.req.query("userId");
+  const search = c.req.query("search")?.trim();
 
   const where: any = {};
-  if (action) where.action = action;
-  if (status) where.status = status;
+  if (action && action !== "ALL") where.action = action;
+  if (status && status !== "ALL") where.status = status;
   if (userId) where.userId = userId;
+  if (search) {
+    where.OR = [
+      { ipAddress: { contains: search, mode: "insensitive" } },
+      { user: { name: { contains: search, mode: "insensitive" } } },
+      { user: { email: { contains: search, mode: "insensitive" } } },
+    ];
+  }
 
   const [total, logs] = await Promise.all([
     prisma.sessionAuditLog.count({ where }),

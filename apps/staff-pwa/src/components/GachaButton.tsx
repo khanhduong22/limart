@@ -10,7 +10,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import confetti from "canvas-confetti";
 
 export default function GachaButton({
   userId,
@@ -37,6 +36,7 @@ export default function GachaButton({
 
     if (res.success && res.reward) {
       setReward(res.reward);
+      const confetti = (await import("canvas-confetti")).default;
       confetti({
         particleCount: 50,
         spread: 60,

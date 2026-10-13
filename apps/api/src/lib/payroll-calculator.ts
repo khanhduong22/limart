@@ -1,6 +1,7 @@
 import { prisma } from "@checkin/db";
 import { calculateLatePenalty, isLate as checkIsLate, applyHardworkingBonus } from "@checkin/shared";
 import { getVietnamMonthRange, toVNDateString, VN_OFFSET_MS } from "./date-utils";
+import { getOrSetCache } from "./cache";
 
 export interface DailyDetail {
   date: string;
@@ -151,7 +152,8 @@ export function findBestMatchingShift(
 
 export async function calculateUserMonthlyStats(
   userId: string,
-  targetDate: Date = new Date()
+  targetDate: Date = new Date(),
+  prefetchedHolidays?: any[]
 ): Promise<UserPayrollSummary | null> {
   const vnDate = new Date(targetDate.getTime() + VN_OFFSET_MS);
   const targetYear = vnDate.getUTCFullYear();
@@ -162,92 +164,100 @@ export async function calculateUserMonthlyStats(
     targetYear
   );
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: {
-      adjustments: {
-        where: { date: { gte: startDate, lte: endDate } },
-        orderBy: { date: "desc" },
-      },
-      payslips: {
-        where: { month, year },
-      },
-    },
-  });
+  const cacheKey = `stats:monthly:${userId}:${month}:${year}`;
 
-  if (!user) return null;
-
-  // 1. If Payslip is already saved and CLOSED/PAID, return stored summary
-  const existingPayslip = user.payslips?.[0];
-  if (existingPayslip && (existingPayslip.status === "PAID" || existingPayslip.status === "CLOSED") && existingPayslip.content) {
-    const content = existingPayslip.content as any;
-    return {
-      userId: user.id,
-      totalHours: content.totalHours || 0,
-      totalOvertimeHours: content.totalOvertimeHours || 0,
-      leaderboardOvertimeHours: content.leaderboardOvertimeHours || 0,
-      daysWorked: content.daysWorked || 0,
-      checkinCount: content.checkinCount || 0,
-      baseSalary: content.baseSalary || 0,
-      totalAdjustments: content.totalAdjustments || 0,
-      lateCount: content.lateCount || 0,
-      latePenaltyHours: content.latePenaltyHours || 0,
-      latePenaltyAmount: content.latePenaltyAmount || 0,
-      totalSalary: content.totalSalary ?? existingPayslip.netSalary ?? 0,
-      projectedSalary: content.projectedSalary || content.totalSalary || existingPayslip.netSalary || 0,
-      hourlyRate: content.hourlyRate || user.hourlyRate,
-      dynamicHourlyRate: content.dynamicHourlyRate || content.hourlyRate || user.hourlyRate,
-      monthlySalary: content.monthlySalary || user.monthlySalary,
-      employmentType: content.employmentType || user.employmentType,
-      standardDays: content.standardDays || 26,
-      dailySalary: content.dailySalary || 0,
-      leaveCount: content.leaveCount || 0,
-      deduction: content.deduction || 0,
-      totalSeniorBonus: content.totalSeniorBonus || 0,
-      isThuKpiSalary: content.isThuKpiSalary,
-      kpiCompletionRate: content.kpiCompletionRate,
-      kpiTasksTotal: content.kpiTasksTotal,
-      kpiTasksApproved: content.kpiTasksApproved,
-      fixedBaseSalary: content.fixedBaseSalary,
-      kpiSalary: content.kpiSalary,
-      adjustments: content.adjustments || user.adjustments || [],
-      dailyDetails: content.dailyDetails || [],
-    };
-  }
-
-  // 2. Live calculation
-  const queryStartDate = new Date(startDate.getTime() - 16 * 60 * 60 * 1000);
-  const queryEndDate = new Date(endDate.getTime() + 16 * 60 * 60 * 1000);
-
-  const isThuKpiSalary =
-    (user.email === "cuccung123456789@gmail.com" || user.name === "Thư") &&
-    (year > 2026 || (year === 2026 && month >= 6));
-
-  const [checkins, shifts, requests, holidays, staffTasks] = await Promise.all([
-    prisma.checkIn.findMany({
-      where: {
-        userId,
-        timestamp: { gte: queryStartDate, lte: queryEndDate },
+  return getOrSetCache(cacheKey, 300, async () => {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        adjustments: {
+          where: { date: { gte: startDate, lte: endDate } },
+          orderBy: { date: "desc" },
+        },
+        payslips: {
+          where: { month, year },
+        },
       },
-      orderBy: { timestamp: "asc" },
-    }),
-    prisma.workShift.findMany({
-      where: {
-        userId,
-        start: { gte: startDate, lte: endDate },
-      },
-      orderBy: { start: "asc" },
-    }),
-    prisma.request.findMany({
-      where: {
-        userId,
-        type: { in: ["LEAVE", "WFH", "EARLY_LEAVE"] },
-        date: { gte: startDate, lte: endDate },
-      },
-    }),
-    prisma.holiday.findMany({
-      where: { date: { gte: startDate, lte: endDate } },
-    }),
+    });
+
+    if (!user) return null;
+
+    // 1. If Payslip is already saved and CLOSED/PAID, return stored summary
+    const existingPayslip = user.payslips?.[0];
+    if (existingPayslip && (existingPayslip.status === "PAID" || existingPayslip.status === "CLOSED") && existingPayslip.content) {
+      const content = existingPayslip.content as any;
+      return {
+        userId: user.id,
+        totalHours: content.totalHours || 0,
+        totalOvertimeHours: content.totalOvertimeHours || 0,
+        leaderboardOvertimeHours: content.leaderboardOvertimeHours || 0,
+        daysWorked: content.daysWorked || 0,
+        checkinCount: content.checkinCount || 0,
+        baseSalary: content.baseSalary || 0,
+        totalAdjustments: content.totalAdjustments || 0,
+        lateCount: content.lateCount || 0,
+        latePenaltyHours: content.latePenaltyHours || 0,
+        latePenaltyAmount: content.latePenaltyAmount || 0,
+        totalSalary: content.totalSalary ?? existingPayslip.netSalary ?? 0,
+        projectedSalary: content.projectedSalary || content.totalSalary || existingPayslip.netSalary || 0,
+        hourlyRate: content.hourlyRate || user.hourlyRate,
+        dynamicHourlyRate: content.dynamicHourlyRate || content.hourlyRate || user.hourlyRate,
+        monthlySalary: content.monthlySalary || user.monthlySalary,
+        employmentType: content.employmentType || user.employmentType,
+        standardDays: content.standardDays || 26,
+        dailySalary: content.dailySalary || 0,
+        leaveCount: content.leaveCount || 0,
+        deduction: content.deduction || 0,
+        totalSeniorBonus: content.totalSeniorBonus || 0,
+        isThuKpiSalary: content.isThuKpiSalary,
+        kpiCompletionRate: content.kpiCompletionRate,
+        kpiTasksTotal: content.kpiTasksTotal,
+        kpiTasksApproved: content.kpiTasksApproved,
+        fixedBaseSalary: content.fixedBaseSalary,
+        kpiSalary: content.kpiSalary,
+        adjustments: content.adjustments || user.adjustments || [],
+        dailyDetails: content.dailyDetails || [],
+      };
+    }
+
+    // 2. Live calculation
+    const queryStartDate = new Date(startDate.getTime() - 16 * 60 * 60 * 1000);
+    const queryEndDate = new Date(endDate.getTime() + 16 * 60 * 60 * 1000);
+
+    const isThuKpiSalary =
+      (user.email === "cuccung123456789@gmail.com" || user.name === "Thư") &&
+      (year > 2026 || (year === 2026 && month >= 6));
+
+    const [checkins, shifts, requests, holidays, staffTasks] = await Promise.all([
+      prisma.checkIn.findMany({
+        where: {
+          userId,
+          timestamp: { gte: queryStartDate, lte: queryEndDate },
+        },
+        orderBy: { timestamp: "asc" },
+      }),
+      prisma.workShift.findMany({
+        where: {
+          userId,
+          start: { gte: startDate, lte: endDate },
+        },
+        orderBy: { start: "asc" },
+      }),
+      prisma.request.findMany({
+        where: {
+          userId,
+          type: { in: ["LEAVE", "WFH", "EARLY_LEAVE"] },
+          date: { gte: startDate, lte: endDate },
+        },
+      }),
+      prefetchedHolidays !== undefined
+        ? Promise.resolve(prefetchedHolidays || [])
+        : prisma.holiday
+            .findMany({
+              where: { date: { gte: startDate, lte: endDate } },
+            })
+            .then((h) => h || [])
+            .catch(() => []),
     isThuKpiSalary
       ? prisma.staffTask.findMany({
           where: {
@@ -317,7 +327,8 @@ export async function calculateUserMonthlyStats(
   }
 
   const holidayMap = new Map<string, number>();
-  holidays.forEach((h: { date: Date; multiplier: number }) => {
+  const holidayList = Array.isArray(holidays) ? holidays : [];
+  holidayList.forEach((h: { date: Date; multiplier: number }) => {
     holidayMap.set(toVNDateString(h.date), h.multiplier);
   });
 
@@ -670,6 +681,7 @@ export async function calculateUserMonthlyStats(
     adjustments: user.adjustments,
     dailyDetails,
   };
+  });
 }
 
 export async function calculateMonthlyPayrollSummary(
@@ -699,20 +711,26 @@ export async function calculateMonthlyPayrollSummary(
     targetYear
   );
 
-  const users = await prisma.user.findMany({
-    where: {
-      OR: [
-        { isActive: true },
-        { shifts: { some: { start: { gte: startDate, lte: endDate } } } },
-        { checkins: { some: { timestamp: { gte: startDate, lte: endDate } } } },
-        { adjustments: { some: { date: { gte: startDate, lte: endDate } } } },
-      ],
-    },
-    select: { id: true, name: true, role: true, employmentType: true },
-  });
+  const [users, holidays] = await Promise.all([
+    prisma.user.findMany({
+      where: {
+        OR: [
+          { isActive: true },
+          { shifts: { some: { start: { gte: startDate, lte: endDate } } } },
+          { checkins: { some: { timestamp: { gte: startDate, lte: endDate } } } },
+          { adjustments: { some: { date: { gte: startDate, lte: endDate } } } },
+        ],
+      },
+      select: { id: true, name: true, role: true, employmentType: true },
+    }),
+    prisma.holiday.findMany({
+      where: { date: { gte: startDate, lte: endDate } },
+    }),
+  ]);
 
   const useNewOTRule = year > 2026 || (year === 2026 && month >= 8);
 
+  const BATCH_SIZE = 5;
   const userSummaries: Array<{
     id: string;
     name: string;
@@ -728,28 +746,37 @@ export async function calculateMonthlyPayrollSummary(
     daysWorked: number;
   }> = [];
 
-  for (const user of users) {
-    const stats = await calculateUserMonthlyStats(user.id, targetDate);
-    if (stats) {
-      const actualHours = stats.totalHours || 0;
-      const otHours = useNewOTRule
-        ? (stats.leaderboardOvertimeHours || 0)
-        : (stats.totalOvertimeHours || 0);
+  for (let i = 0; i < users.length; i += BATCH_SIZE) {
+    const chunk = users.slice(i, i + BATCH_SIZE);
+    const chunkResults = await Promise.all(
+      chunk.map(async (user) => {
+        const stats = await calculateUserMonthlyStats(user.id, targetDate, holidays);
+        if (!stats) return null;
 
-      userSummaries.push({
-        id: user.id,
-        name: user.name || "Nhân viên",
-        role: user.role,
-        employmentType: stats.employmentType || user.employmentType,
-        totalHours: actualHours,
-        totalSalary: stats.totalSalary,
-        projectedSalary: stats.projectedSalary,
-        actualHours,
-        overtimeHours: otHours,
-        leaderboardOvertimeHours: stats.leaderboardOvertimeHours || 0,
-        totalOvertimeHours: stats.totalOvertimeHours || 0,
-        daysWorked: stats.daysWorked || 0,
-      });
+        const actualHours = stats.totalHours || 0;
+        const otHours = useNewOTRule
+          ? (stats.leaderboardOvertimeHours || 0)
+          : (stats.totalOvertimeHours || 0);
+
+        return {
+          id: user.id,
+          name: user.name || "Nhân viên",
+          role: user.role,
+          employmentType: stats.employmentType || user.employmentType,
+          totalHours: actualHours,
+          totalSalary: stats.totalSalary,
+          projectedSalary: stats.projectedSalary,
+          actualHours,
+          overtimeHours: otHours,
+          leaderboardOvertimeHours: stats.leaderboardOvertimeHours || 0,
+          totalOvertimeHours: stats.totalOvertimeHours || 0,
+          daysWorked: stats.daysWorked || 0,
+        };
+      })
+    );
+
+    for (const res of chunkResults) {
+      if (res) userSummaries.push(res);
     }
   }
 

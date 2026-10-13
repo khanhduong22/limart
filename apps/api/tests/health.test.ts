@@ -30,5 +30,6 @@ describe("GET /health", () => {
     expect(data.meilisearch).toBe("connected");
     expect(typeof data.time).toBe("string");
     expect(typeof data.uptimeSeconds).toBe("number");
+    expect(res.headers.get("ETag")).toBeTruthy();
   });
 });

@@ -36,7 +36,7 @@ graph TD
 | **Git Branch** | `main` (Trunk-based development) | `backup/legacy-v1-main` |
 | **Workflow CI/CD** | `.github/workflows/deploy-monorepo.yml` | Đã gỡ bỏ (`deploy.yml` cũ) |
 | **Docker Compose** | `docker-compose.yml` *(chính)*<br>`docker-compose.monorepo.yml` *(mirror đồng bộ)* | Đã thay thế hoàn toàn |
-| **Active Containers** | `limart-api` (:4000)<br>`limart-admin` (:3001)<br>`limart-staff` (:3002)<br>`limart-db` (:5432)<br>`limart-valkey` (:6389) | `checkin-app` (**Đã xóa khỏi VPS**) |
+| **Active Containers** | `limart-api` (:4000, Bun `oven/bun:1-alpine`)<br>`limart-admin` (:3001)<br>`limart-staff` (:3002)<br>`limart-db` (:5432)<br>`limart-valkey` (:6389) | `checkin-app` (**Đã xóa khỏi VPS**) |
 | **Chiến lược Deploy** | **Blue-Green Atomic Container Swap** (Zero-Downtime) | Không còn áp dụng |
 
 ---
@@ -48,9 +48,10 @@ graph TD
 > Mọi thay đổi code đều phải commit lên GitHub nhánh `main` để kích hoạt pipeline tự động, bảo đảm quy trình kiểm thử (Unit test + Build test).
 
 ### Quy trình triển khai Trunk-based (`deploy-monorepo.yml`)
-1. **Kiểm tra local trước khi push**:
+1. **Kiểm tra local trước khi push (Bun / pnpm)**:
    ```bash
-   pnpm test
+   bun test # hoặc pnpm test
+   bun run build # kiểm tra build
    docker compose config >/dev/null
    ```
 2. **Commit và Push lên nhánh `main` (Quy tắc 1 Conventional Commit)**:
@@ -61,10 +62,10 @@ graph TD
    ```
 3. **Pipeline GitHub Actions tự động thực thi**:
    - **Path Filtering**: Tự động phát hiện app/package nào thay đổi (`api`, `admin-spa`, `staff-pwa`).
-   - **Quality Gate**: Chạy test toàn bộ monorepo (`pnpm test`) và build packages dùng chung.
-   - **Build & Push GHCR**: Đóng gói Docker image song song và push lên GitHub Container Registry (`ghcr.io/khanhduong22/limart/*`).
+   - **Quality Gate**: Chạy test toàn bộ monorepo (`bun test` / `pnpm test`) và build packages dùng chung.
+   - **Build & Push GHCR**: Đóng gói Docker image song song (`oven/bun:1-alpine` cho API) và push lên GitHub Container Registry (`ghcr.io/khanhduong22/limart/*`).
    - **Blue-Green Container Swap**: SSH vào VPS gọi `scripts/deploy-monorepo.sh deploy`:
-     - Khởi chạy candidate container `limart-api_next`.
+     - Khởi chạy candidate container `limart-api_next` (Bun runtime port 4000).
      - Chờ healthcheck `/health` phản hồi `status: ok` (tối đa 45s).
      - Hoán đổi atomic tên container và binding port 4000 với zero-downtime.
      - Drain kết nối container cũ (`limart-api_old`) trong 3 giây rồi dừng.
@@ -98,7 +99,7 @@ Toàn bộ biến môi trường production được quản lý tập trung tạ
 ### A. Những Điều TUYỆT ĐỐI CẤM (Safety Invariants):
 - 🚫 **CẤM** chạy `prisma migrate reset` hoặc `prisma db push --force-reset` trên production.
 - 🚫 **CẤM** xoá volume `checkin-app_checkin_pgdata` hoặc chạy `docker volume prune -a` trên VPS.
-- 🚫 Mọi thay đổi schema đều phải backward-compatible và đồng bộ qua `pnpm prisma db push --skip-generate`.
+- 🚫 Mọi thay đổi schema đều phải backward-compatible và đồng bộ qua `bun run db:push` hoặc `pnpm prisma db push --skip-generate`.
 
 ### B. Cơ Chế Sao Lưu pgBackRest & Khôi Phục Điểm Thời Gian (PITR)
 - Container `limart-db` tự động ghi nhận **WAL archives** liên tục vào volume `checkin_pgbackrest_data`.
@@ -119,8 +120,9 @@ Khi cần kiểm tra trạng thái hoặc tìm nguyên nhân lỗi, chỉ cần 
 
 ### Kiểm tra tình trạng hoạt động (Health check):
 ```bash
-# Kiểm tra Prod HTTP headers
+# Kiểm tra Prod HTTP headers & Server-Timing latency breakdown
 curl -sI https://limart.khanhdp.com | head -n 5
+curl -sI https://limart.khanhdp.com/api/shifts | grep -i server-timing
 
 # Kiểm tra Prod API Health JSON
 curl -s https://limart.khanhdp.com/health

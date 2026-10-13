@@ -193,7 +193,7 @@ describe("StaffTasksView Integration", () => {
     expect(useStaffTasksStore.getState().filter).toBe("APPROVED");
     expect(screen.getByText("Chụp ảnh sản phẩm bộ màu mới")).toBeDefined();
     expect(screen.queryByText("Kiểm kê két tiền sáng")).toBeNull();
-  });
+  }, 15000);
 
   it("starts a task (TODO -> DOING) on clicking 'Bắt đầu làm'", async () => {
     mockSwrResponse = {

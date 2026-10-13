@@ -1,6 +1,7 @@
 import { Context } from "hono";
 import { prisma } from "@checkin/db";
 import { isIPMatch } from "@checkin/shared";
+import { getOrSetCache } from "./cache";
 
 export function getClientIP(c: Context): string {
   const cfConnectingIp = c.req.header("cf-connecting-ip");
@@ -18,13 +19,19 @@ export function getClientIP(c: Context): string {
   return "127.0.0.1";
 }
 
+export async function getAllowedIPs() {
+  return await getOrSetCache("config:allowed-ips", 600, async () => {
+    return await prisma.allowedIP.findMany();
+  });
+}
+
 export async function getIPStatus(c: Context): Promise<{
   ip: string;
   isAllowed: boolean;
   locationName: string;
 }> {
   const clientIP = getClientIP(c);
-  const allowedIps = await prisma.allowedIP.findMany();
+  const allowedIps = await getAllowedIPs();
   const prefixes = allowedIps.map((r: { prefix: string }) => r.prefix);
 
   const isDev = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";

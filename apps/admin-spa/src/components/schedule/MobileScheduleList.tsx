@@ -1,5 +1,13 @@
 import React from 'react';
-import moment from 'moment';
+import {
+  format,
+  addDays,
+  addWeeks,
+  subWeeks,
+  startOfISOWeek,
+  isSameDay,
+} from 'date-fns';
+import { vi } from 'date-fns/locale/vi';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -45,25 +53,25 @@ export default function MobileScheduleList({
     setDutySheetOpen,
   } = useScheduleStore();
 
-  const startOfWeek = moment(selectedDate).startOf('week').toDate();
+  const startOfWeek = startOfISOWeek(selectedDate);
   const weekDays: Date[] = [];
   for (let i = 0; i < 7; i++) {
-    weekDays.push(moment(startOfWeek).add(i, 'days').toDate());
+    weekDays.push(addDays(startOfWeek, i));
   }
 
   const dailyEvents = displayedEvents
-    .filter((e) => moment(e.start).isSame(selectedDate, 'day'))
+    .filter((e) => isSameDay(new Date(e.start), selectedDate))
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 
   const hasEventsOnDay = (date: Date) => {
-    return displayedEvents.some((e) => moment(e.start).isSame(date, 'day'));
+    return displayedEvents.some((e) => isSameDay(new Date(e.start), date));
   };
 
   const handlePrevWeek = () => {
-    setSelectedDate((prev) => moment(prev).subtract(1, 'week').toDate());
+    setSelectedDate((prev) => subWeeks(prev, 1));
   };
   const handleNextWeek = () => {
-    setSelectedDate((prev) => moment(prev).add(1, 'week').toDate());
+    setSelectedDate((prev) => addWeeks(prev, 1));
   };
 
   return (
@@ -116,7 +124,7 @@ export default function MobileScheduleList({
       {/* Week Navigation Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-base font-bold text-gray-700">
-          Tháng {moment(selectedDate).format('M / YYYY')}
+          Tháng {format(selectedDate, 'M / yyyy')}
         </h2>
         <div className="flex gap-1">
           <Button
@@ -151,10 +159,10 @@ export default function MobileScheduleList({
       {/* Weekday Strip */}
       <div className="grid grid-cols-7 gap-1 pb-2 border-b">
         {weekDays.map((d, i) => {
-          const isSelected = moment(d).isSame(selectedDate, 'day');
-          const isToday = moment(d).isSame(new Date(), 'day');
+          const isSelected = isSameDay(d, selectedDate);
+          const isToday = isSameDay(d, new Date());
           const hasEvents = hasEventsOnDay(d);
-          const dayName = moment(d).format('dd');
+          const dayName = format(d, 'eeeee', { locale: vi });
 
           return (
             <button
@@ -177,7 +185,7 @@ export default function MobileScheduleList({
                     : ''
                 }`}
               >
-                {moment(d).format('D')}
+                {format(d, 'd')}
               </span>
               {hasEvents && (
                 <span
@@ -195,7 +203,7 @@ export default function MobileScheduleList({
       <div className="flex items-center justify-between pt-1">
         <h3 className="text-sm font-bold text-gray-800 flex items-center gap-1.5">
           <CalendarIcon className="h-4 w-4 text-emerald-600" />
-          Lịch làm việc ({moment(selectedDate).format('DD/MM/YYYY')})
+          Lịch làm việc ({format(selectedDate, 'dd/MM/yyyy')})
         </h3>
       </div>
 
@@ -218,15 +226,15 @@ export default function MobileScheduleList({
                 <div className="flex items-center gap-1.5 font-bold text-gray-800 text-sm">
                   <Clock className="h-3.5 w-3.5 text-gray-400" />
                   <span>
-                    {moment(event.start).format('HH:mm')} -{' '}
-                    {moment(event.end).format('HH:mm')}
+                    {format(new Date(event.start), 'HH:mm')} -{' '}
+                    {format(new Date(event.end), 'HH:mm')}
                   </span>
                   <span className="text-xs font-normal text-gray-400">
                     (
-                    {moment
-                      .duration(moment(event.end).diff(moment(event.start)))
-                      .asHours()
-                      .toFixed(1)}
+                    {(
+                      (new Date(event.end).getTime() - new Date(event.start).getTime()) /
+                      (1000 * 60 * 60)
+                    ).toFixed(1)}
                     h)
                   </span>
                 </div>
@@ -298,7 +306,7 @@ export default function MobileScheduleList({
           className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 shadow-lg rounded-xl flex items-center justify-center gap-2 text-sm"
         >
           <Plus className="h-5 w-5" />
-          Đăng ký ca làm ngày {moment(selectedDate).format('DD/MM')}
+          Đăng ký ca làm ngày {format(selectedDate, 'dd/MM')}
         </Button>
       </div>
     </div>

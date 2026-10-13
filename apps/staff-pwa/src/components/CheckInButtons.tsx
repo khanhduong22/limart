@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import confetti from "canvas-confetti";
 import {
   performCheckIn,
   getIPStatus,
@@ -14,10 +13,17 @@ import {
   LocationSecurityBanner,
   QuickTaskSummaryWidget,
   CheckinHistoryList,
-  CheckinDutyModal,
-  UncompletedDutiesModal,
-  EarlyCheckoutModal,
-} from "@/components/home";
+} from "./home";
+
+const CheckinDutyModal = lazy(() =>
+  import("./home").then((m) => ({ default: m.CheckinDutyModal }))
+);
+const UncompletedDutiesModal = lazy(() =>
+  import("./home").then((m) => ({ default: m.UncompletedDutiesModal }))
+);
+const EarlyCheckoutModal = lazy(() =>
+  import("./home").then((m) => ({ default: m.EarlyCheckoutModal }))
+);
 
 export interface CheckInButtonsProps {
   userId: string;
@@ -86,6 +92,7 @@ export default function CheckInButtons({
         toast.success(result.message);
         setEarlyCheckoutReason("");
         if (type === "checkin") {
+          const confetti = (await import("canvas-confetti")).default;
           confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
           const dutyRes = await getTodayUserShiftDuties(userId);
           const duties = dutyRes.success && Array.isArray(dutyRes.data) ? dutyRes.data : result.todayDuties || [];
@@ -188,35 +195,47 @@ export default function CheckInButtons({
 
       <CheckinHistoryList checkins={todayCheckins} />
 
-      <CheckinDutyModal
-        open={dutyModalOpen}
-        onOpenChange={setDutyModalOpen}
-        duties={todayDuties}
-        onToggleDuty={handleToggleDuty}
-      />
+      {dutyModalOpen && (
+        <Suspense fallback={null}>
+          <CheckinDutyModal
+            open={dutyModalOpen}
+            onOpenChange={setDutyModalOpen}
+            duties={todayDuties}
+            onToggleDuty={handleToggleDuty}
+          />
+        </Suspense>
+      )}
 
-      <UncompletedDutiesModal
-        open={uncompletedWarningOpen}
-        onOpenChange={setUncompletedWarningOpen}
-        uncompletedDuties={uncompletedDuties}
-        onReviewDuties={() => {
-          setUncompletedWarningOpen(false);
-          setDutyModalOpen(true);
-        }}
-        onConfirmCheckout={() => {
-          setUncompletedWarningOpen(false);
-          proceedWithCheckout();
-        }}
-      />
+      {uncompletedWarningOpen && (
+        <Suspense fallback={null}>
+          <UncompletedDutiesModal
+            open={uncompletedWarningOpen}
+            onOpenChange={setUncompletedWarningOpen}
+            uncompletedDuties={uncompletedDuties}
+            onReviewDuties={() => {
+              setUncompletedWarningOpen(false);
+              setDutyModalOpen(true);
+            }}
+            onConfirmCheckout={() => {
+              setUncompletedWarningOpen(false);
+              proceedWithCheckout();
+            }}
+          />
+        </Suspense>
+      )}
 
-      <EarlyCheckoutModal
-        open={earlyCheckoutModalOpen}
-        onOpenChange={setEarlyCheckoutModalOpen}
-        shiftEnd={todayShift?.end}
-        reason={earlyCheckoutReason}
-        onReasonChange={setEarlyCheckoutReason}
-        onConfirm={confirmEarlyCheckout}
-      />
+      {earlyCheckoutModalOpen && (
+        <Suspense fallback={null}>
+          <EarlyCheckoutModal
+            open={earlyCheckoutModalOpen}
+            onOpenChange={setEarlyCheckoutModalOpen}
+            shiftEnd={todayShift?.end}
+            reason={earlyCheckoutReason}
+            onReasonChange={setEarlyCheckoutReason}
+            onConfirm={confirmEarlyCheckout}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

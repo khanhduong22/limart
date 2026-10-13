@@ -19,11 +19,7 @@ export default defineConfig({
         "favicon.png",
         "apple-touch-icon.png",
         "logo.png",
-        "icon-192.png",
-        "icon-512.png",
-        "icons/icon-192x192.png",
-        "capybara_mascot.png",
-        "capybara_bg.png"
+        "icon-192.png"
       ],
       manifest: {
         name: "LimArt Chấm Công",
@@ -61,7 +57,8 @@ export default defineConfig({
       },
       workbox: {
         navigateFallbackDenylist: [/^\/admin/, /^\/api/],
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff,woff2}"],
+        globPatterns: ["**/*.{js,css,html,svg,webp,woff,woff2}"],
+        globIgnores: ["**/capybara_bg.png", "**/capybara_mascot.png", "**/icons/capy_*.png"],
         runtimeCaching: [
           {
             // CacheFirst cho static assets (fonts, icons, images, css, js)

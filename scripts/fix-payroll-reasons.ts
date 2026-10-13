@@ -1,4 +1,4 @@
-import { prisma } from "../src/lib/prisma";
+import { prisma } from "../packages/db/src";
 
 async function main() {
   const adjustments = await prisma.payrollAdjustment.findMany({

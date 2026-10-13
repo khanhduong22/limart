@@ -52,7 +52,7 @@ export const PwaStepCards: React.FC<PwaStepCardsProps> = ({ isIos }) => {
               alt="LimArt Staff"
               className="w-full h-full object-cover rounded"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = "/capybara_mascot.png";
+                (e.target as HTMLImageElement).src = "/capybara_mascot.webp";
               }}
             />
           </div>

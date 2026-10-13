@@ -1,6 +1,17 @@
-import { Calendar, momentLocalizer, Views } from 'react-big-calendar';
+import { Calendar, dateFnsLocalizer, Views } from 'react-big-calendar';
 import withDragAndDrop from 'react-big-calendar/lib/addons/dragAndDrop';
-import moment from 'moment';
+import {
+  format,
+  parse,
+  startOfWeek,
+  getDay,
+  startOfISOWeek,
+  endOfISOWeek,
+  addDays,
+  isSameDay,
+  startOfDay,
+} from 'date-fns';
+import { vi } from 'date-fns/locale/vi';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
 import { useState, useCallback, useEffect, useMemo } from 'react';
@@ -17,7 +28,14 @@ import ShiftActionDialog from './ShiftActionDialog';
 import MobileScheduleList from './MobileScheduleList';
 import type { CalendarEvent, SheetWeekDay } from './types';
 
-const localizer = momentLocalizer(moment);
+const locales = { vi };
+const localizer = dateFnsLocalizer({
+  format,
+  parse,
+  startOfWeek: () => startOfWeek(new Date(), { weekStartsOn: 1 }),
+  getDay,
+  locales,
+});
 const DnDCalendar = withDragAndDrop(Calendar as any) as any;
 
 export default function ScheduleCalendar({
@@ -133,11 +151,11 @@ export default function ScheduleCalendar({
 
   // Week boundaries and duties calculations for Sheet
   const weekStart = useMemo(
-    () => moment(currentCalDate).startOf('isoWeek').toDate(),
+    () => startOfISOWeek(currentCalDate),
     [currentCalDate]
   );
   const weekEnd = useMemo(
-    () => moment(currentCalDate).endOf('isoWeek').toDate(),
+    () => endOfISOWeek(currentCalDate),
     [currentCalDate]
   );
 
@@ -156,15 +174,15 @@ export default function ScheduleCalendar({
 
   const sheetWeekDays: SheetWeekDay[] = useMemo(() => {
     return [0, 1, 2, 3, 4, 5, 6].map((offset) => {
-      const dayMoment = moment(weekStart).add(offset, 'days');
+      const dayDate = addDays(weekStart, offset);
       const dayEvents = displayedEvents
-        .filter((e) => moment(e.start).isSame(dayMoment, 'day'))
+        .filter((e) => isSameDay(new Date(e.start), dayDate))
         .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
       return {
-        dateStr: dayMoment.format('YYYY-MM-DD'),
-        dayTitle: dayMoment.format('dddd, [ngày] DD/MM'),
-        isToday: dayMoment.isSame(moment(), 'day'),
+        dateStr: format(dayDate, 'yyyy-MM-dd'),
+        dayTitle: format(dayDate, "EEEE, 'ngày' dd/MM", { locale: vi }),
+        isToday: isSameDay(dayDate, new Date()),
         events: dayEvents,
       };
     });
@@ -334,7 +352,7 @@ export default function ScheduleCalendar({
   );
 
   const handleMobileRegister = () => {
-    if (selectedDate < moment().startOf('day').toDate()) {
+    if (selectedDate < startOfDay(new Date())) {
       toast.error('Không thể đăng ký lịch trong quá khứ!');
       return;
     }

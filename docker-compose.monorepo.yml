@@ -133,6 +133,8 @@ services:
     container_name: limart-db
     restart: unless-stopped
     shm_size: 256mb
+    mem_limit: 1024m
+    mem_reservation: 256m
     environment:
       POSTGRES_DB: checkin_db
       POSTGRES_USER: kido

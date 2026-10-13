@@ -184,7 +184,7 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
           <div className="relative">
             <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-tr from-orange-400 to-amber-400 text-white shadow-sm overflow-hidden">
               <img
-                src="/capybara_mascot.png"
+                src="/capybara_mascot.webp"
                 alt="Capy"
                 className="w-full h-full object-cover"
                 onError={(e) => {
@@ -222,7 +222,7 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
           {messages.length === 0 ? (
             <div className="flex flex-col h-full items-center justify-center text-center space-y-4 py-4">
               <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center overflow-hidden shadow-inner">
-                <img src="/capybara_mascot.png" alt="Capy" className="w-10 h-10 object-contain" />
+                <img src="/capybara_mascot.webp" alt="Capy" className="w-10 h-10 object-contain" />
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-bold text-gray-800">

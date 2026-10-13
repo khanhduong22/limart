@@ -1,5 +1,5 @@
 import React from 'react';
-import moment from 'moment';
+import { format } from 'date-fns';
 import {
   Sheet,
   SheetContent,
@@ -54,8 +54,8 @@ export default function ShiftDutySheet({
                   Bảng nhiệm vụ theo ca
                 </SheetTitle>
                 <SheetDescription className="text-xs text-gray-500">
-                  Tuần {moment(weekStart).format('DD/MM')} -{' '}
-                  {moment(weekEnd).format('DD/MM/YYYY')} • {totalWeekDuties} nhiệm vụ
+                  Tuần {format(weekStart, 'dd/MM')} -{' '}
+                  {format(weekEnd, 'dd/MM/yyyy')} • {totalWeekDuties} nhiệm vụ
                 </SheetDescription>
               </div>
             </div>
@@ -141,8 +141,8 @@ export default function ShiftDutySheet({
                             <div className="text-[11px] text-gray-500 flex items-center gap-1 mt-0.5">
                               <Clock className="h-3 w-3 text-gray-400" />
                               <span>
-                                {moment(ev.start).format('HH:mm')} -{' '}
-                                {moment(ev.end).format('HH:mm')}
+                                {format(new Date(ev.start), 'HH:mm')} -{' '}
+                                {format(new Date(ev.end), 'HH:mm')}
                               </span>
                             </div>
                           </div>

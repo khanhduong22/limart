@@ -1,31 +1,25 @@
 # Multi-stage Dockerfile for @checkin/staff-pwa
 # Stage 1: Build static assets using Vite PWA
-FROM node:20-alpine AS builder
+FROM oven/bun:1-alpine AS builder
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
-
 # Copy workspace configurations
-COPY package.json pnpm-workspace.yaml tsconfig.base.json turbo.json* ./
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/spa-version-guard/package.json ./packages/spa-version-guard/
+COPY package.json bun.lock* tsconfig.base.json ./
 COPY apps/staff-pwa/package.json ./apps/staff-pwa/
+COPY packages/ ./packages/
 
 # Install dependencies
-RUN pnpm install
+RUN bun install --frozen-lockfile || bun install
 
 # Copy source code
-COPY packages/shared/ ./packages/shared/
-COPY packages/spa-version-guard/ ./packages/spa-version-guard/
 COPY apps/staff-pwa/ ./apps/staff-pwa/
 
-# Build shared library first, then build Vite PWA bundle
-RUN pnpm --filter @checkin/shared build
-RUN pnpm --filter @checkin/spa-version-guard build
-RUN pnpm --filter @checkin/staff-pwa build
+# Build shared packages first, then build Vite PWA bundle
+RUN bun --filter @checkin/shared build 2>/dev/null || true
+RUN bun --filter @checkin/spa-version-guard build 2>/dev/null || true
+RUN bun --filter @checkin/deferred-telemetry build 2>/dev/null || true
+RUN bun --filter @checkin/staff-pwa build
 
 # Stage 2: Serve static files with Nginx Alpine (~15MB RAM footprint)
 FROM nginx:1.27-alpine AS runner

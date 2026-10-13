@@ -47,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
             {/* Mascot Capybara */}
             <div className="relative mx-auto w-24 h-24 flex items-center justify-center">
               <img
-                src="/capybara_mascot.png"
+                src="/capybara_mascot.webp"
                 alt="Capybara Mascot"
                 className="w-20 h-20 object-contain drop-shadow-md animate-bounce"
                 onError={(e) => {

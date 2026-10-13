@@ -42,10 +42,26 @@ export function setRedisClient(client: Redis | null) {
 
 export const inFlightPromises = new Map<string, Promise<any>>();
 
+export interface CacheOptions {
+  disableJitter?: boolean;
+  jitterRatio?: number;
+}
+
+/**
+ * Calculates a jittered TTL to prevent cache stampedes / thundering herds (default ±15%).
+ */
+export function getJitteredTTL(baseTTLSeconds: number, jitterRatio = 0.15): number {
+  if (baseTTLSeconds <= 0) return baseTTLSeconds;
+  const min = baseTTLSeconds * (1 - jitterRatio);
+  const max = baseTTLSeconds * (1 + jitterRatio);
+  return Math.floor(Math.random() * (max - min + 1) + min);
+}
+
 export async function getOrSetCache<T>(
   key: string,
   ttlSeconds: number,
-  fetcher: () => Promise<T>
+  fetcher: () => Promise<T>,
+  options?: CacheOptions
 ): Promise<T> {
   // If an in-flight fetch already exists for this key, await that promise (SingleFlight deduplication)
   const existingInFlight = inFlightPromises.get(key);
@@ -78,7 +94,10 @@ export async function getOrSetCache<T>(
 
       if (client && data !== undefined && data !== null) {
         try {
-          await client.setex(key, ttlSeconds, JSON.stringify(data));
+          const actualTTL = options?.disableJitter
+            ? ttlSeconds
+            : getJitteredTTL(ttlSeconds, options?.jitterRatio ?? 0.15);
+          await client.setex(key, actualTTL, JSON.stringify(data));
         } catch {
           // Ignore cache write error
         }
@@ -176,6 +195,7 @@ export async function invalidateShiftDutyCache(userId?: string, shiftId?: number
   try {
     await invalidateCachePattern("shift-duties:*");
     await invalidateCachePattern("shifts:*");
+    await invalidateCachePattern("staff:home:*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate shift duty cache:", e);
   }
@@ -188,6 +208,8 @@ export async function invalidatePayrollCache(): Promise<void> {
   try {
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("stats:*");
+    await invalidateCachePattern("stats:monthly:*");
+    await invalidateCachePattern("admin:dashboard:*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate payroll cache:", e);
   }
@@ -203,6 +225,7 @@ export async function invalidateUserStatsCache(userId?: string): Promise<void> {
     } else {
       await invalidateCachePattern(`stats:monthly:*`);
     }
+    await invalidateCachePattern(`admin:dashboard:*`);
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate stats cache:", e);
   }

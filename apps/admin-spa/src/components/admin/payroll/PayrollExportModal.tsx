@@ -39,10 +39,10 @@ export function PayrollExportModal({
   const [includeDailyDetails, setIncludeDailyDetails] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
 
-  const handleExport = () => {
+  const handleExport = async () => {
     setIsExporting(true);
     try {
-      exportFullPayrollXLSX(
+      await exportFullPayrollXLSX(
         data as PayrollExportUser[],
         month,
         year,

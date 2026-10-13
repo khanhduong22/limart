@@ -129,8 +129,12 @@ export async function closePayrollMonth(
     return period;
   });
 
-  await invalidateCachePattern("payroll:*").catch(() => {});
-  await invalidateCachePattern("stats:*").catch(() => {});
+  await Promise.all([
+    invalidateCachePattern("payroll:*"),
+    invalidateCachePattern("stats:*"),
+    invalidateCachePattern("stats:monthly:*"),
+    invalidateCachePattern("admin:dashboard:*"),
+  ]).catch(() => {});
 
   return {
     success: true,

@@ -39,7 +39,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile }) => {
         {/* Avatar */}
         <div className="w-20 h-20 mx-auto rounded-full bg-orange-100 border-3 border-orange-300 p-1 flex items-center justify-center overflow-hidden shadow-sm">
           <img
-            src={profile?.avatarUrl || "/capybara_mascot.png"}
+            src={profile?.avatarUrl || "/capybara_mascot.webp"}
             alt={profile?.name || "Profile"}
             className="w-full h-full object-cover rounded-full"
             onError={(e) => {

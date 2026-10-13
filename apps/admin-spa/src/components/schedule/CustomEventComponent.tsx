@@ -1,5 +1,5 @@
 import React from 'react';
-import moment from 'moment';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useScheduleStore } from '@/stores/useScheduleStore';
 import type { CalendarEvent } from './types';
@@ -15,7 +15,7 @@ export default function CustomEventComponent({ event }: CustomEventComponentProp
   const count = duties.length;
   const completedCount = duties.filter((d: any) => d.isCompleted).length;
   const isSenior = Boolean(event.isSenior || event.resource?.isSenior);
-  const timeStr = `${moment(event.start).format('HH:mm')} - ${moment(event.end).format('HH:mm')}`;
+  const timeStr = `${format(new Date(event.start), 'HH:mm')} - ${format(new Date(event.end), 'HH:mm')}`;
   const tooltip = `${isSenior ? '👑 [Trưởng ca (+3k/h)] ' : ''}${event.title} (${timeStr})${count > 0 ? ` - ${count} việc` : ''}`;
 
   return (

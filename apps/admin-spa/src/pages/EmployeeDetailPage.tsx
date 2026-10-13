@@ -76,7 +76,14 @@ export function EmployeeDetailPage() {
           </Link>
           <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-900 font-extrabold text-base sm:text-lg border border-amber-200 uppercase shrink-0">
             {user.image ? (
-              <img src={user.image} alt={user.name} className="h-full w-full object-cover rounded-2xl" />
+              <img
+                src={user.image}
+                alt={user.name}
+                width="128"
+                height="128"
+                decoding="async"
+                className="h-full w-full object-cover rounded-2xl"
+              />
             ) : (
               user.name?.[0] || "?"
             )}

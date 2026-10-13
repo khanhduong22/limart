@@ -15,7 +15,7 @@ export const CheckinHistoryList: React.FC<CheckinHistoryListProps> = ({ checkins
       </h3>
       <div className="rounded-xl border bg-white shadow-2xs divide-y text-left">
         {checkins.map((c, i) => (
-          <div key={c.id || i} className="flex items-center justify-between p-3.5">
+          <div key={c.id || i} className="cv-auto flex items-center justify-between p-3.5">
             <div className="flex items-center gap-3">
               <div
                 className={cn(

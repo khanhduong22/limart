@@ -6,9 +6,9 @@ import {
   isInsideGeofence,
 } from "@checkin/shared";
 import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
-import { getClientIP } from "../lib/ip-utils";
+import { getClientIP, getAllowedIPs } from "../lib/ip-utils";
 import { getVietnamDayRange } from "../lib/date-utils";
-import { invalidateCachePattern } from "../lib/cache";
+import { getOrSetCache, invalidateCachePattern } from "../lib/cache";
 import { acquireLock } from "../lib/lock";
 import { checkinRateLimiter } from "../middleware/rate-limiter";
 import { recordSecureAuditLog } from "../lib/audit";
@@ -22,7 +22,7 @@ checkinsRoute.use("*", checkinRateLimiter);
 checkinsRoute.get("/today", authMiddleware, async (c) => {
   try {
     const user = c.get("user");
-    const { startOfDay, endOfDay } = getVietnamDayRange();
+    const { startOfDay, endOfDay, dateStr } = getVietnamDayRange();
     const isAdmin = user.role === "ADMIN";
     const isAll = isAdmin && c.req.query("all") !== "false";
 
@@ -36,14 +36,20 @@ checkinsRoute.get("/today", authMiddleware, async (c) => {
       whereClause.userId = user.sub;
     }
 
-    const checkins = await prisma.checkIn.findMany({
-      where: whereClause,
-      include: {
-        user: {
-          select: { id: true, name: true, email: true, image: true, role: true },
+    const cacheKey = isAll
+      ? `checkin:today:all:${dateStr}`
+      : `checkin:today:${user.sub}:${dateStr}`;
+
+    const checkins = await getOrSetCache(cacheKey, 30, async () => {
+      return await prisma.checkIn.findMany({
+        where: whereClause,
+        include: {
+          user: {
+            select: { id: true, name: true, email: true, image: true, role: true },
+          },
         },
-      },
-      orderBy: { timestamp: "desc" },
+        orderBy: { timestamp: "desc" },
+      });
     });
 
     return c.json({
@@ -133,7 +139,7 @@ async function handleCheckinPost(c: any, forcedType?: "checkin" | "checkout") {
     const clientIP = getClientIP(c);
 
     // 1. IP Whitelist Validation
-    const allowedIps = await prisma.allowedIP.findMany();
+    const allowedIps = await getAllowedIPs();
     const prefixes = allowedIps.map((r: { prefix: string }) => r.prefix);
 
     const isDev = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
@@ -259,10 +265,15 @@ async function handleCheckinPost(c: any, forcedType?: "checkin" | "checkout") {
       requestId: c.var.requestId || c.get("requestId"),
     });
 
-    // Invalidate payroll and stats cache immediately
+    // Invalidate payroll, stats, home-data, today checkin and dashboard cache immediately
     await Promise.all([
       invalidateCachePattern("payroll:*"),
       invalidateCachePattern("stats:*"),
+      invalidateCachePattern("stats:monthly:*"),
+      invalidateCachePattern("admin:dashboard:*"),
+      invalidateCachePattern(`staff:home:${user.sub}:*`),
+      invalidateCachePattern(`checkin:today:${user.sub}:*`),
+      invalidateCachePattern("checkin:today:all:*"),
     ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
 
     return c.json(
@@ -458,6 +469,11 @@ checkinsRoute.post("/sync-offline", authMiddleware, async (c) => {
       await Promise.all([
         invalidateCachePattern("payroll:*"),
         invalidateCachePattern("stats:*"),
+        invalidateCachePattern("stats:monthly:*"),
+        invalidateCachePattern("admin:dashboard:*"),
+        invalidateCachePattern(`staff:home:${userId}:*`),
+        invalidateCachePattern(`checkin:today:${userId}:*`),
+        invalidateCachePattern("checkin:today:all:*"),
       ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
     }
 

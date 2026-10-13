@@ -69,9 +69,9 @@ export function EmployeePayrollPage() {
   const displayTotal = isClosed && stats?.finalNet != null ? stats.finalNet : stats?.totalSalary || 0;
   const bonusAmount: number = stats?.bonusAmount || 0;
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     try {
-      exportSingleEmployeeXLSX(
+      await exportSingleEmployeeXLSX(
         {
           id: user.id,
           name: user.name,

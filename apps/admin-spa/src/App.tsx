@@ -5,6 +5,7 @@ import { queryClient } from "@/lib/queryClient";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { AdminPageLoadingSkeleton } from "@/components/ui/AdminPageLoadingSkeleton";
 import { useAppVersionGuard, VersionGuardBanner } from "@checkin/spa-version-guard";
+import { DeferredTelemetryProvider } from "@checkin/deferred-telemetry";
 
 // Dynamic Code-Splitting: Route-level lazy loading
 const DashboardPage = React.lazy(() =>
@@ -73,39 +74,41 @@ export default function App() {
   const { isUpdating } = useAppVersionGuard();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <VersionGuardBanner isUpdating={isUpdating} />
-      <BrowserRouter basename="/admin">
-        <Suspense fallback={<AdminPageLoadingSkeleton />}>
-          <Routes>
-            <Route path="/" element={<AdminLayout />}>
-              <Route index element={<DashboardPage />} />
-              <Route path="employees" element={<EmployeesPage />} />
-              <Route path="employees/:id" element={<EmployeeDetailPage />} />
-              <Route path="schedule" element={<SchedulePage />} />
-              <Route path="reports" element={<ReportsPage />} />
-              <Route path="requests" element={<RequestsPage />} />
-              <Route path="announcements" element={<AnnouncementsPage />} />
-              <Route path="payroll" element={<PayrollPage />} />
-              <Route path="payroll/:userId" element={<EmployeePayrollPage />} />
-              <Route path="changelog" element={<ChangelogPage />} />
-              <Route path="lucky-wheel" element={<LuckyWheelPage />} />
-              <Route path="tasks" element={<TasksPage />} />
-              <Route path="manager-tasks" element={<ManagerTasksPage />} />
-              <Route path="staff-tasks" element={<StaffTasksPage />} />
-              <Route path="settings" element={<SettingsPage />} />
-              <Route path="audit-logs" element={<AuditLogPage />} />
-              <Route
-                path="audit"
-                element={<Navigate to="/audit-logs" replace />}
-              />
-              <Route path="help" element={<HelpPage />} />
-              {/* Catch-all route redirects to dashboard */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Route>
-          </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </QueryClientProvider>
+    <DeferredTelemetryProvider config={{ googleAnalyticsId: "G-LIMART-ADMIN", debug: false }}>
+      <QueryClientProvider client={queryClient}>
+        <VersionGuardBanner isUpdating={isUpdating} />
+        <BrowserRouter basename="/admin">
+          <Suspense fallback={<AdminPageLoadingSkeleton />}>
+            <Routes>
+              <Route path="/" element={<AdminLayout />}>
+                <Route index element={<DashboardPage />} />
+                <Route path="employees" element={<EmployeesPage />} />
+                <Route path="employees/:id" element={<EmployeeDetailPage />} />
+                <Route path="schedule" element={<SchedulePage />} />
+                <Route path="reports" element={<ReportsPage />} />
+                <Route path="requests" element={<RequestsPage />} />
+                <Route path="announcements" element={<AnnouncementsPage />} />
+                <Route path="payroll" element={<PayrollPage />} />
+                <Route path="payroll/:userId" element={<EmployeePayrollPage />} />
+                <Route path="changelog" element={<ChangelogPage />} />
+                <Route path="lucky-wheel" element={<LuckyWheelPage />} />
+                <Route path="tasks" element={<TasksPage />} />
+                <Route path="manager-tasks" element={<ManagerTasksPage />} />
+                <Route path="staff-tasks" element={<StaffTasksPage />} />
+                <Route path="settings" element={<SettingsPage />} />
+                <Route path="audit-logs" element={<AuditLogPage />} />
+                <Route
+                  path="audit"
+                  element={<Navigate to="/audit-logs" replace />}
+                />
+                <Route path="help" element={<HelpPage />} />
+                {/* Catch-all route redirects to dashboard */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
+            </Routes>
+          </Suspense>
+        </BrowserRouter>
+      </QueryClientProvider>
+    </DeferredTelemetryProvider>
   );
 }

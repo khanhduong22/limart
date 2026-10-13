@@ -1,20 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { Toaster, toast } from "sonner";
 import { BottomNavigation, NavTab } from "./components/BottomNavigation";
 import { HomeCheckinView } from "./views/HomeCheckinView";
-import { ScheduleView } from "./views/ScheduleView";
-import { TasksView } from "./views/TasksView";
-import { PayrollView } from "./views/PayrollView";
-import { ProfileView } from "./views/ProfileView";
-import { HistoryView } from "./views/HistoryView";
-import { RequestsView } from "./views/RequestsView";
-import { LuckyWheelView } from "./views/LuckyWheelView";
 import { LoginView } from "./views/LoginView";
-import { PackingView } from "./views/PackingView";
-import { CarryingView } from "./views/CarryingView";
-import { StaffTasksView } from "./views/StaffTasksView";
-import { RewardsView } from "./views/RewardsView";
 import { QueryClientProvider } from "@tanstack/react-query";
+
+// Code-split secondary views via lazy loading to reduce initial bundle size
+const ScheduleView = lazy(() => import("./views/ScheduleView"));
+const TasksView = lazy(() => import("./views/TasksView"));
+const PayrollView = lazy(() => import("./views/PayrollView"));
+const ProfileView = lazy(() => import("./views/ProfileView"));
+const HistoryView = lazy(() => import("./views/HistoryView"));
+const RequestsView = lazy(() => import("./views/RequestsView"));
+const LuckyWheelView = lazy(() => import("./views/LuckyWheelView"));
+const PackingView = lazy(() => import("./views/PackingView"));
+const CarryingView = lazy(() => import("./views/CarryingView"));
+const StaffTasksView = lazy(() => import("./views/StaffTasksView"));
+const RewardsView = lazy(() => import("./views/RewardsView"));
 import { queryClient } from "./lib/queryClient";
 import { useAppQuery } from "./lib/api-query";
 import {
@@ -31,8 +33,9 @@ import { useOfflineQueue } from "./lib/use-offline-queue";
 import { initPWARegistration } from "./lib/pwa-register";
 import { RouterProvider, usePathname, useRouter } from "./lib/router";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import { PwaInstallModal } from "./components/pwa";
+const PwaInstallModal = lazy(() => import("./components/pwa").then((m) => ({ default: m.PwaInstallModal })));
 import { useAppVersionGuard, VersionGuardBanner } from "@checkin/spa-version-guard";
+import { DeferredTelemetryProvider } from "@checkin/deferred-telemetry";
 
 function AppContent() {
   const rawPathname = usePathname();
@@ -79,7 +82,7 @@ function AppContent() {
             name: data.user.name || "Nhân viên LimArt",
             email: data.user.email || "",
             role: data.user.role || "USER",
-            avatarUrl: data.user.image || "/capybara_mascot.png",
+            avatarUrl: data.user.image || "/capybara_mascot.webp",
             employmentType: data.user.employmentType || "PART_TIME",
             hourlyRate: data.user.hourlyRate || 25000,
             streakDays: 0,
@@ -129,7 +132,7 @@ function AppContent() {
         name: liveUser.name || "Nhân viên LimArt",
         email: liveUser.email || "",
         role: liveUser.role || "USER",
-        avatarUrl: liveUser.image || "/capybara_mascot.png",
+        avatarUrl: liveUser.image || "/capybara_mascot.webp",
         employmentType: liveUser.employmentType || "PART_TIME",
         hourlyRate: liveUser.hourlyRate || 25000,
         streakDays: homeRes?.data?.streak || 0,
@@ -201,7 +204,14 @@ function AppContent() {
       <div className="min-h-screen bg-[#faf6f0] flex items-center justify-center p-4">
         <div className="text-center">
           <div className="h-16 w-16 mx-auto mb-3 overflow-hidden rounded-full bg-orange-100 border-2 border-orange-300 flex items-center justify-center animate-pulse">
-            <img src="/capybara_mascot.png" alt="LimArt" className="w-full h-full object-cover" />
+            <img
+              src="/capybara_mascot.webp"
+              alt="LimArt"
+              width="64"
+              height="64"
+              decoding="async"
+              className="w-full h-full object-cover"
+            />
           </div>
           <p className="text-xs text-orange-900 font-medium">Đang kiểm tra đăng nhập...</p>
         </div>
@@ -215,7 +225,7 @@ function AppContent() {
       <div
         className="min-h-screen text-stone-900 font-sans selection:bg-amber-400 selection:text-stone-950 flex flex-col justify-center relative"
         style={{
-          backgroundImage: 'url(/capybara_bg.png)',
+          backgroundImage: 'url(/capybara_bg.webp)',
           backgroundAttachment: 'fixed',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -224,7 +234,9 @@ function AppContent() {
         <div className="fixed inset-0 bg-[#faf6f0]/85 pointer-events-none -z-10" />
         <Toaster position="top-center" richColors theme="light" closeButton />
         <LoginView />
-        <PwaInstallModal />
+        <Suspense fallback={null}>
+          <PwaInstallModal />
+        </Suspense>
       </div>
     );
   }
@@ -233,7 +245,7 @@ function AppContent() {
     <div
       className="min-h-screen text-stone-900 font-sans selection:bg-amber-400 selection:text-stone-950 flex flex-col relative"
       style={{
-        backgroundImage: 'url(/capybara_bg.png)',
+        backgroundImage: 'url(/capybara_bg.webp)',
         backgroundAttachment: 'fixed',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
@@ -254,18 +266,26 @@ function AppContent() {
         {/* Main Content Area */}
         <main className="flex-1 flex flex-col">
           <ErrorBoundary>
-            {pathname === "/" && <HomeCheckinView />}
-            {pathname === "/schedule" && <ScheduleView />}
-            {pathname === "/payroll" && <PayrollView />}
-            {pathname === "/history" && <HistoryView />}
-            {pathname === "/requests" && <RequestsView />}
-            {pathname === "/lucky-wheel" && <LuckyWheelView />}
-            {pathname === "/rewards" && <RewardsView />}
-            {pathname === "/tasks" && <TasksView />}
-            {pathname === "/packing" && <PackingView />}
-            {pathname === "/carrying" && <CarryingView />}
-            {pathname === "/staff-tasks" && <StaffTasksView />}
-            {pathname === "/profile" && <ProfileView profile={profile} />}
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center min-h-[50vh]">
+                  <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              }
+            >
+              {pathname === "/" && <HomeCheckinView />}
+              {pathname === "/schedule" && <ScheduleView />}
+              {pathname === "/payroll" && <PayrollView />}
+              {pathname === "/history" && <HistoryView />}
+              {pathname === "/requests" && <RequestsView />}
+              {pathname === "/lucky-wheel" && <LuckyWheelView />}
+              {pathname === "/rewards" && <RewardsView />}
+              {pathname === "/tasks" && <TasksView />}
+              {pathname === "/packing" && <PackingView />}
+              {pathname === "/carrying" && <CarryingView />}
+              {pathname === "/staff-tasks" && <StaffTasksView />}
+              {pathname === "/profile" && <ProfileView profile={profile} />}
+            </Suspense>
           </ErrorBoundary>
         </main>
 
@@ -279,7 +299,9 @@ function AppContent() {
       </div>
 
       {/* PWA Installation Guide Modal */}
-      <PwaInstallModal />
+      <Suspense fallback={null}>
+        <PwaInstallModal />
+      </Suspense>
     </div>
   );
 }
@@ -293,14 +315,16 @@ export const App: React.FC = () => {
   }, []);
 
   return (
-    <ErrorBoundary>
-      <VersionGuardBanner isUpdating={isUpdating} />
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider>
-          <AppContent />
-        </RouterProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
+    <DeferredTelemetryProvider config={{ googleAnalyticsId: "G-LIMART-STAFF", debug: false }}>
+      <ErrorBoundary>
+        <VersionGuardBanner isUpdating={isUpdating} />
+        <QueryClientProvider client={queryClient}>
+          <RouterProvider>
+            <AppContent />
+          </RouterProvider>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </DeferredTelemetryProvider>
   );
 };
 

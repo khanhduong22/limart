@@ -1,6 +1,8 @@
 
-const { getUserMonthlyStats } = require('../src/lib/stats');
-const { prisma } = require('../src/lib/prisma');
+// Legacy test script
+// const { getUserMonthlyStats } = require('../apps/api/src/lib/payroll-calculator');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 async function verify() {
   console.log('Verifying stats.ts...');

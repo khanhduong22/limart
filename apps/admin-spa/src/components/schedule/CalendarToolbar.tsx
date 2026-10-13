@@ -1,5 +1,14 @@
 import React from 'react';
-import moment from 'moment';
+import {
+  format,
+  addDays,
+  addWeeks,
+  subDays,
+  subWeeks,
+  startOfISOWeek,
+  endOfISOWeek,
+} from 'date-fns';
+import { vi } from 'date-fns/locale/vi';
 import { Views } from 'react-big-calendar';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -42,13 +51,11 @@ export default function CalendarToolbar({
   } = useScheduleStore();
 
   const handlePrev = () => {
-    const step = view === Views.DAY ? 'day' : 'week';
-    onNavigate(moment(currentCalDate).subtract(1, step).toDate());
+    onNavigate(view === Views.DAY ? subDays(currentCalDate, 1) : subWeeks(currentCalDate, 1));
   };
 
   const handleNext = () => {
-    const step = view === Views.DAY ? 'day' : 'week';
-    onNavigate(moment(currentCalDate).add(1, step).toDate());
+    onNavigate(view === Views.DAY ? addDays(currentCalDate, 1) : addWeeks(currentCalDate, 1));
   };
 
   const handleToday = () => {
@@ -65,8 +72,8 @@ export default function CalendarToolbar({
 
   const dateLabel =
     view === Views.DAY
-      ? moment(currentCalDate).format('dddd, [ngày] DD/MM/YYYY')
-      : `Tháng ${moment(currentCalDate).format('M / YYYY')} (Tuần ${moment(currentCalDate).startOf('isoWeek').format('DD/MM')} - ${moment(currentCalDate).endOf('isoWeek').format('DD/MM')})`;
+      ? format(currentCalDate, "EEEE, 'ngày' dd/MM/yyyy", { locale: vi })
+      : `Tháng ${format(currentCalDate, 'M / yyyy')} (Tuần ${format(startOfISOWeek(currentCalDate), 'dd/MM')} - ${format(endOfISOWeek(currentCalDate), 'dd/MM')})`;
 
   return (
     <div className="flex flex-col gap-2.5 mb-2 px-2 pb-2 border-b">

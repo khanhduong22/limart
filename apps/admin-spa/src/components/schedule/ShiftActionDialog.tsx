@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import moment from 'moment';
+import { format } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -314,12 +314,12 @@ export default function ShiftActionDialog({
               <>
                 Khung giờ:{' '}
                 <span className="font-bold text-emerald-600 block text-lg my-1">
-                  {moment(selectedEvent.start).format('HH:mm')} -{' '}
-                  {moment(selectedEvent.end).format('HH:mm')}
+                  {format(new Date(selectedEvent.start), 'HH:mm')} -{' '}
+                  {format(new Date(selectedEvent.end), 'HH:mm')}
                 </span>
                 Ngày:{' '}
                 <span className="font-semibold text-slate-800">
-                  {moment(selectedEvent.start).format('DD/MM/YYYY')}
+                  {format(new Date(selectedEvent.start), 'dd/MM/yyyy')}
                 </span>
                 {(selectedEvent.isSenior || selectedEvent.resource?.isSenior) && (
                   <div className="mt-2">

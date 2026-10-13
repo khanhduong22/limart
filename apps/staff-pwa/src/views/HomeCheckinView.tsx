@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { useAppQuery } from "@/lib/api-query";
 import {
   DEFAULT_HOME_DATA,
@@ -10,7 +10,7 @@ import AnnouncementBar from "@/components/AnnouncementBar";
 import HomeAnnouncements from "@/components/HomeAnnouncements";
 import PrivacyStats from "@/components/PrivacyStats";
 import ShiftDutyHomeWidget from "@/components/shift-duty/ShiftDutyHomeWidget";
-import CapyAssistant from "@/components/CapyAssistant";
+const CapyAssistant = lazy(() => import("@/components/CapyAssistant"));
 import { Button } from "@/components/ui/button";
 import { Link, useRouter } from "@/lib/router";
 import { useHomeCheckinStore } from "@/stores/useHomeCheckinStore";
@@ -21,9 +21,12 @@ import {
   PartnerWelcomeBanner,
   HomeNavGrid,
   SpecialDaysWidget,
-  RejectedTasksModal,
   RejectedTasksAlertBanner,
 } from "@/components/home";
+
+const RejectedTasksModal = lazy(() =>
+  import("@/components/home").then((m) => ({ default: m.RejectedTasksModal }))
+);
 
 export const HomeCheckinView: React.FC = () => {
   const router = useRouter();
@@ -186,8 +189,14 @@ export const HomeCheckinView: React.FC = () => {
             </div>
 
             {/* Capybara Mascot AI Assistant */}
-            <div id="home-sticky" className="pt-2">
-              <CapyAssistant currentUser={user} />
+            <div id="home-sticky" className="pt-2 min-h-[96px]">
+              <Suspense
+                fallback={
+                  <div className="h-24 w-full animate-pulse rounded-2xl bg-amber-50/50 border border-amber-200/40" />
+                }
+              >
+                <CapyAssistant currentUser={user} />
+              </Suspense>
             </div>
 
             {/* Functional Menu Buttons */}
@@ -233,12 +242,16 @@ export const HomeCheckinView: React.FC = () => {
       </div>
 
       {/* Rejected Tasks Modal */}
-      <RejectedTasksModal
-        open={showRejectedModal}
-        onOpenChange={setShowRejectedModal}
-        rejectedTasks={rejectedTasks}
-        onNavigateToTask={(link) => router.push(link)}
-      />
+      {showRejectedModal && (
+        <Suspense fallback={null}>
+          <RejectedTasksModal
+            open={showRejectedModal}
+            onOpenChange={setShowRejectedModal}
+            rejectedTasks={rejectedTasks}
+            onNavigateToTask={(link) => router.push(link)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

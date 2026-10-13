@@ -125,5 +125,19 @@
   min-width: 0 !important;
 }
 
+/* Lighthouse Main-Thread & Rendering Optimization */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 60px;
+}
+.cv-auto-table-row {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 48px;
+}
+.cv-auto-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 160px;
+}
+
 
 

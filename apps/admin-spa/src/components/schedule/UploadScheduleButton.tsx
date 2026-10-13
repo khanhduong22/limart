@@ -1,5 +1,4 @@
 import React, { useRef, useState } from 'react';
-import * as XLSX from 'xlsx';
 import { Button } from '@/components/ui/button';
 import { Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -61,6 +60,7 @@ export default function UploadScheduleButton({ onSuccess }: { onSuccess?: () => 
 
     setIsLoading(true);
     try {
+      const XLSX = await import('xlsx');
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: 'array' });
       const sheetName = workbook.SheetNames[0];

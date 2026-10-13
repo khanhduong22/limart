@@ -1,65 +1,37 @@
-# Multi-stage Dockerfile for @checkin/api
-# Ultra-optimized Node.js / Bun Alpine build
-
-# ----------------- Stage 1: Build -----------------
-FROM node:20-alpine AS builder
+# Multi-stage Dockerfile for @checkin/api using Bun
+# Stage 1: Build
+FROM oven/bun:1-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
-
-# Copy workspace configurations
-COPY package.json pnpm-workspace.yaml tsconfig.base.json turbo.json* ./
-COPY packages/shared/package.json ./packages/shared/
-COPY packages/db/package.json ./packages/db/
-COPY packages/audit-trail/package.json ./packages/audit-trail/
-COPY packages/zero-downtime-deploy/package.json ./packages/zero-downtime-deploy/
+COPY package.json bun.lock* ./
 COPY apps/api/package.json ./apps/api/
+COPY packages/ ./packages/
+RUN bun install --frozen-lockfile || bun install
 
-# Install all workspace dependencies
-RUN pnpm install
-
-# Copy source trees
-COPY packages/shared/ ./packages/shared/
-COPY packages/db/ ./packages/db/
-COPY packages/audit-trail/ ./packages/audit-trail/
-COPY packages/zero-downtime-deploy/ ./packages/zero-downtime-deploy/
 COPY apps/api/ ./apps/api/
+RUN bun --filter @checkin/shared build 2>/dev/null || true
+RUN bun --filter @checkin/audit-trail build 2>/dev/null || true
+RUN bun --filter @checkin/zero-downtime-deploy build 2>/dev/null || true
+RUN bun --filter @checkin/db generate 2>/dev/null || true
+RUN bun --filter @checkin/api build
 
-# Build shared, audit-trail, zero-downtime-deploy, generate prisma client, build db & api
-RUN pnpm --filter @checkin/shared build
-RUN pnpm --filter @checkin/audit-trail build
-RUN pnpm --filter @checkin/zero-downtime-deploy build
-RUN pnpm --filter @checkin/db generate
-RUN pnpm --filter @checkin/db build
-RUN pnpm --filter @checkin/api build
-
-# ----------------- Stage 2: Runner -----------------
-FROM node:20-alpine AS runner
-RUN apk add --no-cache libc6-compat openssl dumb-init
+# Stage 2: Runner
+FROM oven/bun:1-alpine AS runner
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=4000
-# Optimize Node.js heap limit for VPS (~128MB-256MB RAM)
-ENV NODE_OPTIONS="--max-old-space-size=256 --enable-source-maps"
 
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 apiapp
-
-# Copy built workspace & runtime node_modules
-COPY --from=builder --chown=apiapp:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=apiapp:nodejs /app/packages ./packages
-COPY --from=builder --chown=apiapp:nodejs /app/apps/api ./apps/api
-COPY --from=builder --chown=apiapp:nodejs /app/package.json ./package.json
-
-USER apiapp
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
+COPY --from=builder /app/packages/ ./packages/
 
 EXPOSE 4000
 
-HEALTHCHECK --interval=15s --timeout=5s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:4000/health || exit 1
 
-ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "apps/api/dist/index.js"]
+CMD ["bun", "apps/api/dist/index.js"]

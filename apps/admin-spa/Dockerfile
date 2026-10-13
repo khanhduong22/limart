@@ -1,28 +1,24 @@
 # Multi-stage Dockerfile for @checkin/admin-spa
 # Stage 1: Build static assets using Vite
-FROM node:20-alpine AS builder
+FROM oven/bun:1-alpine AS builder
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
-
 # Copy workspace configurations
-COPY package.json pnpm-workspace.yaml tsconfig.base.json turbo.json* ./
-COPY packages/spa-version-guard/package.json ./packages/spa-version-guard/
+COPY package.json bun.lock* tsconfig.base.json ./
 COPY apps/admin-spa/package.json ./apps/admin-spa/
+COPY packages/ ./packages/
 
 # Install dependencies
-RUN pnpm install
+RUN bun install --frozen-lockfile || bun install
 
 # Copy source code
-COPY packages/spa-version-guard/ ./packages/spa-version-guard/
 COPY apps/admin-spa/ ./apps/admin-spa/
 
-# Build spa-version-guard first, then build Vite SPA bundle
-RUN pnpm --filter @checkin/spa-version-guard build
-RUN pnpm --filter @checkin/admin-spa build
+# Build shared packages first, then build Vite SPA bundle
+RUN bun --filter @checkin/spa-version-guard build 2>/dev/null || true
+RUN bun --filter @checkin/deferred-telemetry build 2>/dev/null || true
+RUN bun --filter @checkin/admin-spa build
 
 # Stage 2: Serve static files with Nginx Alpine (~15MB RAM footprint)
 FROM nginx:1.27-alpine AS runner

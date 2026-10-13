@@ -85,7 +85,7 @@ export const LoginView: React.FC = () => {
     <div
       className="flex min-h-screen items-center justify-center p-3 sm:p-4 relative bg-[#faf6f0] select-none"
       style={{
-        backgroundImage: "url(/capybara_bg.png)",
+        backgroundImage: "url(/capybara_bg.webp)",
         backgroundSize: "cover",
         backgroundPosition: "center",
       }}
@@ -97,8 +97,12 @@ export const LoginView: React.FC = () => {
         <div className="mb-4 flex justify-center">
           <div className="h-24 w-24 overflow-hidden rounded-full bg-orange-100 shadow-lg border-4 border-orange-300 flex items-center justify-center">
             <img
-              src="/capybara_mascot.png"
+              src="/capybara_mascot.webp"
               alt="Bé Capybara ngoại giao"
+              width="96"
+              height="96"
+              decoding="async"
+              fetchPriority="high"
               className="w-full h-full object-cover"
               onError={(e) => {
                 (e.target as any).src = "/logo.png";

@@ -1,5 +1,5 @@
 import React from 'react';
-import moment from 'moment';
+import { format } from 'date-fns';
 import {
   Dialog,
   DialogContent,
@@ -74,7 +74,7 @@ export default function CreateShiftDialog({
           <DialogTitle>Xác nhận đăng ký ca làm</DialogTitle>
           <DialogDescription>
             Bạn muốn đăng ký làm việc vào ngày{' '}
-            {pendingEvent && moment(pendingEvent.start).format('DD/MM/YYYY')}. Điều
+            {pendingEvent && format(new Date(pendingEvent.start), 'dd/MM/yyyy')}. Điều
             chỉnh khung giờ bên dưới:
           </DialogDescription>
         </DialogHeader>
@@ -87,7 +87,7 @@ export default function CreateShiftDialog({
               </Label>
               <select
                 value={
-                  pendingEvent ? moment(pendingEvent.start).format('HH:mm') : '08:00'
+                  pendingEvent ? format(new Date(pendingEvent.start), 'HH:mm') : '08:00'
                 }
                 onChange={(e) => handleStartTimeChange(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -105,7 +105,7 @@ export default function CreateShiftDialog({
               </Label>
               <select
                 value={
-                  pendingEvent ? moment(pendingEvent.end).format('HH:mm') : '12:00'
+                  pendingEvent ? format(new Date(pendingEvent.end), 'HH:mm') : '12:00'
                 }
                 onChange={(e) => handleEndTimeChange(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"

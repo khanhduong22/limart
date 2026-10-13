@@ -14,8 +14,15 @@ export interface SpecialEvent {
   isToday: boolean;
 }
 
-export async function getSpecialDays(targetDate: Date = new Date()): Promise<SpecialEvent[]> {
-  const { startDate, endDate, month: currentMonthNum, year: currentYear } = getVietnamMonthRange();
+export async function getSpecialDays(
+  targetDate: Date = new Date(),
+  monthInput?: number,
+  yearInput?: number
+): Promise<SpecialEvent[]> {
+  const { startDate, endDate, month: currentMonthNum, year: currentYear } = getVietnamMonthRange(
+    monthInput,
+    yearInput
+  );
   const currentMonthIdx = currentMonthNum - 1;
   const { dateStr } = getVietnamDayRange(targetDate);
   const currentDay = parseInt(dateStr.split("-")[2], 10);

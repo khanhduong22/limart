@@ -31,6 +31,9 @@ export function Sidebar({
             <img
               src="/logo.png"
               alt="LimArt"
+              width="24"
+              height="24"
+              decoding="async"
               className="h-6 w-6 object-contain"
               onError={(e) => {
                 (e.currentTarget as HTMLImageElement).src =

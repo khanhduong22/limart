@@ -115,9 +115,9 @@ export default function PayrollAdminClient({
         return sum + (stats.totalSalary || 0) + bonus;
       }, 0);
 
-  const handleDownloadSingleXLSX = (user: any) => {
+  const handleDownloadSingleXLSX = async (user: any) => {
     try {
-      exportSingleEmployeeXLSX(
+      await exportSingleEmployeeXLSX(
         user as PayrollExportUser,
         month,
         year,

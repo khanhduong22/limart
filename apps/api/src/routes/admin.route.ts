@@ -7,7 +7,7 @@ import { authMiddleware, adminMiddleware, AppEnv } from "../middleware/auth.midd
 import { getVietnamDayRange, getVietnamMonthRange, toVNDateString, VN_OFFSET_MS } from "../lib/date-utils";
 import { calculateMonthlyPayrollSummary, calculateUserMonthlyStats } from "../lib/payroll-calculator";
 import { getSpecialDays } from "../lib/special-days";
-import { invalidateCachePattern, invalidatePayrollCache, invalidateShiftDutyCache } from "../lib/cache";
+import { invalidateCachePattern, invalidatePayrollCache, invalidateShiftDutyCache, getOrSetCache } from "../lib/cache";
 import { assertPeriodOpen } from "../lib/payroll-period";
 import { sendPayslipEmail } from "../lib/email";
 import { getClientIP } from "../lib/ip-utils";
@@ -41,6 +41,7 @@ adminRoute.use("*", authMiddleware, adminMiddleware);
 adminRoute.get("/dashboard", async (c) => {
   try {
     const { startOfDay, endOfDay } = getVietnamDayRange();
+    const { month, year } = getVietnamMonthRange();
 
     const [userCount, ipCount, pendingRequests, checkinsRaw, todayShifts, payrollSummary, specialUsers, pendingTasksCount] =
       await Promise.all([
@@ -65,7 +66,11 @@ adminRoute.get("/dashboard", async (c) => {
           },
           orderBy: { start: "asc" },
         }),
-        calculateMonthlyPayrollSummary(new Date()).catch(() => ({ totalPayroll: 0, totalProjected: 0 })),
+        getOrSetCache(
+          `admin:dashboard:summary:${month}:${year}`,
+          180,
+          () => calculateMonthlyPayrollSummary(new Date()).catch(() => ({ totalPayroll: 0, totalProjected: 0, details: [] }))
+        ),
         getSpecialDays(new Date()),
         Promise.all([
           (prisma as any).userTask?.count
@@ -219,6 +224,7 @@ adminRoute.get("/dashboard", async (c) => {
 adminRoute.get("/dashboard-stats", async (c) => {
   try {
     const { startOfDay, endOfDay } = getVietnamDayRange();
+    const { month, year } = getVietnamMonthRange();
 
     const [
       totalEmployeesCount,
@@ -249,7 +255,11 @@ adminRoute.get("/dashboard-stats", async (c) => {
         },
         orderBy: { start: "asc" },
       }),
-      calculateMonthlyPayrollSummary(new Date()).catch(() => ({ totalPayroll: 0, totalProjected: 0 })),
+      getOrSetCache(
+        `admin:dashboard:summary:${month}:${year}`,
+        180,
+        () => calculateMonthlyPayrollSummary(new Date()).catch(() => ({ totalPayroll: 0, totalProjected: 0, details: [] }))
+      ),
       Promise.all([
         (prisma as any).userTask?.count
           ? (prisma as any).userTask.count({ where: { status: "PENDING" } }).catch(() => 0)
@@ -916,6 +926,8 @@ adminRoute.post("/ip-settings", async (c) => {
       },
     });
 
+    await invalidateCachePattern("config:allowed-ips");
+
     return c.json(
       { success: true, message: "Đã thêm IP thành công!", data: newIp },
       201
@@ -937,6 +949,7 @@ adminRoute.delete("/ip-settings/:id", async (c) => {
     }
 
     await prisma.allowedIP.delete({ where: { id } });
+    await invalidateCachePattern("config:allowed-ips");
     return c.json({ success: true, message: "Đã xóa IP thành công" });
   } catch (err: any) {
     return c.json(
@@ -970,6 +983,7 @@ adminRoute.post("/settings/ips", async (c) => {
         label: body.label?.trim() || null,
       },
     });
+    await invalidateCachePattern("config:allowed-ips");
     return c.json({ success: true, message: "Đã thêm IP thành công!", data: newIp }, 201);
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Lỗi thêm IP" }, 400);
@@ -981,6 +995,7 @@ adminRoute.delete("/settings/ips/:id", async (c) => {
     const id = parseInt(c.req.param("id"), 10);
     if (isNaN(id)) return c.json({ success: false, error: "Invalid IP id" }, 400);
     await prisma.allowedIP.delete({ where: { id } });
+    await invalidateCachePattern("config:allowed-ips");
     return c.json({ success: true, message: "Đã xóa IP thành công" });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to delete IP" }, 500);
@@ -1025,7 +1040,10 @@ adminRoute.post("/settings/holidays", async (c) => {
         multiplier: parseFloat(multiplier) || 3.0,
       },
     });
-    await invalidateCachePattern("payroll:*");
+    await Promise.all([
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("meta:special-days:*"),
+    ]).catch(() => {});
     return c.json(
       {
         id: holiday.id,
@@ -1044,7 +1062,10 @@ adminRoute.delete("/settings/holidays/:id", async (c) => {
   try {
     const id = c.req.param("id");
     await prisma.holiday.delete({ where: { id } });
-    await invalidateCachePattern("payroll:*");
+    await Promise.all([
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("meta:special-days:*"),
+    ]).catch(() => {});
     return c.json({ success: true, message: "Đã xóa ngày lễ" });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to delete holiday" }, 500);
@@ -1128,10 +1149,15 @@ adminRoute.post("/manual-checkin", async (c) => {
       requestId: c.var.requestId || c.get("requestId"),
     });
 
-    // Invalidate payroll and stats cache immediately
+    // Invalidate payroll, stats, home-data, today checkin and dashboard cache immediately
     await Promise.all([
       invalidateCachePattern("payroll:*"),
       invalidateCachePattern("stats:*"),
+      invalidateCachePattern("stats:monthly:*"),
+      invalidateCachePattern("admin:dashboard:*"),
+      invalidateCachePattern(`staff:home:${userId}:*`),
+      invalidateCachePattern(`checkin:today:${userId}:*`),
+      invalidateCachePattern("checkin:today:all:*"),
     ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
 
     return c.json({
@@ -2072,8 +2098,12 @@ adminRoute.post("/adjustments", async (c) => {
       },
     });
 
-    await invalidateCachePattern("payroll:*");
-    await invalidateCachePattern("stats:*");
+    await Promise.all([
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("stats:monthly:*"),
+      invalidateCachePattern("admin:dashboard:*"),
+    ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
 
     return c.json({
       success: true,

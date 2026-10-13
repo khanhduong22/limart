@@ -82,6 +82,9 @@ model User {
   shiftDuties           ShiftDuty[]            @relation("UserShiftDuties")
   shiftDutiesCreated    ShiftDuty[]            @relation("CreatedShiftDuties")
   sessionAudits         SessionAuditLog[]
+
+  @@index([isActive])
+  @@index([role, isActive])
 }
 
 model WorkShift {
@@ -100,6 +103,7 @@ model WorkShift {
   @@index([userId, start])
   @@index([start])
   @@index([start, end])
+  @@index([isOpenForSwap, start])
 }
 
 model ShiftAuditLog {
@@ -117,6 +121,7 @@ model ShiftAuditLog {
   user        User     @relation("UserShiftsLogs", fields: [userId], references: [id], onDelete: Cascade)
   changedBy   User     @relation("ChangedByShiftsLogs", fields: [changedById], references: [id], onDelete: Cascade)
 
+  @@index([shiftId])
   @@index([userId])
   @@index([changedById])
   @@index([createdAt])
@@ -326,6 +331,7 @@ model UserTask {
   taskItem       TaskItem?      @relation(fields: [taskItemId], references: [id])
 
   @@index([userId])
+  @@index([userId, status])
   @@index([taskDefId])
   @@index([taskItemId])
   @@index([status, updatedAt])
@@ -404,6 +410,9 @@ model ManagerTask {
   subtasks  ManagerTask[] @relation("ManagerTaskSubtasks")
 
   @@index([assigneeId])
+  @@index([assigneeId, status])
+  @@index([status])
+  @@index([status, deadline])
   @@index([createdById])
   @@index([parentId])
 }
@@ -523,6 +532,7 @@ model SessionAuditLog {
 
   @@index([userId, createdAt])
   @@index([action, createdAt])
+  @@index([status, createdAt])
   @@index([createdAt])
 }
 

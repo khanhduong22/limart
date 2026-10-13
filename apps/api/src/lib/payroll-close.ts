@@ -133,7 +133,7 @@ export async function closePayrollMonth(
     invalidateCachePattern("payroll:*"),
     invalidateCachePattern("stats:*"),
     invalidateCachePattern("stats:monthly:*"),
-    invalidateCachePattern("admin:dashboard:*"),
+    invalidateCachePattern("admin:dashboard*"),
   ]).catch(() => {});
 
   return {

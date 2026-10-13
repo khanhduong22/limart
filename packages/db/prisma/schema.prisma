@@ -394,6 +394,8 @@ model DocumentChunk {
   createdAt  DateTime               @default(now())
 
   document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
 }
 
 model ManagerTask {
@@ -449,6 +451,8 @@ model StaffTask {
   @@index([createdById])
   @@index([assigneeId, status])
   @@index([status])
+  @@index([status, createdAt])
+  @@index([createdAt])
 }
 
 model ManagerChecklistTask {
@@ -500,6 +504,8 @@ model ManagerWeeklyTask {
   assignee      User      @relation("ManagerWeeklyAssignee", fields: [assigneeId], references: [id], onDelete: Cascade)
 
   @@index([assigneeId, weekStart])
+  @@index([weekStart])
+  @@index([createdAt])
 }
 
 model ShiftDuty {

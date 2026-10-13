@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { calculateUserMonthlyStats } from "../lib/payroll-calculator";
+import { getOrSetCache } from "../lib/cache";
 
 export const payrollRoute = new Hono<AppEnv>();
 
@@ -17,8 +18,11 @@ payrollRoute.get("/my-summary", authMiddleware, async (c) => {
     const month = monthQuery ? parseInt(monthQuery, 10) : now.getMonth() + 1;
     const year = yearQuery ? parseInt(yearQuery, 10) : now.getFullYear();
 
-    const targetDate = new Date(year, month - 1, 15);
-    const summary = await calculateUserMonthlyStats(userId, targetDate);
+    const cacheKey = `payroll:my-summary:${userId}:${month}:${year}`;
+    const summary = await getOrSetCache(cacheKey, 120, async () => {
+      const targetDate = new Date(year, month - 1, 15);
+      return await calculateUserMonthlyStats(userId, targetDate);
+    });
 
     if (!summary) {
       return c.json({ success: false, error: "User not found" }, 404);

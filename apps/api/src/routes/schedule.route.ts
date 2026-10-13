@@ -208,6 +208,7 @@ scheduleRoute.post("/:id/swap", authMiddleware, async (c) => {
       invalidateShiftDutyCache(),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("shifts:*"),
+      invalidateCachePattern("admin:dashboard*"),
     ]).catch(() => {});
 
     return c.json({
@@ -273,6 +274,7 @@ scheduleRoute.post("/:id/take", authMiddleware, async (c) => {
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("shifts:*"),
+      invalidateCachePattern("admin:dashboard*"),
     ]).catch(() => {});
 
     return c.json({

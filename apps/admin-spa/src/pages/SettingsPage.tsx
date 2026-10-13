@@ -1,9 +1,10 @@
 import React from "react";
 import IPManager from "@/components/admin/IPManager";
-import HolidayManager from "@/components/admin/HolidayManager";
-import BackupManager from "@/components/admin/BackupManager";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSettings } from "@/hooks/useAdminData";
+
+const HolidayManager = React.lazy(() => import("@/components/admin/HolidayManager"));
+const BackupManager = React.lazy(() => import("@/components/admin/BackupManager"));
 
 export function SettingsPage() {
   const { settings } = useSettings();
@@ -38,13 +39,15 @@ export function SettingsPage() {
           <IPManager ips={ips} />
         </TabsContent>
 
-        <TabsContent value="holidays" className="space-y-4">
-          <HolidayManager />
-        </TabsContent>
+        <React.Suspense fallback={<div className="p-8 text-center text-muted-foreground">Đang tải...</div>}>
+          <TabsContent value="holidays" className="space-y-4">
+            <HolidayManager />
+          </TabsContent>
 
-        <TabsContent value="backup" className="space-y-4">
-          <BackupManager />
-        </TabsContent>
+          <TabsContent value="backup" className="space-y-4">
+            <BackupManager />
+          </TabsContent>
+        </React.Suspense>
       </Tabs>
     </div>
   );

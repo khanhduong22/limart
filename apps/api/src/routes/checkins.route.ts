@@ -68,34 +68,39 @@ checkinsRoute.get("/today", authMiddleware, async (c) => {
 checkinsRoute.get("/status", authMiddleware, async (c) => {
   try {
     const user = c.get("user");
-    const { startOfDay, endOfDay } = getVietnamDayRange();
+    const { startOfDay, endOfDay, dateStr } = getVietnamDayRange();
 
-    const checkins = await prisma.checkIn.findMany({
-      where: {
-        userId: user.sub,
-        timestamp: {
-          gte: startOfDay,
-          lte: endOfDay,
+    const cacheKey = `checkin:status:${user.sub}:${dateStr}`;
+    const statusData = await getOrSetCache(cacheKey, 15, async () => {
+      const checkins = await prisma.checkIn.findMany({
+        where: {
+          userId: user.sub,
+          timestamp: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
         },
-      },
-      orderBy: { timestamp: "desc" },
-    });
+        orderBy: { timestamp: "desc" },
+      });
 
-    const lastCheckin = checkins[0] || null;
-    const isWorking = lastCheckin?.type === "checkin";
+      const lastCheckin = checkins[0] || null;
+      const isWorking = lastCheckin?.type === "checkin";
 
-    return c.json({
-      success: true,
-      data: {
+      return {
         isWorking,
         isCheckedIn: isWorking,
         lastCheckin,
         todayCheckins: checkins,
-      },
-      isWorking,
-      isCheckedIn: isWorking,
-      lastCheckin,
-      todayCheckins: checkins,
+      };
+    });
+
+    return c.json({
+      success: true,
+      data: statusData,
+      isWorking: statusData.isWorking,
+      isCheckedIn: statusData.isCheckedIn,
+      lastCheckin: statusData.lastCheckin,
+      todayCheckins: statusData.todayCheckins,
     });
   } catch (err: any) {
     return c.json(
@@ -270,10 +275,11 @@ async function handleCheckinPost(c: any, forcedType?: "checkin" | "checkout") {
       invalidateCachePattern("payroll:*"),
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("stats:monthly:*"),
-      invalidateCachePattern("admin:dashboard:*"),
+      invalidateCachePattern("admin:dashboard*"),
       invalidateCachePattern(`staff:home:${user.sub}:*`),
       invalidateCachePattern(`checkin:today:${user.sub}:*`),
       invalidateCachePattern("checkin:today:all:*"),
+      invalidateCachePattern(`checkin:status:${user.sub}:*`),
     ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
 
     return c.json(
@@ -470,10 +476,11 @@ checkinsRoute.post("/sync-offline", authMiddleware, async (c) => {
         invalidateCachePattern("payroll:*"),
         invalidateCachePattern("stats:*"),
         invalidateCachePattern("stats:monthly:*"),
-        invalidateCachePattern("admin:dashboard:*"),
+        invalidateCachePattern("admin:dashboard*"),
         invalidateCachePattern(`staff:home:${userId}:*`),
         invalidateCachePattern(`checkin:today:${userId}:*`),
         invalidateCachePattern("checkin:today:all:*"),
+        invalidateCachePattern(`checkin:status:${userId}:*`),
       ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
     }
 

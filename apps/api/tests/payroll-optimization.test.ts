@@ -226,7 +226,7 @@ describe("Payroll Calculator N+1 Elimination & Valkey Caching", () => {
   });
 
   describe("3. Cache Invalidation on Attendance & Adjustments", () => {
-    it("POST /api/admin/manual-checkin invalidates admin:dashboard:* and stats:monthly:*", async () => {
+    it("POST /api/admin/manual-checkin invalidates admin:dashboard* and stats:monthly:*", async () => {
       const invalidateSpy = vi.spyOn(cacheModule, "invalidateCachePattern").mockResolvedValue();
 
       mockCheckInDeleteMany.mockResolvedValue({ count: 0 });
@@ -255,13 +255,13 @@ describe("Payroll Calculator N+1 Elimination & Valkey Caching", () => {
       expect(res.status).toBe(200);
 
       const patternsInvalidated = invalidateSpy.mock.calls.map((call) => call[0]);
-      expect(patternsInvalidated).toContain("admin:dashboard:*");
+      expect(patternsInvalidated).toContain("admin:dashboard*");
       expect(patternsInvalidated).toContain("stats:monthly:*");
 
       invalidateSpy.mockRestore();
     });
 
-    it("POST /api/admin/adjustments invalidates admin:dashboard:* and stats:monthly:*", async () => {
+    it("POST /api/admin/adjustments invalidates admin:dashboard* and stats:monthly:*", async () => {
       const invalidateSpy = vi.spyOn(cacheModule, "invalidateCachePattern").mockResolvedValue();
 
       mockPayrollPeriodFindUnique.mockResolvedValue({
@@ -293,13 +293,13 @@ describe("Payroll Calculator N+1 Elimination & Valkey Caching", () => {
       expect(res.status).toBe(200);
 
       const patternsInvalidated = invalidateSpy.mock.calls.map((call) => call[0]);
-      expect(patternsInvalidated).toContain("admin:dashboard:*");
+      expect(patternsInvalidated).toContain("admin:dashboard*");
       expect(patternsInvalidated).toContain("stats:monthly:*");
 
       invalidateSpy.mockRestore();
     });
 
-    it("invalidatePayrollCache and invalidateUserStatsCache invalidate admin:dashboard:* and stats:monthly:*", async () => {
+    it("invalidatePayrollCache and invalidateUserStatsCache invalidate admin:dashboard* and stats:monthly:*", async () => {
       const mockKeys = vi.fn().mockResolvedValue(["key1"]);
       const mockDel = vi.fn().mockResolvedValue(1);
       cacheModule.setRedisClient({
@@ -310,14 +310,14 @@ describe("Payroll Calculator N+1 Elimination & Valkey Caching", () => {
 
       await cacheModule.invalidatePayrollCache();
       let patterns = mockKeys.mock.calls.map((call) => call[0]);
-      expect(patterns).toContain("admin:dashboard:*");
+      expect(patterns).toContain("admin:dashboard*");
       expect(patterns).toContain("stats:monthly:*");
 
       mockKeys.mockClear();
 
       await cacheModule.invalidateUserStatsCache("user-1");
       patterns = mockKeys.mock.calls.map((call) => call[0]);
-      expect(patterns).toContain("admin:dashboard:*");
+      expect(patterns).toContain("admin:dashboard*");
       expect(patterns).toContain("stats:monthly:user-1:*");
 
       cacheModule.setRedisClient(null);

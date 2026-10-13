@@ -40,172 +40,178 @@ adminRoute.use("*", authMiddleware, adminMiddleware);
 // ============================================================================
 adminRoute.get("/dashboard", async (c) => {
   try {
-    const { startOfDay, endOfDay } = getVietnamDayRange();
+    const { startOfDay, endOfDay, dateStr } = getVietnamDayRange();
     const { month, year } = getVietnamMonthRange();
 
-    const [userCount, ipCount, pendingRequests, checkinsRaw, todayShifts, payrollSummary, specialUsers, pendingTasksCount] =
-      await Promise.all([
-        prisma.user.count(),
-        prisma.allowedIP.count(),
-        prisma.request.count({ where: { status: "PENDING" } }),
-        prisma.checkIn.findMany({
-          where: { timestamp: { gte: startOfDay, lte: endOfDay } },
-          include: {
-            user: {
-              select: { id: true, name: true, email: true, image: true, role: true },
-            },
-          },
-          orderBy: { timestamp: "asc" },
-        }),
-        prisma.workShift.findMany({
-          where: { start: { gte: startOfDay, lte: endOfDay } },
-          include: {
-            user: {
-              select: { id: true, name: true, email: true, image: true, role: true },
-            },
-          },
-          orderBy: { start: "asc" },
-        }),
-        getOrSetCache(
-          `admin:dashboard:summary:${month}:${year}`,
-          180,
-          () => calculateMonthlyPayrollSummary(new Date()).catch(() => ({ totalPayroll: 0, totalProjected: 0, details: [] }))
-        ),
-        getSpecialDays(new Date()),
-        Promise.all([
-          (prisma as any).userTask?.count
-            ? (prisma as any).userTask.count({ where: { status: "PENDING" } }).catch(() => 0)
-            : Promise.resolve(0),
-          (prisma as any).staffTask?.count
-            ? (prisma as any).staffTask.count({ where: { status: "TODO" } }).catch(() => 0)
-            : Promise.resolve(0),
-        ]).then(([u, s]) => (u || 0) + (s || 0)),
-      ]);
+    const dataPayload = await getOrSetCache(
+      "admin:dashboard:" + dateStr,
+      30,
+      async () => {
+        const [userCount, ipCount, pendingRequests, checkinsRaw, todayShifts, payrollSummary, specialUsers, pendingTasksCount] =
+          await Promise.all([
+            prisma.user.count(),
+            prisma.allowedIP.count(),
+            prisma.request.count({ where: { status: "PENDING" } }),
+            prisma.checkIn.findMany({
+              where: { timestamp: { gte: startOfDay, lte: endOfDay } },
+              include: {
+                user: {
+                  select: { id: true, name: true, email: true, image: true, role: true },
+                },
+              },
+              orderBy: { timestamp: "asc" },
+            }),
+            prisma.workShift.findMany({
+              where: { start: { gte: startOfDay, lte: endOfDay } },
+              include: {
+                user: {
+                  select: { id: true, name: true, email: true, image: true, role: true },
+                },
+              },
+              orderBy: { start: "asc" },
+            }),
+            getOrSetCache(
+              `admin:dashboard:summary:${month}:${year}`,
+              180,
+              () => calculateMonthlyPayrollSummary(new Date()).catch(() => ({ totalPayroll: 0, totalProjected: 0, details: [] }))
+            ),
+            getSpecialDays(new Date()),
+            Promise.all([
+              (prisma as any).userTask?.count
+                ? (prisma as any).userTask.count({ where: { status: "PENDING" } }).catch(() => 0)
+                : Promise.resolve(0),
+              (prisma as any).staffTask?.count
+                ? (prisma as any).staffTask.count({ where: { status: "TODO" } }).catch(() => 0)
+                : Promise.resolve(0),
+            ]).then(([u, s]) => (u || 0) + (s || 0)),
+          ]);
 
-    // Calculate shift status for each checkin (early/late in minutes)
-    const checkinsToday = (checkinsRaw as any[]).map((checkin: any) => {
-      const userShifts = (todayShifts as any[]).filter((s: any) => s.userId === checkin.userId);
-      let shiftStatus: {
-        diffMins: number;
-        isLate: boolean;
-        isEarly: boolean;
-        statusText: string;
-      } | null = null;
+        // Calculate shift status for each checkin (early/late in minutes)
+        const checkinsToday = (checkinsRaw as any[]).map((checkin: any) => {
+          const userShifts = (todayShifts as any[]).filter((s: any) => s.userId === checkin.userId);
+          let shiftStatus: {
+            diffMins: number;
+            isLate: boolean;
+            isEarly: boolean;
+            statusText: string;
+          } | null = null;
 
-      if (userShifts.length > 0) {
-        let match: any = null;
-        let minDiff = Infinity;
+          if (userShifts.length > 0) {
+            let match: any = null;
+            let minDiff = Infinity;
 
-        for (const s of userShifts) {
-          const target =
-            checkin.type === "checkin"
-              ? new Date(s.start).getTime()
-              : new Date(s.end).getTime();
-          const diff = Math.abs(new Date(checkin.timestamp).getTime() - target);
-          if (diff < minDiff) {
-            minDiff = diff;
-            match = s;
-          }
-        }
+            for (const s of userShifts) {
+              const target =
+                checkin.type === "checkin"
+                  ? new Date(s.start).getTime()
+                  : new Date(s.end).getTime();
+              const diff = Math.abs(new Date(checkin.timestamp).getTime() - target);
+              if (diff < minDiff) {
+                minDiff = diff;
+                match = s;
+              }
+            }
 
-        if (match) {
-          const targetTime =
-            checkin.type === "checkin"
-              ? new Date(match.start).getTime()
-              : new Date(match.end).getTime();
-          const checkinTime = new Date(checkin.timestamp).getTime();
-          const diffMins = Math.floor(checkinTime / 60000) - Math.floor(targetTime / 60000);
+            if (match) {
+              const targetTime =
+                checkin.type === "checkin"
+                  ? new Date(match.start).getTime()
+                  : new Date(match.end).getTime();
+              const checkinTime = new Date(checkin.timestamp).getTime();
+              const diffMins = Math.floor(checkinTime / 60000) - Math.floor(targetTime / 60000);
 
-          // Grace period 1 min
-          if (Math.abs(diffMins) > 1) {
-            if (checkin.type === "checkin") {
-              shiftStatus = {
-                diffMins,
-                isLate: diffMins > 0,
-                isEarly: diffMins < 0,
-                statusText: diffMins > 0 ? `Trễ ${diffMins}p` : `Sớm ${Math.abs(diffMins)}p`,
-              };
-            } else {
-              shiftStatus = {
-                diffMins,
-                isLate: diffMins > 0,
-                isEarly: diffMins < 0,
-                statusText: diffMins < 0 ? `Sớm ${Math.abs(diffMins)}p` : `Sau ${diffMins}p`,
-              };
+              // Grace period 1 min
+              if (Math.abs(diffMins) > 1) {
+                if (checkin.type === "checkin") {
+                  shiftStatus = {
+                    diffMins,
+                    isLate: diffMins > 0,
+                    isEarly: diffMins < 0,
+                    statusText: diffMins > 0 ? `Trễ ${diffMins}p` : `Sớm ${Math.abs(diffMins)}p`,
+                  };
+                } else {
+                  shiftStatus = {
+                    diffMins,
+                    isLate: diffMins > 0,
+                    isEarly: diffMins < 0,
+                    statusText: diffMins < 0 ? `Sớm ${Math.abs(diffMins)}p` : `Sau ${diffMins}p`,
+                  };
+                }
+              }
             }
           }
-        }
-      }
 
-      return {
-        ...checkin,
-        shiftStatus,
-      };
-    });
+          return {
+            ...checkin,
+            shiftStatus,
+          };
+        });
 
-    const todayCheckinCount = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkin").length;
-    const todayCheckoutCount = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkout").length;
+        const todayCheckinCount = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkin").length;
+        const todayCheckoutCount = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkout").length;
 
-    // Calculate onTimeRate & lateRate for checkins today
-    const inCheckins = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkin");
-    let onTimeCount = 0;
-    let lateCount = 0;
+        // Calculate onTimeRate & lateRate for checkins today
+        const inCheckins = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkin");
+        let onTimeCount = 0;
+        let lateCount = 0;
 
-    for (const checkin of inCheckins) {
-      const userShifts = (todayShifts as any[]).filter((s: any) => s.userId === checkin.userId);
-      if (userShifts.length > 0) {
-        let match: any = null;
-        let minDiff = Infinity;
+        for (const checkin of inCheckins) {
+          const userShifts = (todayShifts as any[]).filter((s: any) => s.userId === checkin.userId);
+          if (userShifts.length > 0) {
+            let match: any = null;
+            let minDiff = Infinity;
 
-        for (const s of userShifts) {
-          const target = new Date(s.start).getTime();
-          const diff = Math.abs(new Date(checkin.timestamp).getTime() - target);
-          if (diff < minDiff) {
-            minDiff = diff;
-            match = s;
-          }
-        }
+            for (const s of userShifts) {
+              const target = new Date(s.start).getTime();
+              const diff = Math.abs(new Date(checkin.timestamp).getTime() - target);
+              if (diff < minDiff) {
+                minDiff = diff;
+                match = s;
+              }
+            }
 
-        if (match) {
-          const targetTime = new Date(match.start).getTime();
-          const checkinTime = new Date(checkin.timestamp).getTime();
-          const diffMins = Math.floor(checkinTime / 60000) - Math.floor(targetTime / 60000);
+            if (match) {
+              const targetTime = new Date(match.start).getTime();
+              const checkinTime = new Date(checkin.timestamp).getTime();
+              const diffMins = Math.floor(checkinTime / 60000) - Math.floor(targetTime / 60000);
 
-          if (diffMins > 5) {
-            lateCount++;
+              if (diffMins > 5) {
+                lateCount++;
+              } else {
+                onTimeCount++;
+              }
+            } else {
+              onTimeCount++;
+            }
           } else {
             onTimeCount++;
           }
-        } else {
-          onTimeCount++;
         }
-      } else {
-        onTimeCount++;
+
+        const totalEvaluated = onTimeCount + lateCount;
+        const onTimeRate = totalEvaluated > 0 ? Math.round((onTimeCount / totalEvaluated) * 1000) / 10 : 100;
+        const lateRate = totalEvaluated > 0 ? Math.round((lateCount / totalEvaluated) * 1000) / 10 : 0;
+        const estimatedMonthPayroll = payrollSummary?.totalProjected || payrollSummary?.totalPayroll || 0;
+
+        return {
+          todayCheckinCount,
+          todayCheckoutCount,
+          pendingRequestsCount: pendingRequests,
+          pendingTasksCount,
+          totalEmployeesCount: userCount,
+          estimatedMonthPayroll,
+          onTimeRate,
+          lateRate,
+          todayShifts,
+          specialUsers,
+          checkinsToday,
+          userCount,
+          ipCount,
+          pendingRequests,
+          payrollSummary,
+        };
       }
-    }
-
-    const totalEvaluated = onTimeCount + lateCount;
-    const onTimeRate = totalEvaluated > 0 ? Math.round((onTimeCount / totalEvaluated) * 1000) / 10 : 100;
-    const lateRate = totalEvaluated > 0 ? Math.round((lateCount / totalEvaluated) * 1000) / 10 : 0;
-    const estimatedMonthPayroll = payrollSummary?.totalProjected || payrollSummary?.totalPayroll || 0;
-
-    const dataPayload = {
-      todayCheckinCount,
-      todayCheckoutCount,
-      pendingRequestsCount: pendingRequests,
-      pendingTasksCount,
-      totalEmployeesCount: userCount,
-      estimatedMonthPayroll,
-      onTimeRate,
-      lateRate,
-      todayShifts,
-      specialUsers,
-      checkinsToday,
-      userCount,
-      ipCount,
-      pendingRequests,
-      payrollSummary,
-    };
+    );
 
     return c.json({
       success: true,
@@ -223,173 +229,179 @@ adminRoute.get("/dashboard", async (c) => {
 // GET /api/admin/dashboard-stats
 adminRoute.get("/dashboard-stats", async (c) => {
   try {
-    const { startOfDay, endOfDay } = getVietnamDayRange();
+    const { startOfDay, endOfDay, dateStr } = getVietnamDayRange();
     const { month, year } = getVietnamMonthRange();
 
-    const [
-      totalEmployeesCount,
-      pendingRequestsCount,
-      checkinsRaw,
-      todayShifts,
-      payrollSummary,
-      pendingTasksCount,
-      specialUsers,
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.request.count({ where: { status: "PENDING" } }),
-      prisma.checkIn.findMany({
-        where: { timestamp: { gte: startOfDay, lte: endOfDay } },
-        include: {
-          user: {
-            select: { id: true, name: true, email: true, image: true, role: true },
-          },
-        },
-        orderBy: { timestamp: "asc" },
-      }),
-      prisma.workShift.findMany({
-        where: { start: { gte: startOfDay, lte: endOfDay } },
-        include: {
-          user: {
-            select: { id: true, name: true, email: true, image: true, role: true },
-          },
-        },
-        orderBy: { start: "asc" },
-      }),
-      getOrSetCache(
-        `admin:dashboard:summary:${month}:${year}`,
-        180,
-        () => calculateMonthlyPayrollSummary(new Date()).catch(() => ({ totalPayroll: 0, totalProjected: 0, details: [] }))
-      ),
-      Promise.all([
-        (prisma as any).userTask?.count
-          ? (prisma as any).userTask.count({ where: { status: "PENDING" } }).catch(() => 0)
-          : Promise.resolve(0),
-        (prisma as any).staffTask?.count
-          ? (prisma as any).staffTask.count({ where: { status: "TODO" } }).catch(() => 0)
-          : Promise.resolve(0),
-      ]).then(([u, s]) => (u || 0) + (s || 0)),
-      getSpecialDays(new Date()),
-    ]);
+    const statsPayload = await getOrSetCache(
+      "admin:dashboard-stats:" + dateStr,
+      30,
+      async () => {
+        const [
+          totalEmployeesCount,
+          pendingRequestsCount,
+          checkinsRaw,
+          todayShifts,
+          payrollSummary,
+          pendingTasksCount,
+          specialUsers,
+        ] = await Promise.all([
+          prisma.user.count(),
+          prisma.request.count({ where: { status: "PENDING" } }),
+          prisma.checkIn.findMany({
+            where: { timestamp: { gte: startOfDay, lte: endOfDay } },
+            include: {
+              user: {
+                select: { id: true, name: true, email: true, image: true, role: true },
+              },
+            },
+            orderBy: { timestamp: "asc" },
+          }),
+          prisma.workShift.findMany({
+            where: { start: { gte: startOfDay, lte: endOfDay } },
+            include: {
+              user: {
+                select: { id: true, name: true, email: true, image: true, role: true },
+              },
+            },
+            orderBy: { start: "asc" },
+          }),
+          getOrSetCache(
+            `admin:dashboard:summary:${month}:${year}`,
+            180,
+            () => calculateMonthlyPayrollSummary(new Date()).catch(() => ({ totalPayroll: 0, totalProjected: 0, details: [] }))
+          ),
+          Promise.all([
+            (prisma as any).userTask?.count
+              ? (prisma as any).userTask.count({ where: { status: "PENDING" } }).catch(() => 0)
+              : Promise.resolve(0),
+            (prisma as any).staffTask?.count
+              ? (prisma as any).staffTask.count({ where: { status: "TODO" } }).catch(() => 0)
+              : Promise.resolve(0),
+          ]).then(([u, s]) => (u || 0) + (s || 0)),
+          getSpecialDays(new Date()),
+        ]);
 
-    // Calculate shift status for each checkin
-    const checkinsToday = (checkinsRaw as any[]).map((checkin: any) => {
-      const userShifts = (todayShifts as any[]).filter((s: any) => s.userId === checkin.userId);
-      let shiftStatus: {
-        diffMins: number;
-        isLate: boolean;
-        isEarly: boolean;
-        statusText: string;
-      } | null = null;
+        // Calculate shift status for each checkin
+        const checkinsToday = (checkinsRaw as any[]).map((checkin: any) => {
+          const userShifts = (todayShifts as any[]).filter((s: any) => s.userId === checkin.userId);
+          let shiftStatus: {
+            diffMins: number;
+            isLate: boolean;
+            isEarly: boolean;
+            statusText: string;
+          } | null = null;
 
-      if (userShifts.length > 0) {
-        let match: any = null;
-        let minDiff = Infinity;
+          if (userShifts.length > 0) {
+            let match: any = null;
+            let minDiff = Infinity;
 
-        for (const s of userShifts) {
-          const target =
-            checkin.type === "checkin"
-              ? new Date(s.start).getTime()
-              : new Date(s.end).getTime();
-          const diff = Math.abs(new Date(checkin.timestamp).getTime() - target);
-          if (diff < minDiff) {
-            minDiff = diff;
-            match = s;
-          }
-        }
+            for (const s of userShifts) {
+              const target =
+                checkin.type === "checkin"
+                  ? new Date(s.start).getTime()
+                  : new Date(s.end).getTime();
+              const diff = Math.abs(new Date(checkin.timestamp).getTime() - target);
+              if (diff < minDiff) {
+                minDiff = diff;
+                match = s;
+              }
+            }
 
-        if (match) {
-          const targetTime =
-            checkin.type === "checkin"
-              ? new Date(match.start).getTime()
-              : new Date(match.end).getTime();
-          const checkinTime = new Date(checkin.timestamp).getTime();
-          const diffMins = Math.floor(checkinTime / 60000) - Math.floor(targetTime / 60000);
+            if (match) {
+              const targetTime =
+                checkin.type === "checkin"
+                  ? new Date(match.start).getTime()
+                  : new Date(match.end).getTime();
+              const checkinTime = new Date(checkin.timestamp).getTime();
+              const diffMins = Math.floor(checkinTime / 60000) - Math.floor(targetTime / 60000);
 
-          if (Math.abs(diffMins) > 1) {
-            if (checkin.type === "checkin") {
-              shiftStatus = {
-                diffMins,
-                isLate: diffMins > 0,
-                isEarly: diffMins < 0,
-                statusText: diffMins > 0 ? `Trễ ${diffMins}p` : `Sớm ${Math.abs(diffMins)}p`,
-              };
-            } else {
-              shiftStatus = {
-                diffMins,
-                isLate: diffMins > 0,
-                isEarly: diffMins < 0,
-                statusText: diffMins < 0 ? `Sớm ${Math.abs(diffMins)}p` : `Sau ${diffMins}p`,
-              };
+              if (Math.abs(diffMins) > 1) {
+                if (checkin.type === "checkin") {
+                  shiftStatus = {
+                    diffMins,
+                    isLate: diffMins > 0,
+                    isEarly: diffMins < 0,
+                    statusText: diffMins > 0 ? `Trễ ${diffMins}p` : `Sớm ${Math.abs(diffMins)}p`,
+                  };
+                } else {
+                  shiftStatus = {
+                    diffMins,
+                    isLate: diffMins > 0,
+                    isEarly: diffMins < 0,
+                    statusText: diffMins < 0 ? `Sớm ${Math.abs(diffMins)}p` : `Sau ${diffMins}p`,
+                  };
+                }
+              }
             }
           }
-        }
-      }
 
-      return {
-        ...checkin,
-        shiftStatus,
-      };
-    });
+          return {
+            ...checkin,
+            shiftStatus,
+          };
+        });
 
-    const todayCheckinCount = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkin").length;
-    const todayCheckoutCount = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkout").length;
+        const todayCheckinCount = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkin").length;
+        const todayCheckoutCount = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkout").length;
 
-    // Calculate onTimeRate & lateRate for checkins today
-    const inCheckins = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkin");
-    let onTimeCount = 0;
-    let lateCount = 0;
+        // Calculate onTimeRate & lateRate for checkins today
+        const inCheckins = (checkinsRaw as any[]).filter((ck: any) => ck.type === "checkin");
+        let onTimeCount = 0;
+        let lateCount = 0;
 
-    for (const checkin of inCheckins) {
-      const userShifts = (todayShifts as any[]).filter((s: any) => s.userId === checkin.userId);
-      if (userShifts.length > 0) {
-        let match: any = null;
-        let minDiff = Infinity;
+        for (const checkin of inCheckins) {
+          const userShifts = (todayShifts as any[]).filter((s: any) => s.userId === checkin.userId);
+          if (userShifts.length > 0) {
+            let match: any = null;
+            let minDiff = Infinity;
 
-        for (const s of userShifts) {
-          const target = new Date(s.start).getTime();
-          const diff = Math.abs(new Date(checkin.timestamp).getTime() - target);
-          if (diff < minDiff) {
-            minDiff = diff;
-            match = s;
-          }
-        }
+            for (const s of userShifts) {
+              const target = new Date(s.start).getTime();
+              const diff = Math.abs(new Date(checkin.timestamp).getTime() - target);
+              if (diff < minDiff) {
+                minDiff = diff;
+                match = s;
+              }
+            }
 
-        if (match) {
-          const targetTime = new Date(match.start).getTime();
-          const checkinTime = new Date(checkin.timestamp).getTime();
-          const diffMins = Math.floor(checkinTime / 60000) - Math.floor(targetTime / 60000);
+            if (match) {
+              const targetTime = new Date(match.start).getTime();
+              const checkinTime = new Date(checkin.timestamp).getTime();
+              const diffMins = Math.floor(checkinTime / 60000) - Math.floor(targetTime / 60000);
 
-          if (diffMins > 5) {
-            lateCount++;
+              if (diffMins > 5) {
+                lateCount++;
+              } else {
+                onTimeCount++;
+              }
+            } else {
+              onTimeCount++;
+            }
           } else {
             onTimeCount++;
           }
-        } else {
-          onTimeCount++;
         }
-      } else {
-        onTimeCount++;
+
+        const totalEvaluated = onTimeCount + lateCount;
+        const onTimeRate = totalEvaluated > 0 ? Math.round((onTimeCount / totalEvaluated) * 1000) / 10 : 100;
+        const lateRate = totalEvaluated > 0 ? Math.round((lateCount / totalEvaluated) * 1000) / 10 : 0;
+        const estimatedMonthPayroll = payrollSummary?.totalProjected || payrollSummary?.totalPayroll || 0;
+
+        return {
+          todayCheckinCount,
+          todayCheckoutCount,
+          pendingRequestsCount,
+          pendingTasksCount,
+          totalEmployeesCount,
+          estimatedMonthPayroll,
+          onTimeRate,
+          lateRate,
+          todayShifts,
+          specialUsers,
+          checkinsToday,
+        };
       }
-    }
-
-    const totalEvaluated = onTimeCount + lateCount;
-    const onTimeRate = totalEvaluated > 0 ? Math.round((onTimeCount / totalEvaluated) * 1000) / 10 : 100;
-    const lateRate = totalEvaluated > 0 ? Math.round((lateCount / totalEvaluated) * 1000) / 10 : 0;
-    const estimatedMonthPayroll = payrollSummary?.totalProjected || payrollSummary?.totalPayroll || 0;
-
-    const statsPayload = {
-      todayCheckinCount,
-      todayCheckoutCount,
-      pendingRequestsCount,
-      pendingTasksCount,
-      totalEmployeesCount,
-      estimatedMonthPayroll,
-      onTimeRate,
-      lateRate,
-      todayShifts,
-      specialUsers,
-      checkinsToday,
-    };
+    );
 
     return c.json({
       success: true,
@@ -926,8 +938,10 @@ adminRoute.delete("/employees/:id", handleDeleteUser);
 // GET /api/admin/ip-settings
 adminRoute.get("/ip-settings", async (c) => {
   try {
-    const ips = await prisma.allowedIP.findMany({
-      orderBy: { createdAt: "desc" },
+    const ips = await getOrSetCache("config:allowed-ips:list", 600, async () => {
+      return prisma.allowedIP.findMany({
+        orderBy: { createdAt: "desc" },
+      });
     });
     return c.json({ success: true, data: ips });
   } catch (err: any) {
@@ -953,7 +967,7 @@ adminRoute.post("/ip-settings", async (c) => {
       },
     });
 
-    await invalidateCachePattern("config:allowed-ips");
+    await invalidateCachePattern("config:allowed-ips*");
 
     return c.json(
       { success: true, message: "Đã thêm IP thành công!", data: newIp },
@@ -976,7 +990,7 @@ adminRoute.delete("/ip-settings/:id", async (c) => {
     }
 
     await prisma.allowedIP.delete({ where: { id } });
-    await invalidateCachePattern("config:allowed-ips");
+    await invalidateCachePattern("config:allowed-ips*");
     return c.json({ success: true, message: "Đã xóa IP thành công" });
   } catch (err: any) {
     return c.json(
@@ -989,8 +1003,10 @@ adminRoute.delete("/ip-settings/:id", async (c) => {
 // Aliases for /settings/ips
 adminRoute.get("/settings/ips", async (c) => {
   try {
-    const ips = await prisma.allowedIP.findMany({
-      orderBy: { createdAt: "desc" },
+    const ips = await getOrSetCache("config:allowed-ips:list", 600, async () => {
+      return prisma.allowedIP.findMany({
+        orderBy: { createdAt: "desc" },
+      });
     });
     return c.json(ips);
   } catch (err: any) {
@@ -1010,7 +1026,7 @@ adminRoute.post("/settings/ips", async (c) => {
         label: body.label?.trim() || null,
       },
     });
-    await invalidateCachePattern("config:allowed-ips");
+    await invalidateCachePattern("config:allowed-ips*");
     return c.json({ success: true, message: "Đã thêm IP thành công!", data: newIp }, 201);
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Lỗi thêm IP" }, 400);
@@ -1022,7 +1038,7 @@ adminRoute.delete("/settings/ips/:id", async (c) => {
     const id = parseInt(c.req.param("id"), 10);
     if (isNaN(id)) return c.json({ success: false, error: "Invalid IP id" }, 400);
     await prisma.allowedIP.delete({ where: { id } });
-    await invalidateCachePattern("config:allowed-ips");
+    await invalidateCachePattern("config:allowed-ips*");
     return c.json({ success: true, message: "Đã xóa IP thành công" });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to delete IP" }, 500);
@@ -1032,17 +1048,18 @@ adminRoute.delete("/settings/ips/:id", async (c) => {
 // Holiday Settings
 const handleGetHolidays = async (c: any) => {
   try {
-    const holidays = await prisma.holiday.findMany({
-      orderBy: { date: "asc" },
-    });
-    return c.json(
-      holidays.map((h) => ({
+    const holidays = await getOrSetCache("meta:holidays:all", 1800, async () => {
+      const list = await prisma.holiday.findMany({
+        orderBy: { date: "asc" },
+      });
+      return list.map((h) => ({
         id: h.id,
-        date: h.date.toISOString().split("T")[0],
+        date: h.date instanceof Date ? h.date.toISOString().split("T")[0] : new Date(h.date).toISOString().split("T")[0],
         name: h.name,
         multiplier: h.multiplier,
-      }))
-    );
+      }));
+    });
+    return c.json(holidays);
   } catch (err: any) {
     return c.json([], 500);
   }
@@ -1070,6 +1087,7 @@ const handleSaveHoliday = async (c: any) => {
     await Promise.all([
       invalidatePayrollCache(),
       invalidateSpecialDaysCache(),
+      invalidateCachePattern("meta:holidays:*"),
     ]).catch(() => {});
     return c.json(
       {
@@ -1092,6 +1110,7 @@ const handleDeleteHoliday = async (c: any) => {
     await Promise.all([
       invalidatePayrollCache(),
       invalidateSpecialDaysCache(),
+      invalidateCachePattern("meta:holidays:*"),
     ]).catch(() => {});
     return c.json({ success: true, message: "Đã xóa ngày lễ" });
   } catch (err: any) {
@@ -1188,10 +1207,11 @@ adminRoute.post("/manual-checkin", async (c) => {
       invalidateCachePattern("payroll:*"),
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("stats:monthly:*"),
-      invalidateCachePattern("admin:dashboard:*"),
+      invalidateCachePattern("admin:dashboard*"),
       invalidateCachePattern(`staff:home:${userId}:*`),
       invalidateCachePattern(`checkin:today:${userId}:*`),
       invalidateCachePattern("checkin:today:all:*"),
+      invalidateCachePattern("checkin:status:*"),
     ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
 
     return c.json({
@@ -1260,6 +1280,7 @@ adminRoute.post("/requests/:id/action", async (c) => {
       invalidateShiftDutyCache(),
       invalidateCachePattern("user:requests:*"),
       invalidateCachePattern("admin:requests:*"),
+      invalidateCachePattern("admin:dashboard*"),
     ]).catch(() => {});
 
     return c.json({
@@ -1293,6 +1314,7 @@ adminRoute.post("/requests/:id/approve", async (c) => {
       invalidateShiftDutyCache(),
       invalidateCachePattern("user:requests:*"),
       invalidateCachePattern("admin:requests:*"),
+      invalidateCachePattern("admin:dashboard*"),
     ]).catch(() => {});
 
     return c.json({
@@ -1327,6 +1349,7 @@ adminRoute.post("/requests/:id/reject", async (c) => {
       invalidateShiftDutyCache(),
       invalidateCachePattern("user:requests:*"),
       invalidateCachePattern("admin:requests:*"),
+      invalidateCachePattern("admin:dashboard*"),
     ]).catch(() => {});
 
     return c.json({
@@ -2181,8 +2204,12 @@ adminRoute.post("/close-all-shifts", async (c) => {
       });
     }
 
-    await invalidateCachePattern("payroll:*");
-    await invalidateCachePattern("stats:*");
+    await Promise.all([
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("checkin:status:*"),
+      invalidateCachePattern("admin:dashboard*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -2227,7 +2254,7 @@ adminRoute.post("/adjustments", async (c) => {
       invalidateCachePattern("payroll:*"),
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("stats:monthly:*"),
-      invalidateCachePattern("admin:dashboard:*"),
+      invalidateCachePattern("admin:dashboard*"),
     ]).catch((e: any) => console.warn("[Cache Invalidation Warning]", e));
 
     return c.json({

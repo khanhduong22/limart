@@ -3,12 +3,12 @@ import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import SpecialDaysWidget from "@/components/home/SpecialDaysWidget";
-import ManualCheckInForm from "@/components/admin/ManualCheckInForm";
 import { LATEST_VERSION, CHANGELOGS } from "@/lib/changelogs";
 import { useDashboardStats, useAttendanceFeed, useEmployees } from "@/hooks/useAdminData";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 
+const ManualCheckInForm = React.lazy(() => import("@/components/admin/ManualCheckInForm"));
 const ChangelogPopup = React.lazy(() => import("@/components/admin/ChangelogPopup"));
 
 const GRACE_PERIOD_MINUTES = 5;
@@ -421,20 +421,22 @@ export function DashboardPage() {
       </div>
 
       {/* Quick Manual Check-In Form */}
-      <ManualCheckInForm
-        users={
-          Array.isArray(employees) && employees.length > 0
-            ? employees.map((u) => ({ id: u.id, name: u.name }))
-            : (Array.isArray(todayShifts) ? todayShifts : []).map((s: any) => ({
-                id: s.userId,
-                name: s.user?.name || "Nhân viên",
-              }))
-        }
-        onSuccess={() => {
-          refreshStats();
-          refreshFeed();
-        }}
-      />
+      <React.Suspense fallback={null}>
+        <ManualCheckInForm
+          users={
+            Array.isArray(employees) && employees.length > 0
+              ? employees.map((u) => ({ id: u.id, name: u.name }))
+              : (Array.isArray(todayShifts) ? todayShifts : []).map((s: any) => ({
+                  id: s.userId,
+                  name: s.user?.name || "Nhân viên",
+                }))
+          }
+          onSuccess={() => {
+            refreshStats();
+            refreshFeed();
+          }}
+        />
+      </React.Suspense>
 
       {/* Changelog popup */}
       {showChangelog && (

@@ -200,6 +200,7 @@ export async function invalidateShiftDutyCache(userId?: string, shiftId?: number
     await invalidateCachePattern("staff:schedule:*");
     await invalidateCachePattern("staff:rewards:*");
     await invalidateCachePattern("staff:reports:*");
+    await invalidateCachePattern("admin:dashboard*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate shift duty cache:", e);
   }
@@ -214,6 +215,7 @@ export async function invalidateScheduleCache(): Promise<void> {
     await invalidateCachePattern("shifts:*");
     await invalidateCachePattern("shift-duties:*");
     await invalidateCachePattern("staff:schedule:*");
+    await invalidateCachePattern("admin:dashboard*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate schedule cache:", e);
   }
@@ -227,7 +229,7 @@ export async function invalidatePayrollCache(): Promise<void> {
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("stats:monthly:*");
-    await invalidateCachePattern("admin:dashboard:*");
+    await invalidateCachePattern("admin:dashboard*");
     await invalidateCachePattern("admin:reports:*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate payroll cache:", e);
@@ -244,7 +246,7 @@ export async function invalidateUserStatsCache(userId?: string): Promise<void> {
     } else {
       await invalidateCachePattern(`stats:monthly:*`);
     }
-    await invalidateCachePattern(`admin:dashboard:*`);
+    await invalidateCachePattern(`admin:dashboard*`);
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate stats cache:", e);
   }

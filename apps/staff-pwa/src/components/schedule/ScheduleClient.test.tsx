@@ -119,7 +119,7 @@ describe("ScheduleClient Integration", () => {
     expect(screen.getByText(/12\/10 - 18\/10\/2026/)).toBeDefined();
   });
 
-  it("opens ShiftDetailsModal on day click and triggers swap modal when clicking Pass ca", () => {
+  it("opens ShiftDetailsModal on day click and triggers swap modal when clicking Pass ca", async () => {
     render(
       <ScheduleClient
         shifts={mockShifts}
@@ -134,7 +134,7 @@ describe("ScheduleClient Integration", () => {
     fireEvent.click(mondayCard!);
 
     // ShiftDetailsModal should be open
-    expect(screen.getByText("Lịch chi tiết")).toBeDefined();
+    expect(await screen.findByText("Lịch chi tiết")).toBeDefined();
     expect(screen.getByText(/Ca làm của bạn \(1\):/)).toBeDefined();
     expect(screen.getByText("Pass ca")).toBeDefined();
 
@@ -143,7 +143,7 @@ describe("ScheduleClient Integration", () => {
 
     // ShiftSwapModal should be open
     expect(useStaffScheduleStore.getState().isSwapModalOpen).toBe(true);
-    expect(screen.getByText("Đổi / Pass ca trực")).toBeDefined();
+    expect(await screen.findByText("Đổi / Pass ca trực")).toBeDefined();
     expect(screen.getByText("🔄 Xác nhận đăng đổi ca")).toBeDefined();
 
     // Close swap modal (target the top modal's close button)
@@ -152,7 +152,7 @@ describe("ScheduleClient Integration", () => {
     expect(useStaffScheduleStore.getState().isSwapModalOpen).toBe(false);
   });
 
-  it("triggers ShiftRegisterModal when openRegisterModal is invoked from store", () => {
+  it("triggers ShiftRegisterModal when openRegisterModal is invoked from store", async () => {
     render(
       <ScheduleClient
         shifts={mockShifts}
@@ -165,7 +165,7 @@ describe("ScheduleClient Integration", () => {
     fireEvent.click(screen.getAllByText("+ Đăng ký ca")[0]);
 
     // Or open date details
-    expect(screen.getByText("Lịch chi tiết")).toBeDefined();
+    expect(await screen.findByText("Lịch chi tiết")).toBeDefined();
     expect(screen.getByText("Xác nhận đăng ký giờ làm")).toBeDefined();
 
     // Close modal
@@ -189,7 +189,7 @@ describe("ScheduleClient Integration", () => {
     fireEvent.click(tuesdayCard!);
 
     // ShiftDetailsModal opens with registration form
-    expect(screen.getByText("Đăng ký giờ làm tự do:")).toBeDefined();
+    expect(await screen.findByText("Đăng ký giờ làm tự do:")).toBeDefined();
     const registerBtn = screen.getByText("Xác nhận đăng ký giờ làm");
 
     fireEvent.click(registerBtn);
@@ -224,7 +224,7 @@ describe("ScheduleClient Integration", () => {
     fireEvent.click(mondayCard!);
 
     // Click "Hủy ca này"
-    const cancelBtn = screen.getByText("Hủy ca này");
+    const cancelBtn = await screen.findByText("Hủy ca này");
     fireEvent.click(cancelBtn);
 
     await waitFor(() => {

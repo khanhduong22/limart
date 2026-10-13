@@ -9,13 +9,20 @@ import {
 import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { useManagerTasksStore } from "@/stores/useManagerTasksStore";
 import { UserItem } from "@/types/manager-tasks";
-import {
-  DailyChecklistTab,
-  TemplatesTab,
-  HistoryTab,
-  CreateChecklistDialog,
-  EditChecklistDialog,
-} from "@/components/tasks/manager";
+import { DailyChecklistTab } from "@/components/tasks/manager";
+
+const TemplatesTab = React.lazy(() =>
+  import("@/components/tasks/manager").then((m) => ({ default: m.TemplatesTab }))
+);
+const HistoryTab = React.lazy(() =>
+  import("@/components/tasks/manager").then((m) => ({ default: m.HistoryTab }))
+);
+const CreateChecklistDialog = React.lazy(() =>
+  import("@/components/tasks/manager").then((m) => ({ default: m.CreateChecklistDialog }))
+);
+const EditChecklistDialog = React.lazy(() =>
+  import("@/components/tasks/manager").then((m) => ({ default: m.EditChecklistDialog }))
+);
 
 export function ManagerTasksPage() {
   const {
@@ -147,12 +154,36 @@ export function ManagerTasksPage() {
 
       {/* Tab Content (Tasks, templates, and history rendered with .cv-auto-table-row) */}
       {activeTab === "checklist" && <DailyChecklistTab />}
-      {activeTab === "templates" && <TemplatesTab />}
-      {activeTab === "history" && <HistoryTab />}
+      {activeTab === "templates" && (
+        <React.Suspense
+          fallback={
+            <div className="p-8 text-center text-muted-foreground">
+              Đang tải...
+            </div>
+          }
+        >
+          <TemplatesTab />
+        </React.Suspense>
+      )}
+      {activeTab === "history" && (
+        <React.Suspense
+          fallback={
+            <div className="p-8 text-center text-muted-foreground">
+              Đang tải...
+            </div>
+          }
+        >
+          <HistoryTab />
+        </React.Suspense>
+      )}
 
       {/* Dialogs */}
-      <CreateChecklistDialog />
-      <EditChecklistDialog />
+      <React.Suspense fallback={null}>
+        <CreateChecklistDialog />
+      </React.Suspense>
+      <React.Suspense fallback={null}>
+        <EditChecklistDialog />
+      </React.Suspense>
     </div>
   );
 }

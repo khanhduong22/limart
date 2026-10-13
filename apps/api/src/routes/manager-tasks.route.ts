@@ -447,76 +447,90 @@ managerTasksRoute.get("/stats-history", authMiddleware, async (c) => {
     const dateParam = c.req.query("date");
     const targetDate = dateParam ? new Date(dateParam) : new Date();
 
-    const stats = await calculateUserMonthlyStats(targetUserId, targetDate);
-    if (!stats) {
-      return c.json({ success: false, error: "User not found" }, 404);
-    }
+    const cacheKey =
+      "manager-tasks:stats-history:" +
+      targetUserId +
+      ":" +
+      toVNDateString(targetDate).slice(0, 7);
 
-    const { startDate, endDate } = getVietnamMonthRange(
-      targetDate.getMonth() + 1,
-      targetDate.getFullYear()
-    );
-    const startDateStr = toVNDateString(startDate);
-    const endDateStr = toVNDateString(endDate);
-
-    const [checklistTasks, checklistCompletions] = await Promise.all([
-      prisma.managerChecklistTask.findMany({
-        where: { assigneeId: targetUserId },
-      }),
-      prisma.managerChecklistCompletion.findMany({
-        where: {
-          task: { assigneeId: targetUserId },
-          date: { gte: startDateStr, lte: endDateStr },
-        },
-      }),
-    ]);
-
-    const details = (stats.dailyDetails || []).map((day: any) => {
-      const isWorkingDay = day.hours > 0 || (day.error && day.error.includes("WFH"));
-      let isChecklistIncomplete = false;
-      let updatedError = day.error;
-
-      if (isWorkingDay && checklistTasks.length > 0) {
-        const activeTasks = checklistTasks.filter((task) => {
-          const taskCreatedKey = toVNDateString(task.createdAt);
-          const matchesDate = !task.targetDate || task.targetDate === day.date;
-          return taskCreatedKey <= day.date && task.active && matchesDate;
-        });
-
-        if (activeTasks.length > 0) {
-          const completedTaskIds = checklistCompletions
-            .filter((comp) => comp.date === day.date && comp.completed)
-            .map((comp) => comp.taskId);
-
-          const hasUncompleted = activeTasks.some(
-            (task) => !completedTaskIds.includes(task.id)
-          );
-
-          if (hasUncompleted) {
-            isChecklistIncomplete = true;
-            updatedError = updatedError
-              ? `${updatedError}, Thiếu checklist`
-              : "Thiếu checklist";
-          }
-        }
+    const statsData = await getOrSetCache(cacheKey, 60, async () => {
+      const stats = await calculateUserMonthlyStats(targetUserId, targetDate);
+      if (!stats) {
+        return null;
       }
 
+      const { startDate, endDate } = getVietnamMonthRange(
+        targetDate.getMonth() + 1,
+        targetDate.getFullYear()
+      );
+      const startDateStr = toVNDateString(startDate);
+      const endDateStr = toVNDateString(endDate);
+
+      const [checklistTasks, checklistCompletions] = await Promise.all([
+        prisma.managerChecklistTask.findMany({
+          where: { assigneeId: targetUserId },
+        }),
+        prisma.managerChecklistCompletion.findMany({
+          where: {
+            task: { assigneeId: targetUserId },
+            date: { gte: startDateStr, lte: endDateStr },
+          },
+        }),
+      ]);
+
+      const details = (stats.dailyDetails || []).map((day: any) => {
+        const isWorkingDay = day.hours > 0 || (day.error && day.error.includes("WFH"));
+        let isChecklistIncomplete = false;
+        let updatedError = day.error;
+
+        if (isWorkingDay && checklistTasks.length > 0) {
+          const activeTasks = checklistTasks.filter((task) => {
+            const taskCreatedKey = toVNDateString(task.createdAt);
+            const matchesDate = !task.targetDate || task.targetDate === day.date;
+            return taskCreatedKey <= day.date && task.active && matchesDate;
+          });
+
+          if (activeTasks.length > 0) {
+            const completedTaskIds = checklistCompletions
+              .filter((comp) => comp.date === day.date && comp.completed)
+              .map((comp) => comp.taskId);
+
+            const hasUncompleted = activeTasks.some(
+              (task) => !completedTaskIds.includes(task.id)
+            );
+
+            if (hasUncompleted) {
+              isChecklistIncomplete = true;
+              updatedError = updatedError
+                ? `${updatedError}, Thiếu checklist`
+                : "Thiếu checklist";
+            }
+          }
+        }
+
+        return {
+          ...day,
+          isChecklistIncomplete,
+          error: updatedError,
+        };
+      });
+
+      const totalDeficiencies = details.filter((d: any) => d.isChecklistIncomplete).length;
+
       return {
-        ...day,
-        isChecklistIncomplete,
-        error: updatedError,
-      };
-    });
-
-    const totalDeficiencies = details.filter((d: any) => d.isChecklistIncomplete).length;
-
-    return c.json({
-      success: true,
-      data: {
         ...stats,
         dailyDetails: details,
         totalDeficiencies,
-      },
+      };
+    });
+
+    if (!statsData) {
+      return c.json({ success: false, error: "User not found" }, 404);
+    }
+
+    return c.json({
+      success: true,
+      data: statsData,
     });
   } catch (err: any) {
     return c.json(
@@ -547,16 +561,24 @@ managerTasksRoute.get("/weekly", authMiddleware, async (c) => {
     const currentDate = new Date(dateStr + "T00:00:00+07:00");
     const { weekStart } = getWeekBounds(currentDate);
 
-    const whereClause: any = {
-      weekStart,
-    };
-    if (targetUserId) {
-      whereClause.assigneeId = targetUserId;
-    }
+    const cacheKey =
+      "manager-tasks:weekly:" +
+      targetUserId +
+      ":" +
+      weekStart.toISOString().slice(0, 10);
 
-    const tasks = await prisma.managerWeeklyTask.findMany({
-      where: whereClause,
-      orderBy: { createdAt: "asc" },
+    const tasks = await getOrSetCache(cacheKey, 60, async () => {
+      const whereClause: any = {
+        weekStart,
+      };
+      if (targetUserId) {
+        whereClause.assigneeId = targetUserId;
+      }
+
+      return prisma.managerWeeklyTask.findMany({
+        where: whereClause,
+        orderBy: { createdAt: "asc" },
+      });
     });
 
     return c.json({ success: true, data: tasks });
@@ -610,6 +632,9 @@ managerTasksRoute.post("/weekly", authMiddleware, async (c) => {
       },
     });
 
+    await invalidateCachePattern("manager-tasks:weekly:*");
+    await invalidateCachePattern("manager-tasks:stats-history:*");
+
     return c.json({ success: true, data: task });
   } catch (err: any) {
     return c.json(
@@ -658,6 +683,8 @@ managerTasksRoute.patch("/weekly/:id", authMiddleware, async (c) => {
       data,
     });
 
+    await invalidateCachePattern("manager-tasks:weekly:*");
+    await invalidateCachePattern("manager-tasks:stats-history:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("payroll:*");
 
@@ -696,6 +723,9 @@ managerTasksRoute.delete("/weekly/:id", authMiddleware, async (c) => {
       where: { id },
     });
 
+    await invalidateCachePattern("manager-tasks:weekly:*");
+    await invalidateCachePattern("manager-tasks:stats-history:*");
+
     return c.json({ success: true });
   } catch (err: any) {
     return c.json(
@@ -733,6 +763,8 @@ managerTasksRoute.post("/weekly/:id/toggle", authMiddleware, async (c) => {
       },
     });
 
+    await invalidateCachePattern("manager-tasks:weekly:*");
+    await invalidateCachePattern("manager-tasks:stats-history:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("payroll:*");
 
@@ -802,6 +834,8 @@ managerTasksRoute.post("/weekly/:id/carry-over", authMiddleware, async (c) => {
       },
     });
 
+    await invalidateCachePattern("manager-tasks:weekly:*");
+    await invalidateCachePattern("manager-tasks:stats-history:*");
     await invalidateCachePattern("stats:*");
     await invalidateCachePattern("payroll:*");
 

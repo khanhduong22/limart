@@ -72,16 +72,18 @@ documentsRoute.get("/", async (c) => {
 documentsRoute.get("/:id", async (c) => {
   try {
     const id = c.req.param("id");
-    const doc = await prisma.document.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        title: true,
-        path: true,
-        content: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const doc = await getOrSetCache("meta:documents:" + id, 1800, async () => {
+      return prisma.document.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          title: true,
+          path: true,
+          content: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
     });
 
     if (!doc) {
@@ -344,7 +346,94 @@ documentsRoute.delete("/:id", authMiddleware, adminMiddleware, async (c) => {
 });
 
 // ----------------------------------------------------------------------------
-// 5. POST /api/documents/chat (or /api/chat) - Capy AI grounded chat
+// 5. PATCH & PUT /api/documents/:id - Update document title and content
+// ----------------------------------------------------------------------------
+documentsRoute.patch("/:id", authMiddleware, adminMiddleware, async (c) => {
+  try {
+    const id = c.req.param("id");
+    const body = await c.req.json().catch(() => ({}));
+    const { title, content } = body;
+
+    const existing = await prisma.document.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return c.json(
+        { success: false, error: "Không tìm thấy tài liệu cần cập nhật" },
+        404
+      );
+    }
+
+    const data: any = {};
+    if (title !== undefined) data.title = title.trim();
+    if (content !== undefined) data.content = content.trim();
+
+    const updated = await prisma.document.update({
+      where: { id },
+      data,
+    });
+
+    await invalidateCachePattern("meta:documents:*").catch(() => {});
+
+    return c.json({
+      success: true,
+      data: updated,
+      message: "Cập nhật tài liệu thành công",
+    });
+  } catch (error: any) {
+    console.error("[DOCUMENTS_UPDATE_ERROR]", error);
+    return c.json(
+      { success: false, error: error.message || "Lỗi cập nhật tài liệu" },
+      500
+    );
+  }
+});
+
+documentsRoute.put("/:id", authMiddleware, adminMiddleware, async (c) => {
+  try {
+    const id = c.req.param("id");
+    const body = await c.req.json().catch(() => ({}));
+    const { title, content } = body;
+
+    const existing = await prisma.document.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      return c.json(
+        { success: false, error: "Không tìm thấy tài liệu cần cập nhật" },
+        404
+      );
+    }
+
+    const data: any = {};
+    if (title !== undefined) data.title = title.trim();
+    if (content !== undefined) data.content = content.trim();
+
+    const updated = await prisma.document.update({
+      where: { id },
+      data,
+    });
+
+    await invalidateCachePattern("meta:documents:*").catch(() => {});
+
+    return c.json({
+      success: true,
+      data: updated,
+      message: "Cập nhật tài liệu thành công",
+    });
+  } catch (error: any) {
+    console.error("[DOCUMENTS_UPDATE_ERROR]", error);
+    return c.json(
+      { success: false, error: error.message || "Lỗi cập nhật tài liệu" },
+      500
+    );
+  }
+});
+
+// ----------------------------------------------------------------------------
+// 6. POST /api/documents/chat (or /api/chat) - Capy AI grounded chat
 // ----------------------------------------------------------------------------
 documentsRoute.post("/chat", async (c) => {
   try {

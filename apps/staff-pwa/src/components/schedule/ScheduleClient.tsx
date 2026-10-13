@@ -14,9 +14,15 @@ import {
   getMonday,
   formatShiftLabel,
 } from "./schedule-utils";
-import { ShiftDetailsModal } from "./ShiftDetailsModal";
-import { ShiftSwapModal } from "./ShiftSwapModal";
-import { ShiftRegisterModal } from "./ShiftRegisterModal";
+const ShiftDetailsModal = React.lazy(() =>
+  import("./ShiftDetailsModal").then((m) => ({ default: m.ShiftDetailsModal }))
+);
+const ShiftSwapModal = React.lazy(() =>
+  import("./ShiftSwapModal").then((m) => ({ default: m.ShiftSwapModal }))
+);
+const ShiftRegisterModal = React.lazy(() =>
+  import("./ShiftRegisterModal").then((m) => ({ default: m.ShiftRegisterModal }))
+);
 
 interface ScheduleClientProps {
   shifts: any[];
@@ -393,35 +399,41 @@ export default function ScheduleClient({
       </Card>
 
       {/* Date Detail / Registration Modal */}
-      <ShiftDetailsModal
-        selectedDate={selectedDate}
-        myShifts={selectedMyShifts}
-        isSubmitting={isSubmitting}
-        onClose={closeDateDetails}
-        onCancelShift={handleCancelShift}
-        onRegisterShift={handleRegister}
-        onOpenSwap={(shift) => openSwapModal(shift)}
-      />
+      <React.Suspense fallback={null}>
+        <ShiftDetailsModal
+          selectedDate={selectedDate}
+          myShifts={selectedMyShifts}
+          isSubmitting={isSubmitting}
+          onClose={closeDateDetails}
+          onCancelShift={handleCancelShift}
+          onRegisterShift={handleRegister}
+          onOpenSwap={(shift) => openSwapModal(shift)}
+        />
+      </React.Suspense>
 
       {/* Shift Swap Modal */}
-      <ShiftSwapModal
-        isOpen={isSwapModalOpen}
-        shift={swapTargetShift}
-        onClose={closeSwapModal}
-        onSuccess={() => {
-          if (onRefresh) onRefresh();
-        }}
-      />
+      <React.Suspense fallback={null}>
+        <ShiftSwapModal
+          isOpen={isSwapModalOpen}
+          shift={swapTargetShift}
+          onClose={closeSwapModal}
+          onSuccess={() => {
+            if (onRefresh) onRefresh();
+          }}
+        />
+      </React.Suspense>
 
       {/* Direct Shift Register Modal */}
-      <ShiftRegisterModal
-        isOpen={isRegisterModalOpen}
-        selectedDate={selectedDate}
-        onClose={() => useStaffScheduleStore.getState().closeRegisterModal()}
-        onSuccess={() => {
-          if (onRefresh) onRefresh();
-        }}
-      />
+      <React.Suspense fallback={null}>
+        <ShiftRegisterModal
+          isOpen={isRegisterModalOpen}
+          selectedDate={selectedDate}
+          onClose={() => useStaffScheduleStore.getState().closeRegisterModal()}
+          onSuccess={() => {
+            if (onRefresh) onRefresh();
+          }}
+        />
+      </React.Suspense>
     </div>
   );
 }

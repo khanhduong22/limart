@@ -1,7 +1,9 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useAdminQuery } from "@/hooks/useAdminQuery";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+
+const MarkdownRenderer = React.lazy(
+  () => import("@/components/help/MarkdownRenderer")
+);
 import {
   Card,
   CardContent,
@@ -596,9 +598,9 @@ export function HelpPage() {
                     <ScrollArea className="flex-1 p-6 sm:p-8">
                       <div className="max-w-3xl mx-auto pb-12">
                         <div className="prose prose-slate max-w-none prose-headings:font-bold prose-headings:text-slate-900 prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-slate-700 prose-p:leading-relaxed prose-table:border prose-th:bg-slate-100 prose-th:p-2.5 prose-th:text-xs prose-td:p-2.5 prose-td:text-xs prose-td:border prose-ul:list-disc prose-ul:pl-5 prose-li:text-slate-700">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {selectedDoc.content}
-                          </ReactMarkdown>
+                          <React.Suspense fallback={<div className="text-xs text-muted-foreground">Đang hiển thị...</div>}>
+                            <MarkdownRenderer content={selectedDoc.content} />
+                          </React.Suspense>
                         </div>
                       </div>
                     </ScrollArea>
@@ -645,9 +647,9 @@ export function HelpPage() {
                         {m.role === "user" ? (
                           m.content
                         ) : (
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {m.content}
-                          </ReactMarkdown>
+                          <React.Suspense fallback={<div className="text-xs text-muted-foreground">Đang hiển thị...</div>}>
+                            <MarkdownRenderer content={m.content} />
+                          </React.Suspense>
                         )}
                       </div>
                     </div>

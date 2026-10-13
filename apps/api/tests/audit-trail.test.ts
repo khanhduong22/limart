@@ -25,10 +25,12 @@ import {
   computeEntryHash,
   canonicalJsonStringify,
 } from "../src/lib/audit";
+import { setRedisClient } from "../src/lib/cache";
 
 describe("Cryptographic Audit Trail Engine Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setRedisClient(null);
   });
 
   describe("1. SHA-256 Hash Chaining Between Consecutive Logs", () => {
@@ -275,4 +277,132 @@ describe("Cryptographic Audit Trail Engine Integration", () => {
       expect(verifySessionAuditChain([log]).isValid).toBe(true);
     });
   });
+
+  describe("4. Valkey Fast-Path Caching for Audit Hash", () => {
+    it("uses cached hash from Valkey without querying database findFirst", async () => {
+      const cachedHash = "a".repeat(64);
+      const mockRedis = {
+        get: vi.fn().mockResolvedValue(cachedHash),
+        set: vi.fn().mockResolvedValue("OK"),
+      } as any;
+      setRedisClient(mockRedis);
+
+      const hash = await getPreviousAuditHash();
+
+      expect(hash).toBe(cachedHash);
+      expect(mockRedis.get).toHaveBeenCalledWith("audit:latest_hash");
+      expect(mockSessionAuditLogFindFirst).not.toHaveBeenCalled();
+    });
+
+    it("falls back to database findFirst if Valkey returns null (cache miss)", async () => {
+      const dbHash = "b".repeat(64);
+      const mockRedis = {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue("OK"),
+      } as any;
+      setRedisClient(mockRedis);
+
+      mockSessionAuditLogFindFirst.mockResolvedValue({
+        details: { hash: dbHash },
+      });
+
+      const hash = await getPreviousAuditHash();
+
+      expect(hash).toBe(dbHash);
+      expect(mockRedis.get).toHaveBeenCalledWith("audit:latest_hash");
+      expect(mockSessionAuditLogFindFirst).toHaveBeenCalled();
+    });
+
+    it("falls back to database findFirst if Valkey returns an invalid or non-64-char hash", async () => {
+      const dbHash = "c".repeat(64);
+      const mockRedis = {
+        get: vi.fn().mockResolvedValue("too-short-hash"),
+        set: vi.fn().mockResolvedValue("OK"),
+      } as any;
+      setRedisClient(mockRedis);
+
+      mockSessionAuditLogFindFirst.mockResolvedValue({
+        details: { hash: dbHash },
+      });
+
+      const hash = await getPreviousAuditHash();
+
+      expect(hash).toBe(dbHash);
+      expect(mockRedis.get).toHaveBeenCalledWith("audit:latest_hash");
+      expect(mockSessionAuditLogFindFirst).toHaveBeenCalled();
+    });
+
+    it("falls back to database findFirst if Valkey get throws an error", async () => {
+      const dbHash = "d".repeat(64);
+      const mockRedis = {
+        get: vi.fn().mockRejectedValue(new Error("Valkey timeout")),
+        set: vi.fn().mockResolvedValue("OK"),
+      } as any;
+      setRedisClient(mockRedis);
+
+      mockSessionAuditLogFindFirst.mockResolvedValue({
+        details: { hash: dbHash },
+      });
+
+      const hash = await getPreviousAuditHash();
+
+      expect(hash).toBe(dbHash);
+      expect(mockSessionAuditLogFindFirst).toHaveBeenCalled();
+    });
+
+    it("writes computed hash to Valkey with 24h TTL upon recordSecureAuditLog", async () => {
+      const mockRedis = {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockResolvedValue("OK"),
+      } as any;
+      setRedisClient(mockRedis);
+
+      mockSessionAuditLogFindFirst.mockResolvedValue(null);
+      mockSessionAuditLogCreate.mockImplementation(async ({ data }) => ({
+        id: "audit-valkey-success",
+        ...data,
+      }));
+
+      const log = await recordSecureAuditLog({
+        userId: "usr_valkey_write",
+        action: "STORE_AUDIT",
+        requestId: "req-valkey-write-1",
+      });
+
+      expect(log).not.toBeNull();
+      const generatedHash = log?.details.hash;
+      expect(generatedHash).toHaveLength(64);
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        "audit:latest_hash",
+        generatedHash,
+        "EX",
+        86400
+      );
+    });
+
+    it("continues successfully even if Valkey set rejects with an error", async () => {
+      const mockRedis = {
+        get: vi.fn().mockResolvedValue(null),
+        set: vi.fn().mockRejectedValue(new Error("Valkey write error")),
+      } as any;
+      setRedisClient(mockRedis);
+
+      mockSessionAuditLogFindFirst.mockResolvedValue(null);
+      mockSessionAuditLogCreate.mockImplementation(async ({ data }) => ({
+        id: "audit-valkey-resilience",
+        ...data,
+      }));
+
+      const log = await recordSecureAuditLog({
+        userId: "usr_resilience",
+        action: "TEST_RESILIENCE",
+        requestId: "req-resilience-1",
+      });
+
+      expect(log).not.toBeNull();
+      expect(log?.id).toBe("audit-valkey-resilience");
+      expect(log?.details.hash).toHaveLength(64);
+    });
+  });
 });
+

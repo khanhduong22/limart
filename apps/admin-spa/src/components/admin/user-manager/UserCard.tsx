@@ -189,12 +189,22 @@ export function UserCard({
           className="hover:opacity-80 transition-opacity shrink-0"
           title="Xem chi tiết"
         >
-          <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-800 shrink-0 border border-orange-200">
+          <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center font-bold text-orange-800 shrink-0 border border-orange-200 overflow-hidden">
             {user.image ? (
               <img
                 src={user.image}
-                alt=""
+                alt={user.name || "Avatar"}
+                width="40"
+                height="40"
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full rounded-full object-cover"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.endsWith("/icons/capy_dashboard.webp")) {
+                    target.src = "/icons/capy_dashboard.webp";
+                  }
+                }}
               />
             ) : (
               user.name?.[0] || "?"

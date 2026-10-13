@@ -148,12 +148,22 @@ export default function SpecialDaysWidget({
             </div>
 
             <div className="flex items-center gap-4 relative z-10">
-              <div className="h-14 w-14 rounded-full border-2 border-yellow-400 p-0.5 bg-white shadow-sm shrink-0">
+              <div className="h-14 w-14 rounded-full border-2 border-yellow-400 p-0.5 bg-white shadow-sm shrink-0 overflow-hidden">
                 {event.image ? (
                   <img
                     src={event.image}
                     alt={event.name}
+                    width="56"
+                    height="56"
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full rounded-full object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.endsWith("/icons/capy_dashboard.webp")) {
+                        target.src = "/icons/capy_dashboard.webp";
+                      }
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full rounded-full bg-yellow-100 flex items-center justify-center text-yellow-700 font-bold text-xl">

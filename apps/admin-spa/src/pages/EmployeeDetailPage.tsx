@@ -74,15 +74,22 @@ export function EmployeeDetailPage() {
               <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 text-slate-600" />
             </Button>
           </Link>
-          <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-900 font-extrabold text-base sm:text-lg border border-amber-200 uppercase shrink-0">
+          <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-amber-100 flex items-center justify-center text-amber-900 font-extrabold text-base sm:text-lg border border-amber-200 uppercase shrink-0 overflow-hidden">
             {user.image ? (
               <img
                 src={user.image}
                 alt={user.name}
                 width="128"
                 height="128"
+                loading="lazy"
                 decoding="async"
                 className="h-full w-full object-cover rounded-2xl"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.endsWith("/icons/capy_dashboard.webp")) {
+                    target.src = "/icons/capy_dashboard.webp";
+                  }
+                }}
               />
             ) : (
               user.name?.[0] || "?"

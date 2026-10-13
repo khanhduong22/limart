@@ -197,6 +197,9 @@ export async function invalidateShiftDutyCache(userId?: string, shiftId?: number
     await invalidateCachePattern("shifts:*");
     await invalidateCachePattern("staff:home:*");
     await invalidateCachePattern("admin:schedule:*");
+    await invalidateCachePattern("staff:schedule:*");
+    await invalidateCachePattern("staff:rewards:*");
+    await invalidateCachePattern("staff:reports:*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate shift duty cache:", e);
   }
@@ -210,6 +213,7 @@ export async function invalidateScheduleCache(): Promise<void> {
     await invalidateCachePattern("admin:schedule:*");
     await invalidateCachePattern("shifts:*");
     await invalidateCachePattern("shift-duties:*");
+    await invalidateCachePattern("staff:schedule:*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate schedule cache:", e);
   }
@@ -243,6 +247,17 @@ export async function invalidateUserStatsCache(userId?: string): Promise<void> {
     await invalidateCachePattern(`admin:dashboard:*`);
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate stats cache:", e);
+  }
+}
+
+/**
+ * Invalidate special days cache (birthdays, anniversaries, holidays)
+ */
+export async function invalidateSpecialDaysCache(): Promise<void> {
+  try {
+    await invalidateCachePattern("meta:special-days:*");
+  } catch (e) {
+    console.warn("[Cache Warning] Failed to invalidate special days cache:", e);
   }
 }
 

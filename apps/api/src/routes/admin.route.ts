@@ -7,7 +7,7 @@ import { authMiddleware, adminMiddleware, AppEnv } from "../middleware/auth.midd
 import { getVietnamDayRange, getVietnamMonthRange, toVNDateString, VN_OFFSET_MS } from "../lib/date-utils";
 import { calculateMonthlyPayrollSummary, calculateUserMonthlyStats } from "../lib/payroll-calculator";
 import { getSpecialDays } from "../lib/special-days";
-import { invalidateCachePattern, invalidatePayrollCache, invalidateShiftDutyCache, getOrSetCache } from "../lib/cache";
+import { invalidateCachePattern, invalidatePayrollCache, invalidateShiftDutyCache, invalidateSpecialDaysCache, getOrSetCache } from "../lib/cache";
 import { assertPeriodOpen } from "../lib/payroll-period";
 import { sendPayslipEmail } from "../lib/email";
 import { getClientIP } from "../lib/ip-utils";
@@ -665,6 +665,7 @@ const handleUpdateUserStatus = async (c: any) => {
     await Promise.all([
       invalidateCachePattern("admin:employees:*"),
       invalidateCachePattern("user:me:" + id),
+      invalidateSpecialDaysCache(),
     ]).catch(() => {});
 
     return c.json({
@@ -739,6 +740,7 @@ const handleCreateUser = async (c: any) => {
     await Promise.all([
       invalidatePayrollCache(),
       invalidateCachePattern("admin:employees:*"),
+      invalidateSpecialDaysCache(),
     ]).catch(() => {});
 
     return c.json(
@@ -863,6 +865,7 @@ const handleUpdateUser = async (c: any) => {
       invalidateCachePattern("admin:employees:*"),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("user:me:" + id),
+      invalidateSpecialDaysCache(),
     ]).catch(() => {});
 
     return c.json({
@@ -889,6 +892,7 @@ const handleDeleteUser = async (c: any) => {
       invalidateShiftDutyCache(id),
       invalidateCachePattern("admin:employees:*"),
       invalidateCachePattern("user:me:" + id),
+      invalidateSpecialDaysCache(),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa nhân viên thành công" });
@@ -1022,7 +1026,7 @@ adminRoute.delete("/settings/ips/:id", async (c) => {
 });
 
 // Holiday Settings
-adminRoute.get("/settings/holidays", async (c) => {
+const handleGetHolidays = async (c: any) => {
   try {
     const holidays = await prisma.holiday.findMany({
       orderBy: { date: "asc" },
@@ -1038,9 +1042,9 @@ adminRoute.get("/settings/holidays", async (c) => {
   } catch (err: any) {
     return c.json([], 500);
   }
-});
+};
 
-adminRoute.post("/settings/holidays", async (c) => {
+const handleSaveHoliday = async (c: any) => {
   try {
     const body = await c.req.json().catch(() => ({}));
     const { date, name, multiplier } = body;
@@ -1060,8 +1064,8 @@ adminRoute.post("/settings/holidays", async (c) => {
       },
     });
     await Promise.all([
-      invalidateCachePattern("payroll:*"),
-      invalidateCachePattern("meta:special-days:*"),
+      invalidatePayrollCache(),
+      invalidateSpecialDaysCache(),
     ]).catch(() => {});
     return c.json(
       {
@@ -1075,21 +1079,28 @@ adminRoute.post("/settings/holidays", async (c) => {
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to save holiday" }, 500);
   }
-});
+};
 
-adminRoute.delete("/settings/holidays/:id", async (c) => {
+const handleDeleteHoliday = async (c: any) => {
   try {
     const id = c.req.param("id");
     await prisma.holiday.delete({ where: { id } });
     await Promise.all([
-      invalidateCachePattern("payroll:*"),
-      invalidateCachePattern("meta:special-days:*"),
+      invalidatePayrollCache(),
+      invalidateSpecialDaysCache(),
     ]).catch(() => {});
     return c.json({ success: true, message: "Đã xóa ngày lễ" });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to delete holiday" }, 500);
   }
-});
+};
+
+adminRoute.get("/settings/holidays", handleGetHolidays);
+adminRoute.get("/holidays", handleGetHolidays);
+adminRoute.post("/settings/holidays", handleSaveHoliday);
+adminRoute.post("/holidays", handleSaveHoliday);
+adminRoute.delete("/settings/holidays/:id", handleDeleteHoliday);
+adminRoute.delete("/holidays/:id", handleDeleteHoliday);
 
 // ============================================================================
 // 4. MANUAL CHECKIN

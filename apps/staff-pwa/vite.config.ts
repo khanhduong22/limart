@@ -61,6 +61,20 @@ export default defineConfig({
         globIgnores: ["**/capybara_bg.png", "**/capybara_mascot.png", "**/icons/capy_*.png"],
         runtimeCaching: [
           {
+            urlPattern: /^https:\/\/.*\.googleusercontent\.com\/.*/i,
+            handler: "StaleWhileRevalidate",
+            options: {
+              cacheName: "google-avatar-cache",
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200],
+              },
+            },
+          },
+          {
             // CacheFirst cho static assets (fonts, icons, images, css, js)
             urlPattern: ({ request }) =>
               request.destination === "style" ||

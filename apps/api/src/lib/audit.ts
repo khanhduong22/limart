@@ -1,4 +1,5 @@
 import { prisma } from "@checkin/db";
+import { getRedisClient } from "./cache";
 import {
   GENESIS_HASH,
   computeEntryHash,
@@ -37,6 +38,14 @@ export interface RecordSecureAuditLogParams {
  */
 export async function getPreviousAuditHash(): Promise<string> {
   try {
+    const redis = getRedisClient();
+    if (redis) {
+      const cachedHash = await redis.get("audit:latest_hash").catch(() => null);
+      if (cachedHash && typeof cachedHash === "string" && cachedHash.length === 64) {
+        return cachedHash;
+      }
+    }
+
     if (typeof prisma?.sessionAuditLog?.findFirst === "function") {
       const lastLog = await prisma.sessionAuditLog.findFirst({
         orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -123,7 +132,7 @@ export async function recordSecureAuditLog(params: RecordSecureAuditLogParams) {
       hash,
     };
 
-    return await prisma.sessionAuditLog.create({
+    const createdLog = await prisma.sessionAuditLog.create({
       data: {
         userId,
         action,
@@ -135,6 +144,13 @@ export async function recordSecureAuditLog(params: RecordSecureAuditLogParams) {
         details: enrichedDetails,
       },
     });
+
+    const redis = getRedisClient();
+    if (redis) {
+      await redis.set("audit:latest_hash", hash, "EX", 86400).catch(() => null);
+    }
+
+    return createdLog;
   } catch (err: any) {
     console.warn("[Audit Warning] Failed to record secure audit log:", err);
     return null;

@@ -390,6 +390,12 @@ export function DashboardPage() {
                             decoding="async"
                             loading="lazy"
                             className="h-6 w-6 rounded-full object-cover shrink-0"
+                            onError={(e) => {
+                              const target = e.currentTarget;
+                              if (!target.src.endsWith("/icons/capy_dashboard.webp")) {
+                                target.src = "/icons/capy_dashboard.webp";
+                              }
+                            }}
                           />
                         ) : (
                           <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] text-blue-600 font-bold shrink-0">

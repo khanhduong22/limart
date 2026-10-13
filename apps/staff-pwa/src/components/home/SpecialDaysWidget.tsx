@@ -179,7 +179,17 @@ export default function SpecialDaysWidget({
                   <img
                     src={event.image}
                     alt={event.name}
+                    width="56"
+                    height="56"
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full rounded-full object-cover"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (!target.src.endsWith("/capybara_mascot.webp")) {
+                        target.src = "/capybara_mascot.webp";
+                      }
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full rounded-full bg-yellow-100 flex items-center justify-center text-yellow-700 font-bold text-xl">

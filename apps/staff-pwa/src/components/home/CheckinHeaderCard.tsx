@@ -83,10 +83,14 @@ export const CheckinHeaderCard: React.FC<CheckinHeaderCardProps> = ({
               alt="Mascot Capybara"
               width="48"
               height="48"
+              loading="lazy"
               decoding="async"
               className="h-full w-full object-cover"
               onError={(e) => {
-                (e.target as HTMLImageElement).src = "/capybara_mascot.webp";
+                const target = e.currentTarget;
+                if (!target.src.endsWith("/capybara_mascot.webp")) {
+                  target.src = "/capybara_mascot.webp";
+                }
               }}
             />
             {isWorking && (

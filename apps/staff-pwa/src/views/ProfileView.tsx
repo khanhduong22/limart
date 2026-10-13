@@ -41,9 +41,16 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile }) => {
           <img
             src={profile?.avatarUrl || "/capybara_mascot.webp"}
             alt={profile?.name || "Profile"}
+            width="80"
+            height="80"
+            loading="lazy"
+            decoding="async"
             className="w-full h-full object-cover rounded-full"
             onError={(e) => {
-              (e.target as any).src = "/logo.png";
+              const target = e.currentTarget;
+              if (!target.src.endsWith("/capybara_mascot.webp")) {
+                target.src = "/capybara_mascot.webp";
+              }
             }}
           />
         </div>

@@ -2078,6 +2078,7 @@ staffRoute.post("/staff-tasks/:id/toggle", authMiddleware, async (c) => {
     });
 
     await invalidateCachePattern("payroll:*");
+    await invalidateCachePattern("staff-tasks:stats:*");
 
     return c.json({
       success: true,

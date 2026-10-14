@@ -110,6 +110,7 @@ model WorkShift {
   @@index([status, start])
   @@index([userId, status])
   @@index([userId, status, start])
+  @@index([userId, status, start, end])
 }
 
 model ShiftAuditLog {
@@ -342,6 +343,7 @@ model TaskItem {
   @@index([taskDefId, status])
   @@index([assigneeId])
   @@index([assigneeId, status])
+  @@index([assigneeId, status, deadline])
   @@index([status])
   @@index([status, createdAt])
   @@index([createdAt])
@@ -466,6 +468,7 @@ model ManagerTask {
 
   @@index([assigneeId])
   @@index([assigneeId, status])
+  @@index([assigneeId, status, deadline])
   @@index([assigneeId, createdAt])
   @@index([status])
   @@index([status, deadline])
@@ -584,6 +587,7 @@ model ShiftDuty {
   shift       WorkShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
 
   @@index([userId, date])
+  @@index([userId, date, isCompleted])
   @@index([userId, isCompleted])
   @@index([userId, createdAt])
   @@index([createdById])

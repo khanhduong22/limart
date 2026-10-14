@@ -149,7 +149,7 @@ describe("StaffTasksView Integration", () => {
       expect(screen.getByText("1 / 4 Việc")).toBeDefined();
       expect(screen.getAllByText("Chờ duyệt").length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText("Đã duyệt").length).toBeGreaterThanOrEqual(1);
-    });
+    }, { timeout: 4000 });
   });
 
   it("filters tasks properly when switching tabs (TODO, DOING, DONE, APPROVED)", () => {

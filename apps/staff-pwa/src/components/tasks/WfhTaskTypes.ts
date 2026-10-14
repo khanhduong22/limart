@@ -65,3 +65,5 @@ export interface SubmittingWfhTask {
   title: string;
   unit: string;
 }
+
+export type WfhTabType = "market" | "general" | "history";

@@ -10,29 +10,26 @@ import {
   type StaffTaskUserOption,
 } from "@/types/staff-tasks";
 import { useAdminStaffTasksStore } from "@/stores/useAdminStaffTasksStore";
-import {
-  StaffTasksFilterBar,
-  computeStaffTaskDateRanges,
-  filterStaffTasks,
-} from "@/components/tasks/staff";
+import { StaffTasksFilterBar } from "@/components/tasks/staff/StaffTasksFilterBar";
+import { computeStaffTaskDateRanges, filterStaffTasks } from "@/components/tasks/staff/staff-task-utils";
 
 const StaffTasksTable = React.lazy(() =>
-  import("@/components/tasks/staff").then((m) => ({ default: m.StaffTasksTable }))
+  import("@/components/tasks/staff/StaffTasksTable").then((m) => ({ default: m.StaffTasksTable }))
 );
 const StaffKpiStatsCards = React.lazy(() =>
-  import("@/components/tasks/staff").then((m) => ({ default: m.StaffKpiStatsCards }))
+  import("@/components/tasks/staff/StaffKpiStatsCards").then((m) => ({ default: m.StaffKpiStatsCards }))
 );
 const StaffTaskFormDialog = React.lazy(() =>
-  import("@/components/tasks/staff").then((m) => ({ default: m.StaffTaskFormDialog }))
+  import("@/components/tasks/staff/StaffTaskFormDialog").then((m) => ({ default: m.StaffTaskFormDialog }))
 );
 const TaskReviewModal = React.lazy(() =>
-  import("@/components/tasks/staff").then((m) => ({ default: m.TaskReviewModal }))
+  import("@/components/tasks/staff/TaskReviewModal").then((m) => ({ default: m.TaskReviewModal }))
 );
 const CreateTaskDefinitionDialog = React.lazy(() =>
-  import("@/components/tasks/staff").then((m) => ({ default: m.CreateTaskDefinitionDialog }))
+  import("@/components/tasks/staff/CreateTaskDefinitionDialog").then((m) => ({ default: m.CreateTaskDefinitionDialog }))
 );
 const TaskRejectDialog = React.lazy(() =>
-  import("@/components/tasks/staff").then((m) => ({ default: m.TaskRejectDialog }))
+  import("@/components/tasks/staff/TaskRejectDialog").then((m) => ({ default: m.TaskRejectDialog }))
 );
 
 export function StaffTasksPage() {

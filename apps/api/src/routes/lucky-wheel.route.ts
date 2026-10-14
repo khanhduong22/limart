@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { prisma } from "@checkin/db";
 import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { getVietnamDayRange } from "../lib/date-utils";
-import { getOrSetCache, invalidateCachePattern } from "../lib/cache";
+import { getOrSetCache, invalidateCachePattern, invalidatePayrollCache } from "../lib/cache";
 import { acquireLock } from "../lib/lock";
 import { luckyWheelRateLimiter } from "../middleware/rate-limiter";
 
@@ -15,59 +15,66 @@ luckyWheelRoute.get("/", authMiddleware, async (c) => {
     const userId = tokenPayload.sub;
     const { startOfDay, endOfDay } = getVietnamDayRange();
 
-    const [user, prizes, checkinToday, spunToday, recentWinners] = await Promise.all([
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: { id: true, role: true, luckyWheelAllowed: true },
-      }),
-      getOrSetCache("meta:lucky-wheel:prizes", 300, () =>
-        prisma.luckyWheelPrize.findMany({
-          where: { active: true },
-          orderBy: { createdAt: "asc" },
-        })
-      ),
-      prisma.checkIn.findFirst({
-        where: {
-          userId,
-          timestamp: { gte: startOfDay, lte: endOfDay },
-        },
-      }),
-      prisma.luckyWheelHistory.findFirst({
-        where: {
-          userId,
-          createdAt: { gte: startOfDay, lte: endOfDay },
-        },
-      }),
-      getOrSetCache("meta:lucky-wheel:recent-winners", 60, () =>
-        prisma.luckyWheelHistory.findMany({
-          take: 20,
-          orderBy: { createdAt: "desc" },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                image: true,
+    const cacheKey = `lucky-wheel:status:${userId}:${startOfDay.toISOString().slice(0, 10)}`;
+    const statusData = await getOrSetCache(cacheKey, 60, async () => {
+      const [user, prizes, checkinToday, spunToday, recentWinners] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: userId },
+          select: { id: true, role: true, luckyWheelAllowed: true },
+        }),
+        getOrSetCache("meta:lucky-wheel:prizes", 300, () =>
+          prisma.luckyWheelPrize.findMany({
+            where: { active: true },
+            orderBy: { createdAt: "asc" },
+          })
+        ),
+        prisma.checkIn.findFirst({
+          where: {
+            userId,
+            timestamp: { gte: startOfDay, lte: endOfDay },
+          },
+        }),
+        prisma.luckyWheelHistory.findFirst({
+          where: {
+            userId,
+            createdAt: { gte: startOfDay, lte: endOfDay },
+          },
+        }),
+        getOrSetCache("meta:lucky-wheel:recent-winners", 60, () =>
+          prisma.luckyWheelHistory.findMany({
+            take: 20,
+            orderBy: { createdAt: "desc" },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  image: true,
+                },
               },
             },
-          },
-        })
-      ),
-    ]);
+          })
+        ),
+      ]);
 
-    const isAllowed = user?.role === "ADMIN" || Boolean(user?.luckyWheelAllowed);
-    const hasCheckedInToday = Boolean(checkinToday);
-    const hasSpunToday = Boolean(spunToday);
-    const canSpin = user?.role === "ADMIN" || (isAllowed && hasCheckedInToday && !hasSpunToday);
+      const isAllowed = user?.role === "ADMIN" || Boolean(user?.luckyWheelAllowed);
+      const hasCheckedInToday = Boolean(checkinToday);
+      const hasSpunToday = Boolean(spunToday);
+      const canSpin = user?.role === "ADMIN" || (isAllowed && hasCheckedInToday && !hasSpunToday);
+
+      return {
+        allowed: isAllowed,
+        hasCheckedInToday,
+        hasSpunToday,
+        canSpin,
+        prizes,
+        recentWinners,
+      };
+    });
 
     return c.json({
       success: true,
-      allowed: isAllowed,
-      hasCheckedInToday,
-      hasSpunToday,
-      canSpin,
-      prizes,
-      recentWinners,
+      ...statusData,
     });
   } catch (err: any) {
     return c.json(
@@ -264,12 +271,15 @@ luckyWheelRoute.post("/spin", authMiddleware, luckyWheelRateLimiter, async (c) =
     });
 
     await Promise.all([
+      invalidateCachePattern(`lucky-wheel:status:${userId}:*`),
       invalidateCachePattern("meta:lucky-wheel:recent-winners"),
       invalidateCachePattern("meta:lucky-wheel:*"),
       invalidateCachePattern("admin:lucky-wheel:*"),
     ]).catch(() => {});
 
     if (selectedPrize.type === "MONEY" && selectedPrize.value > 0) {
+      await invalidatePayrollCache();
+      await invalidateCachePattern("staff:home:*");
       await invalidateCachePattern("payroll:*");
       await invalidateCachePattern("stats:*");
     }

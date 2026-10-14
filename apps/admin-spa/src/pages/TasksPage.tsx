@@ -12,20 +12,19 @@ import type {
   TaskDefinition,
   MarketplaceTaskItem,
 } from "@/types";
-import { computeOverduePenalty, filterReviewedTasks } from "@/components/tasks/wfh";
+import { computeOverduePenalty, filterReviewedTasks } from "@/components/tasks/wfh/wfh-task-utils";
 
 const ReviewPendingTab = React.lazy(() =>
-  import("@/components/tasks/wfh").then((m) => ({ default: m.ReviewPendingTab }))
+  import("@/components/tasks/wfh/ReviewPendingTab").then((m) => ({ default: m.ReviewPendingTab }))
 );
-
 const TaskHistoryTab = React.lazy(() =>
-  import("@/components/tasks/wfh").then((m) => ({ default: m.TaskHistoryTab }))
+  import("@/components/tasks/wfh/TaskHistoryTab").then((m) => ({ default: m.TaskHistoryTab }))
 );
 const TaskDefinitionsTab = React.lazy(() =>
-  import("@/components/tasks/wfh").then((m) => ({ default: m.TaskDefinitionsTab }))
+  import("@/components/tasks/wfh/TaskDefinitionsTab").then((m) => ({ default: m.TaskDefinitionsTab }))
 );
 const MarketplaceTab = React.lazy(() =>
-  import("@/components/tasks/wfh").then((m) => ({ default: m.MarketplaceTab }))
+  import("@/components/tasks/wfh/MarketplaceTab").then((m) => ({ default: m.MarketplaceTab }))
 );
 
 const ReviewSubmissionDialog = React.lazy(

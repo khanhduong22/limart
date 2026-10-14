@@ -13,19 +13,17 @@ import {
   StaffTask,
   KPIStats,
 } from "@/stores/useStaffTasksStore";
-import {
-  TaskFilterTabs,
-  StaffTaskCard,
-} from "@/components/tasks";
+import { TaskFilterTabs } from "@/components/tasks/TaskFilterTabs";
+import { StaffTaskCard } from "@/components/tasks/StaffTaskCard";
 
 const StaffTasksKpiBanner = React.lazy(
   () => import("@/components/tasks/staff/StaffTasksKpiBanner")
 );
 const TaskDetailModal = React.lazy(() =>
-  import("@/components/tasks").then((m) => ({ default: m.TaskDetailModal }))
+  import("@/components/tasks/TaskDetailModal").then((m) => ({ default: m.TaskDetailModal }))
 );
 const TaskSubmitModal = React.lazy(() =>
-  import("@/components/tasks").then((m) => ({ default: m.TaskSubmitModal }))
+  import("@/components/tasks/TaskSubmitModal").then((m) => ({ default: m.TaskSubmitModal }))
 );
 
 interface StaffTasksResponse {

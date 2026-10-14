@@ -1,7 +1,6 @@
 import React from "react";
 import { ShoppingBag, Sparkles, FileCheck } from "lucide-react";
-
-export type WfhTabType = "market" | "general" | "history";
+import type { WfhTabType } from "./WfhTaskTypes";
 
 export interface WfhTaskTabsProps {
   activeTab: WfhTabType;

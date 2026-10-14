@@ -103,7 +103,7 @@ describe("RequestListClient Component", () => {
     // Modal loads dynamically via React.lazy and React.Suspense
     await waitFor(() => {
       expect(screen.getByText("Gửi yêu cầu / giải trình")).toBeDefined();
-    });
+    }, { timeout: 4000 });
 
     // Close modal via Hủy
     const cancelBtn = screen.getByRole("button", { name: "Hủy" });

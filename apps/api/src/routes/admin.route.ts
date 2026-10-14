@@ -3228,6 +3228,7 @@ adminRoute.post("/lucky-wheel/allowed/all", async (c) => {
     await Promise.all([
       invalidateCachePattern("admin:employees:*"),
       invalidateCachePattern("user:me:*"),
+      invalidateCachePattern("lucky-wheel:status:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -3255,6 +3256,7 @@ adminRoute.patch("/lucky-wheel/allowed/:userId", async (c) => {
     await Promise.all([
       invalidateCachePattern("admin:employees:*"),
       invalidateCachePattern("user:me:" + userId),
+      invalidateCachePattern(`lucky-wheel:status:${userId}:*`),
     ]).catch(() => {});
 
     return c.json({

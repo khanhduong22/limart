@@ -9,26 +9,26 @@ import {
   startWfhTask,
   submitWfhTask,
 } from "@/lib/api-client";
-import {
+import { WfhTaskTabs } from "@/components/tasks/WfhTaskTabs";
+import type {
   MarketItem,
   TaskDefItem,
   UserTaskRecord,
   SubmittingWfhTask,
-  WfhTaskTabs,
   WfhTabType,
-} from "@/components/tasks";
+} from "@/components/tasks/WfhTaskTypes";
 
 const MarketTaskList = React.lazy(() =>
-  import("@/components/tasks").then((m) => ({ default: m.MarketTaskList }))
+  import("@/components/tasks/MarketTaskList").then((m) => ({ default: m.MarketTaskList }))
 );
 const GeneralTaskList = React.lazy(() =>
-  import("@/components/tasks").then((m) => ({ default: m.GeneralTaskList }))
+  import("@/components/tasks/GeneralTaskList").then((m) => ({ default: m.GeneralTaskList }))
 );
 const UserTaskHistoryList = React.lazy(() =>
-  import("@/components/tasks").then((m) => ({ default: m.UserTaskHistoryList }))
+  import("@/components/tasks/UserTaskHistoryList").then((m) => ({ default: m.UserTaskHistoryList }))
 );
 const WfhTaskSubmitModal = React.lazy(() =>
-  import("@/components/tasks").then((m) => ({ default: m.WfhTaskSubmitModal }))
+  import("@/components/tasks/WfhTaskSubmitModal").then((m) => ({ default: m.WfhTaskSubmitModal }))
 );
 
 export const TasksView: React.FC = () => {

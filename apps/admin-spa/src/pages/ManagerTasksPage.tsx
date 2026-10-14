@@ -11,20 +11,20 @@ import { useManagerTasksStore } from "@/stores/useManagerTasksStore";
 import { UserItem } from "@/types/manager-tasks";
 
 const DailyChecklistTab = React.lazy(() =>
-  import("@/components/tasks/manager").then((m) => ({ default: m.DailyChecklistTab }))
+  import("@/components/tasks/manager/DailyChecklistTab").then((m) => ({ default: m.DailyChecklistTab }))
 );
 
 const TemplatesTab = React.lazy(() =>
-  import("@/components/tasks/manager").then((m) => ({ default: m.TemplatesTab }))
+  import("@/components/tasks/manager/TemplatesTab").then((m) => ({ default: m.TemplatesTab }))
 );
 const HistoryTab = React.lazy(() =>
-  import("@/components/tasks/manager").then((m) => ({ default: m.HistoryTab }))
+  import("@/components/tasks/manager/HistoryTab").then((m) => ({ default: m.HistoryTab }))
 );
 const CreateChecklistDialog = React.lazy(() =>
-  import("@/components/tasks/manager").then((m) => ({ default: m.CreateChecklistDialog }))
+  import("@/components/tasks/manager/CreateChecklistDialog").then((m) => ({ default: m.CreateChecklistDialog }))
 );
 const EditChecklistDialog = React.lazy(() =>
-  import("@/components/tasks/manager").then((m) => ({ default: m.EditChecklistDialog }))
+  import("@/components/tasks/manager/EditChecklistDialog").then((m) => ({ default: m.EditChecklistDialog }))
 );
 
 export function ManagerTasksPage() {

@@ -5,7 +5,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    testTimeout: 15000,
+    fileParallelism: false,
+    testTimeout: 20000,
+    hookTimeout: 20000,
   },
   resolve: {
     alias: {

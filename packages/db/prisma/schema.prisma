@@ -224,6 +224,7 @@ model LuckyWheelPrize {
   history     LuckyWheelHistory[]
 
   @@index([active, createdAt])
+  @@index([active, remaining])
 }
 
 model LuckyWheelHistory {
@@ -385,6 +386,7 @@ model UserTask {
   @@index([status, updatedAt])
   @@index([status, submittedAt])
   @@index([status, submittedAt, userId])
+  @@index([status, taskDefId, submittedAt])
 }
 
 model PayrollPeriod {
@@ -431,6 +433,7 @@ model Document {
   chunks    DocumentChunk[]
 
   @@index([createdAt])
+  @@index([title])
 }
 
 model DocumentChunk {
@@ -566,6 +569,7 @@ model ManagerWeeklyTask {
   @@index([assigneeId, completed, weekStart])
   @@index([weekStart])
   @@index([weekStart, weekEnd])
+  @@index([assigneeId, weekStart, weekEnd])
   @@index([createdAt])
 }
 

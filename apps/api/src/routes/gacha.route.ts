@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { prisma } from "@checkin/db";
 import { authMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { getVietnamDayRange } from "../lib/date-utils";
-import { getOrSetCache, invalidateCachePattern } from "../lib/cache";
+import { getOrSetCache, invalidateCachePattern, invalidatePayrollCache } from "../lib/cache";
 
 export const gachaRoute = new Hono<AppEnv>();
 
@@ -85,6 +85,7 @@ const handleGachaRoll = async (c: any) => {
       return await fn(prisma);
     };
 
+    let selectedPrize: any = null;
     const result = await runInTransaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId } });
       if (!user) {
@@ -132,7 +133,7 @@ const handleGachaRoll = async (c: any) => {
       const totalProbability = prizes.reduce((sum: number, p: any) => sum + p.probability, 0);
       const random = Math.random() * totalProbability;
 
-      let selectedPrize = null;
+      selectedPrize = null;
       let accumulatedProb = 0;
 
       for (const prize of prizes) {
@@ -210,6 +211,11 @@ const handleGachaRoll = async (c: any) => {
     await invalidateCachePattern("gacha:status:" + userId + ":*");
     await invalidateCachePattern("meta:lucky-wheel:*");
     await invalidateCachePattern("admin:lucky-wheel:*");
+    await invalidateCachePattern("staff:home:*");
+
+    if (selectedPrize && selectedPrize.type === "MONEY" && selectedPrize.value > 0) {
+      await invalidatePayrollCache();
+    }
 
     return c.json({
       success: true,

@@ -2615,7 +2615,10 @@ adminRoute.get("/payroll/:userId", async (c) => {
     const targetDate = new Date(year, month - 1, 1);
 
     const cacheKey = `admin:payroll-user:${userId}:${month}:${year}`;
-    const result = await getOrSetCache(cacheKey, 60, async () => {
+    const result = await getOrSetCache(
+      cacheKey,
+      (data) => (data?.isClosed && data?.payslip ? 300 : 60),
+      async () => {
       const [user, period, payslip] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId } }),
         prisma.payrollPeriod.findUnique({

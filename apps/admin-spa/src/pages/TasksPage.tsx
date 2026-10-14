@@ -12,11 +12,11 @@ import type {
   TaskDefinition,
   MarketplaceTaskItem,
 } from "@/types";
-import {
-  ReviewPendingTab,
-  computeOverduePenalty,
-  filterReviewedTasks,
-} from "@/components/tasks/wfh";
+import { computeOverduePenalty, filterReviewedTasks } from "@/components/tasks/wfh";
+
+const ReviewPendingTab = React.lazy(() =>
+  import("@/components/tasks/wfh").then((m) => ({ default: m.ReviewPendingTab }))
+);
 
 const TaskHistoryTab = React.lazy(() =>
   import("@/components/tasks/wfh").then((m) => ({ default: m.TaskHistoryTab }))
@@ -282,11 +282,19 @@ export function TasksPage() {
 
         {/* 1. REVIEW PENDING TAB */}
         <TabsContent value="review">
-          <ReviewPendingTab
-            pendingTasks={pendingTasks}
-            onOpenReview={openReview}
-            onQuickApprove={approveTask}
-          />
+          <React.Suspense
+            fallback={
+              <div className="h-96 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-xs text-slate-400">
+                Đang tải danh sách chờ duyệt...
+              </div>
+            }
+          >
+            <ReviewPendingTab
+              pendingTasks={pendingTasks}
+              onOpenReview={openReview}
+              onQuickApprove={approveTask}
+            />
+          </React.Suspense>
         </TabsContent>
 
         {/* 2. HISTORY TAB */}

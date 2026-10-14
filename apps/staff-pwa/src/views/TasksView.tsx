@@ -14,11 +14,13 @@ import {
   TaskDefItem,
   UserTaskRecord,
   SubmittingWfhTask,
-  MarketTaskList,
   WfhTaskTabs,
   WfhTabType,
 } from "@/components/tasks";
 
+const MarketTaskList = React.lazy(() =>
+  import("@/components/tasks").then((m) => ({ default: m.MarketTaskList }))
+);
 const GeneralTaskList = React.lazy(() =>
   import("@/components/tasks").then((m) => ({ default: m.GeneralTaskList }))
 );
@@ -193,12 +195,20 @@ export const TasksView: React.FC = () => {
       />
 
       {activeTab === "market" && (
-        <MarketTaskList
-          items={marketItems}
-          isLoading={loadingMarket}
-          isProcessing={isProcessing}
-          onClaim={handleClaim}
-        />
+        <React.Suspense
+          fallback={
+            <div className="h-64 w-full animate-pulse rounded-2xl bg-stone-100 flex items-center justify-center text-xs text-stone-400">
+              Đang tải chợ nhiệm vụ...
+            </div>
+          }
+        >
+          <MarketTaskList
+            items={marketItems}
+            isLoading={loadingMarket}
+            isProcessing={isProcessing}
+            onClaim={handleClaim}
+          />
+        </React.Suspense>
       )}
 
       {activeTab === "general" && (

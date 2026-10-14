@@ -248,6 +248,7 @@ model UserAchievement {
 
   @@unique([userId, code])
   @@index([userId, unlockedAt])
+  @@index([unlockedAt])
 }
 
 model CheckIn {
@@ -370,6 +371,7 @@ model UserTask {
   @@index([userId, updatedAt])
   @@index([createdAt])
   @@index([taskDefId])
+  @@index([taskDefId, status])
   @@index([taskItemId])
   @@index([status, updatedAt])
   @@index([status, submittedAt])
@@ -487,6 +489,7 @@ model StaffTask {
   @@index([assigneeId, createdAt])
   @@index([createdById])
   @@index([assigneeId, status])
+  @@index([assigneeId, status, createdAt])
   @@index([status])
   @@index([status, createdAt])
   @@index([createdAt])

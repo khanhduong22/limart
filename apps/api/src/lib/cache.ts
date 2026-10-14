@@ -59,7 +59,7 @@ export function getJitteredTTL(baseTTLSeconds: number, jitterRatio = 0.15): numb
 
 export async function getOrSetCache<T>(
   key: string,
-  ttlSeconds: number,
+  ttlSeconds: number | ((data: T) => number),
   fetcher: () => Promise<T>,
   options?: CacheOptions
 ): Promise<T> {
@@ -94,9 +94,10 @@ export async function getOrSetCache<T>(
 
       if (client && data !== undefined && data !== null) {
         try {
+          const baseTTL = typeof ttlSeconds === "function" ? ttlSeconds(data) : ttlSeconds;
           const actualTTL = options?.disableJitter
-            ? ttlSeconds
-            : getJitteredTTL(ttlSeconds, options?.jitterRatio ?? 0.15);
+            ? baseTTL
+            : getJitteredTTL(baseTTL, options?.jitterRatio ?? 0.15);
           await client.setex(key, actualTTL, JSON.stringify(data));
         } catch {
           // Ignore cache write error

@@ -858,34 +858,49 @@ staffRoute.get("/payroll", authMiddleware, async (c) => {
     const year = yearQuery ? parseInt(yearQuery, 10) : now.getFullYear();
 
     const cacheKey = "staff:payroll:" + userId + ":" + month + ":" + year;
-    const payload = await getOrSetCache(cacheKey, 120, async () => {
-      const targetDate = new Date(year, month - 1, 15);
-      const [stats, period] = await Promise.all([
-        calculateUserMonthlyStats(userId, targetDate),
-        prisma.payrollPeriod.findUnique({
+    const payload = await getOrSetCache(
+      cacheKey,
+      (data) => (data?.isClosed ? 300 : 120),
+      async () => {
+        const period = await prisma.payrollPeriod.findUnique({
           where: { month_year: { month, year } },
-        }),
-      ]);
+        });
 
-      const isClosed = period?.status === "CLOSED" || period?.status === "LOCKED";
+        const isClosed = period?.status === "CLOSED" || period?.status === "LOCKED";
+        let stats: any = null;
 
-      return {
-        stats: stats || {
-          totalHours: 0,
-          totalSalary: 0,
-          daysWorked: 0,
-          baseSalary: 0,
-          totalAdjustments: 0,
-          lateCount: 0,
-          latePenaltyHours: 0,
-          latePenaltyAmount: 0,
-          dailyDetails: [],
-        },
-        isClosed,
-        month,
-        year,
-      };
-    });
+        if (period?.status === "CLOSED") {
+          const payslip = await prisma.payslip.findUnique({
+            where: { userId_month_year: { userId, month, year } },
+          });
+          if (payslip?.content) {
+            stats = payslip.content;
+          }
+        }
+
+        if (!stats) {
+          const targetDate = new Date(year, month - 1, 15);
+          stats = await calculateUserMonthlyStats(userId, targetDate);
+        }
+
+        return {
+          stats: stats || {
+            totalHours: 0,
+            totalSalary: 0,
+            daysWorked: 0,
+            baseSalary: 0,
+            totalAdjustments: 0,
+            lateCount: 0,
+            latePenaltyHours: 0,
+            latePenaltyAmount: 0,
+            dailyDetails: [],
+          },
+          isClosed,
+          month,
+          year,
+        };
+      }
+    );
 
     return c.json({
       success: true,

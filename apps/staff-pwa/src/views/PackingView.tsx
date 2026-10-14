@@ -3,7 +3,6 @@ import { useAppQuery } from "@/lib/api-query";
 import {
   ChevronLeft,
   Clock,
-  Plus,
   Sparkles,
 } from "lucide-react";
 import { useRouter } from "@/lib/router";
@@ -16,6 +15,9 @@ import type {
 const PackingSubmitModal = React.lazy(() => import("@/components/packing/PackingSubmitModal"));
 const PackingHistoryList = React.lazy(
   () => import("@/components/packing/PackingHistoryList")
+);
+const PackingPriceList = React.lazy(
+  () => import("@/components/packing/PackingPriceList")
 );
 
 interface PackingSummaryData {
@@ -138,45 +140,19 @@ export const PackingView: React.FC = () => {
 
       {/* TAB 1: BẢNG GIÁ ĐIỂM */}
       {activeTab === "pricelist" && (
-        <div className="space-y-2.5">
-          {isLoading ? (
-            <div className="p-8 text-center text-xs text-stone-400">Đang tải bảng quy đổi...</div>
-          ) : priceList.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-stone-200 bg-white/60 p-8 text-center text-xs text-stone-500">
-              Chưa có danh mục đóng gói nào.
+        <Suspense
+          fallback={
+            <div className="h-64 w-full animate-pulse rounded-2xl bg-purple-50/50 border border-purple-100/50 flex items-center justify-center text-xs text-purple-400">
+              Đang tải bảng giá điểm...
             </div>
-          ) : (
-            (priceList || []).map((item) => {
-              const title = item.name || item.title || (item as any).title || "Đóng gói";
-              const unit = item.unit || "đơn";
-              const baseReward = item.baseReward || 0;
-
-              return (
-                <div
-                  key={item.id}
-                  className="rounded-2xl bg-white border border-purple-100 p-3.5 shadow-xs flex items-center justify-between gap-3"
-                >
-                  <div>
-                    <h3 className="text-sm font-bold text-stone-900">{title}</h3>
-                    {item.description && (
-                      <p className="text-xs text-stone-500 mt-0.5">{item.description}</p>
-                    )}
-                    <span className="inline-block mt-1 text-[11px] font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md">
-                      +{baseReward.toLocaleString()}đ / 1 {unit}
-                    </span>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => handleOpenModal(item)}
-                    className="shrink-0 h-8 text-xs bg-purple-700 hover:bg-purple-800 text-white font-bold px-3 rounded-xl cursor-pointer"
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1" /> Khai báo
-                  </Button>
-                </div>
-              );
-            })
-          )}
-        </div>
+          }
+        >
+          <PackingPriceList
+            priceList={priceList}
+            isLoading={isLoading}
+            onOpenModal={handleOpenModal}
+          />
+        </Suspense>
       )}
 
       {/* TAB 2: LỊCH SỬ KHAI BÁO */}

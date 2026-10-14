@@ -508,9 +508,9 @@ documentsRoute.post("/chat", async (c) => {
         .split(/\s+/)
         .filter((w: string) => w.length > 2);
 
-      const allDocs = await prisma.document.findMany({
-        select: { id: true, title: true, path: true, content: true },
-      });
+      const allDocs = await getOrSetCache("meta:documents:all", 600, () =>
+        prisma.document.findMany({ orderBy: { createdAt: "desc" } })
+      );
 
       const matchedDocs = allDocs
         .filter((doc) => {

@@ -14,7 +14,7 @@ import {
 import { vi } from 'date-fns/locale/vi';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import 'react-big-calendar/lib/addons/dragAndDrop/styles.css';
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { isShiftLocked } from '@/lib/schedule-lock';
 import { api } from '@/lib/api';
@@ -22,11 +22,12 @@ import { useScheduleStore } from '@/stores/useScheduleStore';
 import { eventPropGetter, slotPropGetter } from './schedule-utils';
 import CustomEventComponent from './CustomEventComponent';
 import CalendarToolbar from './CalendarToolbar';
-import ShiftDutySheet from './ShiftDutySheet';
-import CreateShiftDialog from './CreateShiftDialog';
-import ShiftActionDialog from './ShiftActionDialog';
-import MobileScheduleList from './MobileScheduleList';
 import type { CalendarEvent, SheetWeekDay } from './types';
+
+const CreateShiftDialog = React.lazy(() => import('./CreateShiftDialog'));
+const ShiftActionDialog = React.lazy(() => import('./ShiftActionDialog'));
+const ShiftDutySheet = React.lazy(() => import('./ShiftDutySheet'));
+const MobileScheduleList = React.lazy(() => import('./MobileScheduleList'));
 
 const locales = { vi };
 const localizer = dateFnsLocalizer({
@@ -64,6 +65,9 @@ export default function ScheduleCalendar({
     hideFullTime,
     showAllShifts,
     setShowAllShifts,
+    modalOpen,
+    actionModalOpen,
+    dutySheetOpen,
     pendingEvent,
     targetUserId,
     isSeniorRegister,
@@ -392,16 +396,22 @@ export default function ScheduleCalendar({
       className="flex flex-col bg-white rounded-xl shadow-sm border p-4 min-h-[600px] md:h-[750px]"
     >
       {isMobile ? (
-        <MobileScheduleList
-          selectedDate={selectedDate}
-          setSelectedDate={setSelectedDate}
-          displayedEvents={displayedEvents}
-          totalWeekDuties={totalWeekDuties}
-          isAdmin={isAdmin}
-          userId={userId}
-          onSelectEvent={handleSelectEvent}
-          onMobileRegister={handleMobileRegister}
-        />
+        <React.Suspense
+          fallback={
+            <div className="min-h-[500px] w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200" />
+          }
+        >
+          <MobileScheduleList
+            selectedDate={selectedDate}
+            setSelectedDate={setSelectedDate}
+            displayedEvents={displayedEvents}
+            totalWeekDuties={totalWeekDuties}
+            isAdmin={isAdmin}
+            userId={userId}
+            onSelectEvent={handleSelectEvent}
+            onMobileRegister={handleMobileRegister}
+          />
+        </React.Suspense>
       ) : (
         <div className="flex flex-col flex-1 min-w-0">
           <CalendarToolbar
@@ -463,30 +473,42 @@ export default function ScheduleCalendar({
       )}
 
       {/* Registration Dialog */}
-      <CreateShiftDialog
-        isAdmin={isAdmin}
-        users={users}
-        onConfirmRegister={handleConfirmRegister}
-      />
+      {modalOpen && (
+        <React.Suspense fallback={null}>
+          <CreateShiftDialog
+            isAdmin={isAdmin}
+            users={users}
+            onConfirmRegister={handleConfirmRegister}
+          />
+        </React.Suspense>
+      )}
 
       {/* Action / Edit / Swap / Duty Assignment Dialog */}
-      <ShiftActionDialog
-        isAdmin={isAdmin}
-        userId={userId}
-        events={events}
-        setEvents={setEvents}
-        onEventsChange={onEventsChange}
-      />
+      {actionModalOpen && (
+        <React.Suspense fallback={null}>
+          <ShiftActionDialog
+            isAdmin={isAdmin}
+            userId={userId}
+            events={events}
+            setEvents={setEvents}
+            onEventsChange={onEventsChange}
+          />
+        </React.Suspense>
+      )}
 
       {/* Week Duty Drawer / Sheet */}
-      <ShiftDutySheet
-        weekStart={weekStart}
-        weekEnd={weekEnd}
-        totalWeekDuties={totalWeekDuties}
-        sheetWeekDays={sheetWeekDays}
-        isAdmin={isAdmin}
-        handleDeleteShiftTask={handleDeleteShiftTask}
-      />
+      {dutySheetOpen && (
+        <React.Suspense fallback={null}>
+          <ShiftDutySheet
+            weekStart={weekStart}
+            weekEnd={weekEnd}
+            totalWeekDuties={totalWeekDuties}
+            sheetWeekDays={sheetWeekDays}
+            isAdmin={isAdmin}
+            handleDeleteShiftTask={handleDeleteShiftTask}
+          />
+        </React.Suspense>
+      )}
     </div>
   );
 }

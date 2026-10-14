@@ -10,7 +10,7 @@ import {
 import { toast } from "sonner";
 import { StaffProfile, removeAuthToken } from "@/lib/api-client";
 import { useRouter } from "@/lib/router";
-import { triggerPwaInstallPrompt } from "@/components/pwa";
+import { triggerPwaInstallPrompt } from "@/lib/pwa/usePwaInstallPrompt";
 
 interface ProfileViewProps {
   profile: StaffProfile;

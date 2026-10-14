@@ -14,11 +14,14 @@ import {
   useShiftHistoryStore,
   ShiftHistoryFilterType,
 } from "@/stores/useShiftHistoryStore";
-import {
-  ShiftHistoryFilterBar,
-  ShiftHistoryTable,
-  getDateRange,
-} from "./shift-history";
+import { getDateRange } from "./shift-history/types";
+import { ShiftHistoryFilterBar } from "./shift-history/ShiftHistoryFilterBar";
+
+const ShiftHistoryTable = React.lazy(() =>
+  import("./shift-history/ShiftHistoryTable").then((m) => ({
+    default: m.ShiftHistoryTable,
+  }))
+);
 
 export function ShiftHistoryDialog() {
   const {
@@ -111,7 +114,13 @@ export function ShiftHistoryDialog() {
         <ShiftHistoryFilterBar onFilterChange={handleFilterChange} />
 
         {/* History table & pagination */}
-        <ShiftHistoryTable onLoadMore={handleLoadMore} />
+        <React.Suspense
+          fallback={
+            <div className="h-64 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200" />
+          }
+        >
+          <ShiftHistoryTable onLoadMore={handleLoadMore} />
+        </React.Suspense>
       </DialogContent>
     </Dialog>
   );

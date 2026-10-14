@@ -81,8 +81,13 @@ export async function createDefinitionHandler(c: any) {
       },
     });
 
-    await invalidateCachePattern("meta:task-definitions:*").catch(() => {});
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("meta:task-definitions:*"),
+      invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json(
       { success: true, message: "Tạo định mức công việc thành công", data: definition },
@@ -128,8 +133,13 @@ export async function updateDefinitionHandler(c: any) {
       data: dataToUpdate,
     });
 
-    await invalidateCachePattern("meta:task-definitions:*").catch(() => {});
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("meta:task-definitions:*"),
+      invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -175,8 +185,13 @@ export async function deleteDefinitionHandler(c: any) {
       where: { id },
     });
 
-    await invalidateCachePattern("meta:task-definitions:*").catch(() => {});
-    await invalidateCachePattern("task*").catch(() => {});
+    await Promise.all([
+      invalidateCachePattern("meta:task-definitions:*"),
+      invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("task*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa định mức công việc" });
   } catch (err: any) {
@@ -252,6 +267,10 @@ export async function createTaskItemHandler(c: any) {
 
     await Promise.all([
       invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("staff:home:*"),
       invalidateCachePattern("task*"),
     ]).catch(() => {});
 
@@ -314,6 +333,10 @@ export async function updateTaskItemHandler(c: any) {
 
     await Promise.all([
       invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("staff:home:*"),
       invalidateCachePattern("task*"),
     ]).catch(() => {});
 
@@ -367,6 +390,10 @@ export async function updateTaskItemStatusHandler(c: any) {
 
     await Promise.all([
       invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("staff:home:*"),
       invalidateCachePattern("task*"),
     ]).catch(() => {});
 
@@ -410,6 +437,10 @@ export async function resetTaskItemHandler(c: any) {
 
     await Promise.all([
       invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("staff:home:*"),
       invalidateCachePattern("task*"),
     ]).catch(() => {});
 
@@ -452,6 +483,10 @@ export async function closeTaskItemHandler(c: any) {
 
     await Promise.all([
       invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("staff:home:*"),
       invalidateCachePattern("task*"),
     ]).catch(() => {});
 
@@ -485,6 +520,10 @@ export async function deleteTaskItemHandler(c: any) {
 
     await Promise.all([
       invalidateCachePattern("tasks:items:*"),
+      invalidateCachePattern("staff:tasks:*"),
+      invalidateCachePattern("admin:tasks:*"),
+      invalidateCachePattern("user:tasks:my:*"),
+      invalidateCachePattern("staff:home:*"),
       invalidateCachePattern("task*"),
     ]).catch(() => {});
 

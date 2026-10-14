@@ -1379,6 +1379,7 @@ staffRoute.post("/tasks/claim", authMiddleware, async (c) => {
 
     await Promise.all([
       invalidateCachePattern("tasks:market:*"),
+      invalidateCachePattern("tasks:items:*"),
       invalidateCachePattern("user:tasks:my:" + userId + "*"),
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff:tasks:*"),

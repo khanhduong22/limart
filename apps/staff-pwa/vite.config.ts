@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     viteVersionPlugin({
-      version: "1.0.0",
+      version: "1.0.1",
       title: "LimArt Chấm Công Staff",
     }),
     VitePWA({
@@ -79,14 +79,15 @@ export default defineConfig(({ mode }) => ({
           },
           {
             // CacheFirst cho static assets (fonts, icons, images, css, js)
-            urlPattern: ({ request }) =>
-              request.destination === "style" ||
-              request.destination === "script" ||
-              request.destination === "image" ||
-              request.destination === "font",
+            urlPattern: ({ request, url }) =>
+              !url.pathname.startsWith("/admin") &&
+              (request.destination === "style" ||
+                request.destination === "script" ||
+                request.destination === "image" ||
+                request.destination === "font"),
             handler: "CacheFirst",
             options: {
-              cacheName: "limart-v2-static-assets",
+              cacheName: "limart-v3-static-assets",
               expiration: {
                 maxEntries: 120,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days

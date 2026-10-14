@@ -26,7 +26,8 @@ FROM nginx:1.27-alpine AS runner
 # Copy custom Nginx configuration
 COPY apps/admin-spa/nginx.conf /etc/nginx/conf.d/default.conf
 
-# Copy compiled static assets into /admin subdirectory for prefix routing
+# Copy compiled static assets into both root and /admin subdirectory for prefix routing
+COPY --from=builder /app/apps/admin-spa/dist /usr/share/nginx/html
 COPY --from=builder /app/apps/admin-spa/dist /usr/share/nginx/html/admin
 
 EXPOSE 3001

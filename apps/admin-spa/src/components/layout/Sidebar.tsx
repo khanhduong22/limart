@@ -29,15 +29,16 @@ export function Sidebar({
         <Link className="flex items-center gap-2.5 font-bold text-slate-800" to="/">
           <div className="h-8 w-8 rounded-lg bg-orange-100 flex items-center justify-center border border-orange-200 shadow-sm shrink-0">
             <img
-              src="/logo.png"
+              src="/admin/logo.png"
               alt="LimArt"
               width="24"
               height="24"
               decoding="async"
               className="h-6 w-6 object-contain"
               onError={(e) => {
+                e.currentTarget.onerror = null;
                 (e.currentTarget as HTMLImageElement).src =
-                  "/icons/capy_dashboard.webp";
+                  "/admin/icons/capy_dashboard.webp";
               }}
             />
           </div>

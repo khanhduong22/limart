@@ -13,30 +13,30 @@ export default function AdminNavLinks({
   onItemClick?: () => void;
 }) {
   const links = [
-    { href: "/", label: "Dashboard", icon: "/icons/capy_dashboard.webp" },
-    { href: "/employees", label: "Nhân sự", icon: "/icons/capy_hr.webp" },
-    { href: "/schedule", label: "Lịch làm việc", icon: "/icons/capy_calendar.webp" },
-    { href: "/reports", label: "Bảng thành tích", icon: "/icons/capy_badge.webp" },
+    { href: "/", label: "Dashboard", icon: "/admin/icons/capy_dashboard.webp" },
+    { href: "/employees", label: "Nhân sự", icon: "/admin/icons/capy_hr.webp" },
+    { href: "/schedule", label: "Lịch làm việc", icon: "/admin/icons/capy_calendar.webp" },
+    { href: "/reports", label: "Bảng thành tích", icon: "/admin/icons/capy_badge.webp" },
     {
       href: "/requests",
       label: "Duyệt yêu cầu",
       badge: pendingRequestsCount,
-      icon: "/icons/capy_request.webp",
+      icon: "/admin/icons/capy_request.webp",
     },
-    { href: "/announcements", label: "Thông báo", icon: "/icons/capy_announce.webp" },
-    { href: "/payroll", label: "Bảng Lương", icon: "/icons/capy_payroll.webp" },
-    { href: "/lucky-wheel", label: "Vòng quay", icon: "/icons/capy_wheel.webp" },
+    { href: "/announcements", label: "Thông báo", icon: "/admin/icons/capy_announce.webp" },
+    { href: "/payroll", label: "Bảng Lương", icon: "/admin/icons/capy_payroll.webp" },
+    { href: "/lucky-wheel", label: "Vòng quay", icon: "/admin/icons/capy_wheel.webp" },
     {
       href: "/tasks",
       label: "Duyệt WFH & Đóng gói",
       badge: pendingTasksCount,
-      icon: "/icons/capy_wfh.webp",
+      icon: "/admin/icons/capy_wfh.webp",
     },
-    { href: "/manager-tasks", label: "Manager Tasks", icon: "/icons/capy_manager.webp" },
-    { href: "/staff-tasks", label: "Công việc và KPI", icon: "/icons/capy_kpi.webp" },
-    { href: "/settings", label: "Cấu hình (IP)", icon: "/icons/capy_settings.webp" },
-    { href: "/audit-logs", label: "Session Audit Log", icon: "/icons/capy_badge.webp" },
-    { href: "/help", label: "Trợ lí Capy", icon: "/icons/capy_ai.webp" },
+    { href: "/manager-tasks", label: "Manager Tasks", icon: "/admin/icons/capy_manager.webp" },
+    { href: "/staff-tasks", label: "Công việc và KPI", icon: "/admin/icons/capy_kpi.webp" },
+    { href: "/settings", label: "Cấu hình (IP)", icon: "/admin/icons/capy_settings.webp" },
+    { href: "/audit-logs", label: "Session Audit Log", icon: "/admin/icons/capy_badge.webp" },
+    { href: "/help", label: "Trợ lí Capy", icon: "/admin/icons/capy_ai.webp" },
   ];
 
   return (
@@ -70,8 +70,9 @@ export default function AdminNavLinks({
                 loading="lazy"
                 className="w-full h-full object-contain"
                 onError={(e) => {
+                  e.currentTarget.onerror = null;
                   (e.currentTarget as HTMLImageElement).src =
-                    "/icons/capy_dashboard.webp";
+                    "/admin/icons/capy_dashboard.webp";
                 }}
               />
             </div>

@@ -131,12 +131,13 @@ export function HelpPage() {
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center p-2 shadow-sm shrink-0">
             <img
-              src="/icons/capy_ai.webp"
+              src="/admin/icons/capy_ai.webp"
               alt="Capy AI"
               className="w-full h-full object-contain"
               onError={(e) => {
+                e.currentTarget.onerror = null;
                 (e.currentTarget as HTMLImageElement).src =
-                  "/icons/capy_dashboard.webp";
+                  "/admin/icons/capy_dashboard.webp";
               }}
             />
           </div>

@@ -6,9 +6,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, DollarSign, Clock, Calendar, Gift, Download, User } from "lucide-react";
-import { exportSingleEmployeeXLSX } from "@/lib/payrollExport";
 import { toast } from "sonner";
-import { SendPayslipButton } from "@/components/admin/SendPayslipButton";
+
+const SendPayslipButton = React.lazy(() =>
+  import("@/components/admin/SendPayslipButton").then((m) => ({
+    default: m.SendPayslipButton,
+  }))
+);
+
+const EmployeePayrollDailyTable = React.lazy(
+  () => import("@/components/admin/employee-payroll/EmployeePayrollDailyTable")
+);
 
 export function EmployeePayrollPage() {
   const { userId } = useParams<{ userId: string }>();
@@ -71,6 +79,7 @@ export function EmployeePayrollPage() {
 
   const handleDownload = async () => {
     try {
+      const { exportSingleEmployeeXLSX } = await import("@/lib/payrollExport");
       await exportSingleEmployeeXLSX(
         {
           id: user.id,
@@ -146,14 +155,27 @@ export function EmployeePayrollPage() {
           >
             <Download className="h-3.5 w-3.5" /> Xuất Excel
           </Button>
-          <SendPayslipButton
-            userId={user.id}
-            month={month}
-            year={year}
-            emailSentAt={data?.data?.payslip?.emailSentAt}
-            hasPayslip={Boolean(isClosed)}
-            onSuccess={() => mutate()}
-          />
+          <React.Suspense
+            fallback={
+              <Button
+                variant="outline"
+                size="sm"
+                disabled
+                className="h-10 sm:h-9 text-xs"
+              >
+                Gửi phiếu lương
+              </Button>
+            }
+          >
+            <SendPayslipButton
+              userId={user.id}
+              month={month}
+              year={year}
+              emailSentAt={data?.data?.payslip?.emailSentAt}
+              hasPayslip={Boolean(isClosed)}
+              onSuccess={() => mutate()}
+            />
+          </React.Suspense>
           <Link to={`/employees/${user.id}`} className="flex-1 sm:flex-initial">
             <Button variant="outline" size="sm" className="w-full h-10 sm:h-9 min-h-[38px] gap-1.5 text-xs">
               <User className="h-3.5 w-3.5" /> Hồ Sơ
@@ -270,67 +292,16 @@ export function EmployeePayrollPage() {
       </Card>
 
       {/* Daily Shift Details */}
-      <Card className="overflow-hidden">
-        <CardHeader className="p-4 bg-slate-50/70 border-b">
-          <CardTitle className="font-bold text-slate-800 text-sm">Chi tiết công theo từng ngày</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch]">
-            {!stats?.dailyDetails || stats.dailyDetails.length === 0 ? (
-              <div className="p-6 text-center text-xs text-muted-foreground">
-                Chưa có dữ liệu chấm công tháng này.
-              </div>
-            ) : (
-              <table className="w-full text-xs min-w-[500px]">
-                <thead className="bg-slate-50 border-b text-[10px] font-bold text-muted-foreground uppercase">
-                  <tr>
-                    <th className="p-3 text-left">Ngày</th>
-                    <th className="p-3 text-center">Vào</th>
-                    <th className="p-3 text-center">Ra</th>
-                    <th className="p-3 text-center">Giờ</th>
-                    <th className="p-3 text-right">Lương</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {stats.dailyDetails.map((day: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-slate-50/50">
-                      <td className="p-3 font-medium text-slate-800">
-                        {new Date(day.date).toLocaleDateString("vi-VN", {
-                          weekday: "short",
-                          day: "2-digit",
-                          month: "2-digit",
-                        })}
-                      </td>
-                      <td className="p-3 text-center font-mono text-slate-600">
-                        {day.checkIn
-                          ? new Date(day.checkIn).toLocaleTimeString("vi-VN", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : "--:--"}
-                      </td>
-                      <td className="p-3 text-center font-mono text-slate-600">
-                        {day.checkOut
-                          ? new Date(day.checkOut).toLocaleTimeString("vi-VN", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })
-                          : "--:--"}
-                      </td>
-                      <td className="p-3 text-center font-mono font-bold text-blue-900">
-                        {day.hours > 0 ? `${day.hours.toFixed(1)}h` : "-"}
-                      </td>
-                      <td className="p-3 text-right font-mono font-bold text-emerald-700">
-                        {day.salary > 0 ? formatVND(day.salary) : "-"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <React.Suspense
+        fallback={
+          <div className="h-64 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200" />
+        }
+      >
+        <EmployeePayrollDailyTable
+          dailyDetails={stats?.dailyDetails}
+          formatVND={formatVND}
+        />
+      </React.Suspense>
     </div>
   );
 }

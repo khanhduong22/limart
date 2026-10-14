@@ -158,6 +158,11 @@ deploy_dual_run() {
             -e NEXTAUTH_SECRET="${NEXTAUTH_SECRET:-checkin-app-jwt-secret-monorepo-safe-2026}" \
             "${API_IMAGE}"
 
+        if docker network inspect limart-infra >/dev/null 2>&1; then
+            docker network connect limart-infra "${CANDIDATE_API_CONTAINER}" 2>/dev/null || true
+            log_info "Connected candidate container to internal network 'limart-infra'."
+        fi
+
         # Step 6: Database schema migration sync in candidate container
         log_info "Syncing database schema via Prisma in candidate container..."
         docker exec "${CANDIDATE_API_CONTAINER}" node -e "
@@ -182,7 +187,7 @@ deploy_dual_run() {
                 break
             fi
 
-            if docker exec "${CANDIDATE_API_CONTAINER}" wget -q -O - http://127.0.0.1:4000/health 2>/dev/null | grep -q '"status":'; then
+            if docker exec "${CANDIDATE_API_CONTAINER}" wget -q -O - http://127.0.0.1:4000/health 2>/dev/null | grep -q '"status":"ok"'; then
                 CANDIDATE_HEALTHY=true
                 log_success "Candidate container '${CANDIDATE_API_CONTAINER}' is HEALTHY in ${ELAPSED}s!"
                 break

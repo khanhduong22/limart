@@ -1372,6 +1372,7 @@ adminRoute.post("/requests/:id/action", async (c) => {
       invalidateCachePattern("user:requests:*"),
       invalidateCachePattern("admin:requests:*"),
       invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("staff:home:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -1406,6 +1407,7 @@ adminRoute.post("/requests/:id/approve", async (c) => {
       invalidateCachePattern("user:requests:*"),
       invalidateCachePattern("admin:requests:*"),
       invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("staff:home:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -1441,6 +1443,7 @@ adminRoute.post("/requests/:id/reject", async (c) => {
       invalidateCachePattern("user:requests:*"),
       invalidateCachePattern("admin:requests:*"),
       invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("staff:home:*"),
     ]).catch(() => {});
 
     return c.json({

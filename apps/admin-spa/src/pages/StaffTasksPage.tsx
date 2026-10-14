@@ -12,12 +12,16 @@ import {
 import { useAdminStaffTasksStore } from "@/stores/useAdminStaffTasksStore";
 import {
   StaffTasksFilterBar,
-  StaffTasksTable,
-  StaffKpiStatsCards,
   computeStaffTaskDateRanges,
   filterStaffTasks,
 } from "@/components/tasks/staff";
 
+const StaffTasksTable = React.lazy(() =>
+  import("@/components/tasks/staff").then((m) => ({ default: m.StaffTasksTable }))
+);
+const StaffKpiStatsCards = React.lazy(() =>
+  import("@/components/tasks/staff").then((m) => ({ default: m.StaffKpiStatsCards }))
+);
 const StaffTaskFormDialog = React.lazy(() =>
   import("@/components/tasks/staff").then((m) => ({ default: m.StaffTaskFormDialog }))
 );
@@ -267,25 +271,29 @@ export function StaffTasksPage() {
       />
 
       {/* KPI Performance Overview */}
-      <StaffKpiStatsCards
-        selectedUserFilter={selectedAssignee}
-        allowedUsers={allowedUsers}
-        userStats={userStats}
-      />
+      <React.Suspense fallback={<div className="h-28 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200" />}>
+        <StaffKpiStatsCards
+          selectedUserFilter={selectedAssignee}
+          allowedUsers={allowedUsers}
+          userStats={userStats}
+        />
+      </React.Suspense>
 
       {/* Staff Tasks Responsive Table / Kanban Board with .cv-auto-table-row & .cv-auto-card */}
-      <StaffTasksTable
-        tasks={filteredTasks}
-        onSelectTask={(task) => openReviewModal(task)}
-        onEditTask={(task, e) => {
-          e.stopPropagation();
-          openAssignTask(task);
-        }}
-        onDeleteTask={handleDeleteTask}
-        onApproveTask={handleApproveTask}
-        onRejectTask={handleOpenRejectDialog}
-        submitting={submitting}
-      />
+      <React.Suspense fallback={<div className="h-96 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-xs text-slate-400">Đang tải danh sách công việc...</div>}>
+        <StaffTasksTable
+          tasks={filteredTasks}
+          onSelectTask={(task) => openReviewModal(task)}
+          onEditTask={(task, e) => {
+            e.stopPropagation();
+            openAssignTask(task);
+          }}
+          onDeleteTask={handleDeleteTask}
+          onApproveTask={handleApproveTask}
+          onRejectTask={handleOpenRejectDialog}
+          submitting={submitting}
+        />
+      </React.Suspense>
 
       {/* Dialogs */}
       <React.Suspense fallback={null}>

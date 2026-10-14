@@ -231,6 +231,7 @@ export async function invalidatePayrollCache(): Promise<void> {
   try {
     await invalidateCachePattern("payroll:*");
     await invalidateCachePattern("admin:payroll:*");
+    await invalidateCachePattern("admin:payroll:closed-payslips:*");
     await invalidateCachePattern("admin:payroll-user:*");
     await invalidateCachePattern("admin:employee-detail:*");
     await invalidateCachePattern("staff:payroll:*");

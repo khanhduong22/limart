@@ -2,12 +2,12 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import SpecialDaysWidget from "@/components/home/SpecialDaysWidget";
 import { LATEST_VERSION, CHANGELOGS } from "@/lib/changelogs";
 import { useDashboardStats, useAttendanceFeed, useEmployees } from "@/hooks/useAdminData";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
 
+const SpecialDaysWidget = React.lazy(() => import("@/components/home/SpecialDaysWidget"));
 const ManualCheckInForm = React.lazy(() => import("@/components/admin/ManualCheckInForm"));
 const ChangelogPopup = React.lazy(() => import("@/components/admin/ChangelogPopup"));
 
@@ -198,10 +198,12 @@ export function DashboardPage() {
 
       {/* Special Days Widget */}
       <div className="mb-6">
-        <SpecialDaysWidget
-          specialUsers={specialUsers}
-          enableCalendar={true}
-        />
+        <React.Suspense fallback={<div className="h-32 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200" />}>
+          <SpecialDaysWidget
+            specialUsers={specialUsers}
+            enableCalendar={true}
+          />
+        </React.Suspense>
       </div>
 
       {/* 4 KPI Cards */}

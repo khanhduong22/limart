@@ -11,6 +11,7 @@ const AnnouncementBar = lazy(() => import("@/components/AnnouncementBar"));
 const ShiftDutyHomeWidget = lazy(() => import("@/components/shift-duty/ShiftDutyHomeWidget"));
 const GachaButton = lazy(() => import("@/components/GachaButton"));
 const CapyAssistant = lazy(() => import("@/components/CapyAssistant"));
+const SpecialDaysWidget = lazy(() => import("@/components/home/SpecialDaysWidget"));
 import { Button } from "@/components/ui/button";
 import { Link, useRouter } from "@/lib/router";
 import { useHomeCheckinStore } from "@/stores/useHomeCheckinStore";
@@ -20,7 +21,6 @@ import {
   LateWarningBanner,
   PartnerWelcomeBanner,
   HomeNavGrid,
-  SpecialDaysWidget,
   RejectedTasksAlertBanner,
 } from "@/components/home";
 
@@ -94,11 +94,13 @@ export const HomeCheckinView: React.FC = () => {
 
         {/* Special Days Widget */}
         <div id="home-special-days">
-          <SpecialDaysWidget
-            specialUsers={specialUsers || []}
-            currentUserId={user?.id}
-            enableCalendar={false}
-          />
+          <Suspense fallback={null}>
+            <SpecialDaysWidget
+              specialUsers={specialUsers || []}
+              currentUserId={user?.id}
+              enableCalendar={false}
+            />
+          </Suspense>
         </div>
 
         {/* Announcements Modal Popup */}

@@ -2381,8 +2381,8 @@ adminRoute.post("/adjustments", async (c) => {
   }
 });
 
-// GET /api/admin/payroll
-adminRoute.get("/payroll", async (c) => {
+// GET /api/admin/payroll and GET /api/admin/payroll/summary
+const payrollSummaryHandler = async (c: any) => {
   try {
     const month = parseInt(c.req.query("month") || "", 10) || new Date().getMonth() + 1;
     const year = parseInt(c.req.query("year") || "", 10) || new Date().getFullYear();
@@ -2424,24 +2424,27 @@ adminRoute.get("/payroll", async (c) => {
       const isPeriodClosed = period?.status === "CLOSED";
 
       if (isPeriodClosed) {
-        const payslips = await prisma.payslip.findMany({
-          where: { month, year },
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                role: true,
-                employmentType: true,
-                hourlyRate: true,
-                adjustments: {
-                  where: { date: { gte: startDate, lte: endDate } },
-                  orderBy: { date: "desc" },
+        const cacheKey = `admin:payroll:closed-payslips:${month}:${year}`;
+        const payslips = await getOrSetCache(cacheKey, 300, async () => {
+          return await prisma.payslip.findMany({
+            where: { month, year },
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  role: true,
+                  employmentType: true,
+                  hourlyRate: true,
+                  adjustments: {
+                    where: { date: { gte: startDate, lte: endDate } },
+                    orderBy: { date: "desc" },
+                  },
                 },
               },
             },
-          },
+          });
         });
 
         if (payslips.length > 0) {
@@ -2598,7 +2601,9 @@ adminRoute.get("/payroll", async (c) => {
       500
     );
   }
-});
+};
+adminRoute.get("/payroll", payrollSummaryHandler);
+adminRoute.get("/payroll/summary", payrollSummaryHandler);
 
 // GET /api/admin/payroll/:userId
 adminRoute.get("/payroll/:userId", async (c) => {
@@ -3263,6 +3268,7 @@ adminRoute.post("/payroll/bonus", async (c) => {
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("admin:dashboard*"),
       invalidateCachePattern("staff:payroll:*"),
+      invalidateCachePattern("admin:payroll:closed-payslips:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -3294,6 +3300,11 @@ adminRoute.post("/payroll/close", async (c) => {
       targets || ["PART_TIME"],
       excludedBonusUsers || []
     );
+
+    await Promise.all([
+      invalidatePayrollCache(),
+      invalidateCachePattern("admin:payroll:closed-payslips:*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,
@@ -3329,6 +3340,7 @@ adminRoute.post("/payroll/reopen", async (c) => {
       invalidateCachePattern("stats:*"),
       invalidateCachePattern("admin:dashboard*"),
       invalidateCachePattern("staff:payroll:*"),
+      invalidateCachePattern("admin:payroll:closed-payslips:*"),
     ]).catch(() => {});
 
     return c.json({

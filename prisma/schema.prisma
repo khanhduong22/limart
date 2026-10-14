@@ -130,6 +130,7 @@ model ShiftAuditLog {
   @@index([createdAt])
   @@index([userId, createdAt])
   @@index([shiftId, createdAt])
+  @@index([action, createdAt])
 }
 
 model Request {
@@ -198,6 +199,7 @@ model PayrollAdjustment {
   @@index([userId, date])
   @@index([date])
   @@index([userId, createdAt])
+  @@index([userId, date, amount])
 }
 
 model LuckyWheelPrize {
@@ -404,6 +406,7 @@ model Payslip {
   @@unique([userId, month, year])
   @@index([month, year])
   @@index([status, month, year])
+  @@index([userId, status, month, year])
 }
 
 model Document {

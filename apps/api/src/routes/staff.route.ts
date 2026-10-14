@@ -830,6 +830,7 @@ staffRoute.post("/schedule/:id/take", authMiddleware, async (c) => {
       invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
       invalidateCachePattern(`shifts:my-shifts:${existing.userId}:*`),
       invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("admin:schedule:history:*"),
       invalidateCachePattern("shifts:*"),
     ]).catch(() => {});
 

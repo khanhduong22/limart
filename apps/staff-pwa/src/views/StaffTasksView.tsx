@@ -20,9 +20,14 @@ import {
 import {
   TaskFilterTabs,
   StaffTaskCard,
-  TaskDetailModal,
-  TaskSubmitModal,
 } from "@/components/tasks";
+
+const TaskDetailModal = React.lazy(() =>
+  import("@/components/tasks").then((m) => ({ default: m.TaskDetailModal }))
+);
+const TaskSubmitModal = React.lazy(() =>
+  import("@/components/tasks").then((m) => ({ default: m.TaskSubmitModal }))
+);
 
 interface StaffTasksResponse {
   allowed: boolean;
@@ -267,25 +272,29 @@ export const StaffTasksView: React.FC = () => {
       </div>
 
       {/* READ-ONLY TASK DETAILS MODAL */}
-      <TaskDetailModal
-        task={viewingTask}
-        isProcessing={isProcessing}
-        onClose={closeDetailModal}
-        onStartTask={handleStartTask}
-        onSubmitTask={openSubmitModal}
-      />
+      <React.Suspense fallback={null}>
+        <TaskDetailModal
+          task={viewingTask}
+          isProcessing={isProcessing}
+          onClose={closeDetailModal}
+          onStartTask={handleStartTask}
+          onSubmitTask={openSubmitModal}
+        />
+      </React.Suspense>
 
       {/* FINISH TASK MODAL */}
-      <TaskSubmitModal
-        task={finishingTask}
-        evidenceLink={evidenceLink}
-        note={note}
-        isProcessing={isProcessing}
-        onEvidenceLinkChange={setEvidenceLink}
-        onNoteChange={setNote}
-        onSubmit={handleFinishSubmit}
-        onClose={closeSubmitModal}
-      />
+      <React.Suspense fallback={null}>
+        <TaskSubmitModal
+          task={finishingTask}
+          evidenceLink={evidenceLink}
+          note={note}
+          isProcessing={isProcessing}
+          onEvidenceLinkChange={setEvidenceLink}
+          onNoteChange={setNote}
+          onSubmit={handleFinishSubmit}
+          onClose={closeSubmitModal}
+        />
+      </React.Suspense>
     </div>
   );
 };

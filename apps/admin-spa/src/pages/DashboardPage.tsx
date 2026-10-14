@@ -10,6 +10,8 @@ import { api } from "@/lib/api";
 const SpecialDaysWidget = React.lazy(() => import("@/components/home/SpecialDaysWidget"));
 const ManualCheckInForm = React.lazy(() => import("@/components/admin/ManualCheckInForm"));
 const ChangelogPopup = React.lazy(() => import("@/components/admin/ChangelogPopup"));
+const CheckinActivityCard = React.lazy(() => import("@/components/home/CheckinActivityCard"));
+const TodayScheduleCard = React.lazy(() => import("@/components/home/TodayScheduleCard"));
 
 const GRACE_PERIOD_MINUTES = 5;
 
@@ -292,134 +294,29 @@ export function DashboardPage() {
       {/* Grid: Check-in Activity & Today Schedule */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-7">
         {/* Check-in Activity (Col 4) */}
-        <Card
-          id="dashboard-checkin-activity"
-          className="col-span-1 lg:col-span-4 bg-white shadow-sm overflow-hidden"
+        <React.Suspense
+          fallback={
+            <div className="col-span-1 lg:col-span-4 h-64 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200" />
+          }
         >
-          <CardHeader>
-            <CardTitle className="text-base font-bold">
-              Hoạt động chấm công
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {checkinsToday.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Chưa có lượt chấm công nào hôm nay.
-                </p>
-              ) : (
-                <div className="space-y-4">
-                  {checkinsToday.map((checkin) => (
-                    <div
-                      key={checkin.id}
-                      className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0 gap-2"
-                    >
-                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                        <div
-                          className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs shrink-0 ${
-                            checkin.type === "checkin"
-                              ? "bg-emerald-100 text-emerald-600"
-                              : "bg-orange-100 text-orange-600"
-                          }`}
-                        >
-                          {(checkin.user?.name || "?").charAt(0).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium hover:underline truncate">
-                            <Link to={`/employees/${checkin.userId}`}>
-                              {checkin.user?.name || "Nhân viên"}
-                            </Link>
-                          </p>
-                          <p
-                            className={`text-xs ${
-                              checkin.type === "checkin"
-                                ? "text-emerald-600"
-                                : "text-orange-600"
-                            }`}
-                          >
-                            {checkin.type === "checkin"
-                              ? "🟢 Vào ca"
-                              : "👋 Tan ca"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-sm font-bold font-mono text-slate-800">
-                          {formatTime(checkin.timestamp)}
-                        </p>
-                        <div className="flex justify-end">
-                          {getShiftStatus(checkin)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+          <CheckinActivityCard
+            checkinsToday={checkinsToday}
+            formatTime={formatTime}
+            getShiftStatus={getShiftStatus}
+          />
+        </React.Suspense>
 
         {/* Today's Schedule (Col 3) */}
-        <Card
-          id="dashboard-today-schedule"
-          className="col-span-1 lg:col-span-3 bg-white shadow-sm overflow-hidden"
+        <React.Suspense
+          fallback={
+            <div className="col-span-1 lg:col-span-3 h-64 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200" />
+          }
         >
-          <CardHeader>
-            <CardTitle className="text-base font-bold">
-              Lịch làm việc hôm nay
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {(Array.isArray(todayShifts) ? todayShifts : []).length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  Không có lịch làm việc hôm nay.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  {(Array.isArray(todayShifts) ? todayShifts : []).map((shift: any) => (
-                    <div
-                      key={shift.id}
-                      className="flex items-center justify-between p-2.5 rounded-lg bg-gray-50 border border-gray-100 gap-2"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {shift.user?.image ? (
-                          <img
-                            src={shift.user.image}
-                            alt={shift.user.name || "Avatar"}
-                            width="24"
-                            height="24"
-                            decoding="async"
-                            loading="lazy"
-                            className="h-6 w-6 rounded-full object-cover shrink-0"
-                            onError={(e) => {
-                              const target = e.currentTarget;
-                              if (!target.src.endsWith("/icons/capy_dashboard.webp")) {
-                                target.src = "/icons/capy_dashboard.webp";
-                              }
-                            }}
-                          />
-                        ) : (
-                          <div className="h-6 w-6 rounded-full bg-blue-100 flex items-center justify-center text-[10px] text-blue-600 font-bold shrink-0">
-                            {(shift.user?.name || "?").charAt(0).toUpperCase()}
-                          </div>
-                        )}
-                        <span className="text-sm font-medium hover:underline text-slate-800 truncate">
-                          <Link to={`/employees/${shift.userId}`}>
-                            {shift.user?.name || "Nhân sự"}
-                          </Link>
-                        </span>
-                      </div>
-                      <div className="text-xs font-mono font-medium text-slate-600 shrink-0">
-                        {formatTime(shift.start)} - {formatTime(shift.end)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+          <TodayScheduleCard
+            todayShifts={todayShifts}
+            formatTime={formatTime}
+          />
+        </React.Suspense>
       </div>
 
       {/* Quick Manual Check-In Form */}

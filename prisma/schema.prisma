@@ -467,6 +467,7 @@ model ManagerTask {
   @@index([status])
   @@index([status, deadline])
   @@index([createdById])
+  @@index([createdById, status, deadline])
   @@index([parentId])
 }
 
@@ -492,6 +493,7 @@ model StaffTask {
 
   @@index([assigneeId, startDate])
   @@index([assigneeId, createdAt])
+  @@index([assigneeId, deadline, status])
   @@index([createdById])
   @@index([assigneeId, status])
   @@index([assigneeId, status, createdAt])
@@ -555,6 +557,7 @@ model ManagerWeeklyTask {
   @@index([assigneeId, completed])
   @@index([assigneeId, completed, weekStart])
   @@index([weekStart])
+  @@index([weekStart, weekEnd])
   @@index([createdAt])
 }
 

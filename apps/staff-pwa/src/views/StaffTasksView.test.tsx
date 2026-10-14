@@ -128,7 +128,7 @@ describe("StaffTasksView Integration", () => {
     expect(mockPush).toHaveBeenCalledWith("/");
   });
 
-  it("renders Monthly KPI overview card with metrics and rate percentage", () => {
+  it("renders Monthly KPI overview card with metrics and rate percentage", async () => {
     mockSwrResponse = {
       data: {
         success: true,
@@ -143,11 +143,13 @@ describe("StaffTasksView Integration", () => {
     render(<StaffTasksView />);
 
     expect(screen.getByText("Công Việc & KPI")).toBeDefined();
-    expect(screen.getByText("Hiệu Suất Tháng")).toBeDefined();
-    expect(screen.getByText("25%")).toBeDefined();
-    expect(screen.getByText("1 / 4 Việc")).toBeDefined();
-    expect(screen.getAllByText("Chờ duyệt").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Đã duyệt").length).toBeGreaterThanOrEqual(1);
+    await waitFor(() => {
+      expect(screen.getByText("Hiệu Suất Tháng")).toBeDefined();
+      expect(screen.getByText("25%")).toBeDefined();
+      expect(screen.getByText("1 / 4 Việc")).toBeDefined();
+      expect(screen.getAllByText("Chờ duyệt").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Đã duyệt").length).toBeGreaterThanOrEqual(1);
+    });
   });
 
   it("filters tasks properly when switching tabs (TODO, DOING, DONE, APPROVED)", () => {

@@ -937,9 +937,11 @@ const handleDeleteUser = async (c: any) => {
 adminRoute.post("/users", handleCreateUser);
 adminRoute.post("/employees", handleCreateUser);
 
-// PUT /api/admin/users/:id and alias /api/admin/employees/:id
+// PUT and PATCH /api/admin/users/:id and alias /api/admin/employees/:id
 adminRoute.put("/users/:id", handleUpdateUser);
 adminRoute.put("/employees/:id", handleUpdateUser);
+adminRoute.patch("/users/:id", handleUpdateUser);
+adminRoute.patch("/employees/:id", handleUpdateUser);
 
 // DELETE /api/admin/users/:id and alias /api/admin/employees/:id
 adminRoute.delete("/users/:id", handleDeleteUser);

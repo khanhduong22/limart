@@ -243,10 +243,13 @@ const handleCreateChecklistTask = async (c: any) => {
       },
     });
 
-    await invalidateCachePattern("manager-tasks:templates:*");
-    await invalidateCachePattern("manager-tasks:checklist:*");
-    await invalidateCachePattern("stats:*");
-    await invalidateCachePattern("payroll:*");
+    await Promise.all([
+      invalidateCachePattern("admin:manager-tasks:*"),
+      invalidateCachePattern("manager-tasks:templates:*"),
+      invalidateCachePattern("manager-tasks:checklist:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("payroll:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: task });
   } catch (err: any) {
@@ -289,10 +292,13 @@ const handleUpdateChecklistTask = async (c: any) => {
       data,
     });
 
-    await invalidateCachePattern("manager-tasks:templates:*");
-    await invalidateCachePattern("manager-tasks:checklist:*");
-    await invalidateCachePattern("stats:*");
-    await invalidateCachePattern("payroll:*");
+    await Promise.all([
+      invalidateCachePattern("admin:manager-tasks:*"),
+      invalidateCachePattern("manager-tasks:templates:*"),
+      invalidateCachePattern("manager-tasks:checklist:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("payroll:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: task });
   } catch (err: any) {
@@ -326,10 +332,13 @@ const handleDeleteChecklistTask = async (c: any) => {
       where: { id },
     });
 
-    await invalidateCachePattern("manager-tasks:templates:*");
-    await invalidateCachePattern("manager-tasks:checklist:*");
-    await invalidateCachePattern("stats:*");
-    await invalidateCachePattern("payroll:*");
+    await Promise.all([
+      invalidateCachePattern("admin:manager-tasks:*"),
+      invalidateCachePattern("manager-tasks:templates:*"),
+      invalidateCachePattern("manager-tasks:checklist:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("payroll:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true });
   } catch (err: any) {
@@ -365,10 +374,13 @@ const handleReorderChecklistTasks = async (c: any) => {
       )
     );
 
-    await invalidateCachePattern("manager-tasks:templates:*");
-    await invalidateCachePattern("manager-tasks:checklist:*");
-    await invalidateCachePattern("stats:*");
-    await invalidateCachePattern("payroll:*");
+    await Promise.all([
+      invalidateCachePattern("admin:manager-tasks:*"),
+      invalidateCachePattern("manager-tasks:templates:*"),
+      invalidateCachePattern("manager-tasks:checklist:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("payroll:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true });
   } catch (err: any) {

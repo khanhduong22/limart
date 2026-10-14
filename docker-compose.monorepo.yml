@@ -28,6 +28,9 @@ services:
       - limart-db
       - limart-valkey
     networks:
+      limart-infra:
+        aliases:
+          - limart-api
       ops_bridge:
         aliases:
           - limart-api
@@ -120,7 +123,7 @@ services:
       - "127.0.0.1:6389:6379"
     mem_limit: 64m
     networks:
-      ops_bridge:
+      limart-infra:
         aliases:
           - limart-valkey
           - checkin-valkey
@@ -148,12 +151,15 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      ops_bridge:
+      limart-infra:
         aliases:
           - limart-db
           - checkin-db
 
 networks:
+  limart-infra:
+    name: limart-infra
+    driver: bridge
   ops_bridge:
     external: true
 

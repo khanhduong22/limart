@@ -272,4 +272,22 @@ export async function invalidateSpecialDaysCache(): Promise<void> {
   }
 }
 
+/**
+ * Invalidate task summary cache (carrying and packing summaries)
+ */
+export async function invalidateTaskSummaryCache(userId?: string): Promise<void> {
+  try {
+    if (userId) {
+      await invalidateCachePattern(`staff:tasks:carrying-summary:${userId}*`);
+      await invalidateCachePattern(`staff:tasks:packing-summary:${userId}*`);
+    } else {
+      await invalidateCachePattern(`staff:tasks:carrying-summary:*`);
+      await invalidateCachePattern(`staff:tasks:packing-summary:*`);
+    }
+  } catch (e) {
+    console.warn("[Cache Warning] Failed to invalidate task summary cache:", e);
+  }
+}
+
+
 

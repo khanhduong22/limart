@@ -372,6 +372,7 @@ model UserTask {
   @@index([createdAt])
   @@index([taskDefId])
   @@index([taskDefId, status])
+  @@index([taskDefId, createdAt])
   @@index([taskItemId])
   @@index([status, updatedAt])
   @@index([status, submittedAt])
@@ -525,6 +526,7 @@ model ManagerChecklistCompletion {
 
   @@unique([taskId, date])
   @@index([taskId])
+  @@index([taskId, completed])
   @@index([date, completed])
 }
 

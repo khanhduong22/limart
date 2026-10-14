@@ -7,7 +7,7 @@ import { authMiddleware, adminMiddleware, AppEnv } from "../middleware/auth.midd
 import { getVietnamDayRange, getVietnamMonthRange, toVNDateString, VN_OFFSET_MS } from "../lib/date-utils";
 import { calculateMonthlyPayrollSummary, calculateUserMonthlyStats } from "../lib/payroll-calculator";
 import { getSpecialDays } from "../lib/special-days";
-import { invalidateCachePattern, invalidatePayrollCache, invalidateShiftDutyCache, invalidateSpecialDaysCache, getOrSetCache } from "../lib/cache";
+import { invalidateCachePattern, invalidatePayrollCache, invalidateShiftDutyCache, invalidateSpecialDaysCache, getOrSetCache, invalidateTaskSummaryCache } from "../lib/cache";
 import { assertPeriodOpen } from "../lib/payroll-period";
 import { sendPayslipEmail } from "../lib/email";
 import { getClientIP } from "../lib/ip-utils";
@@ -2776,8 +2776,8 @@ adminRoute.get("/tasks", async (c) => {
   }
 });
 
-// POST /api/admin/tasks/:id/approve
-adminRoute.post("/tasks/:id/approve", async (c) => {
+// POST & PATCH /api/admin/tasks/:id/approve
+const approveTaskHandler = async (c: any) => {
   try {
     const id = c.req.param("id");
     const tokenPayload = c.get("user");
@@ -2829,16 +2829,19 @@ adminRoute.post("/tasks/:id/approve", async (c) => {
       invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("task*"),
       invalidateCachePattern("staff:rewards:leaderboard:*"),
+      invalidateTaskSummaryCache(),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã duyệt nhiệm vụ", data: updated });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to approve task" }, 500);
   }
-});
+};
+adminRoute.post("/tasks/:id/approve", approveTaskHandler);
+adminRoute.patch("/tasks/:id/approve", approveTaskHandler);
 
-// POST /api/admin/tasks/:id/reject
-adminRoute.post("/tasks/:id/reject", async (c) => {
+// POST & PATCH /api/admin/tasks/:id/reject
+const rejectTaskHandler = async (c: any) => {
   try {
     const id = c.req.param("id");
     const tokenPayload = c.get("user");
@@ -2888,16 +2891,19 @@ adminRoute.post("/tasks/:id/reject", async (c) => {
       invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("task*"),
       invalidateCachePattern("staff:rewards:leaderboard:*"),
+      invalidateTaskSummaryCache(),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã từ chối nhiệm vụ", data: updated });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to reject task" }, 500);
   }
-});
+};
+adminRoute.post("/tasks/:id/reject", rejectTaskHandler);
+adminRoute.patch("/tasks/:id/reject", rejectTaskHandler);
 
-// POST /api/admin/tasks/:id/review
-adminRoute.post("/tasks/:id/review", async (c) => {
+// POST & PATCH /api/admin/tasks/:id/review
+const reviewTaskHandler = async (c: any) => {
   try {
     const id = c.req.param("id");
     const tokenPayload = c.get("user");
@@ -2955,6 +2961,7 @@ adminRoute.post("/tasks/:id/review", async (c) => {
         invalidateCachePattern("staff:tasks:*"),
         invalidateCachePattern("task*"),
         invalidateCachePattern("staff:rewards:leaderboard:*"),
+        invalidateTaskSummaryCache(),
       ]).catch(() => {});
 
       return c.json({ success: true, message: "Đã duyệt nhiệm vụ", data: updated });
@@ -2995,6 +3002,7 @@ adminRoute.post("/tasks/:id/review", async (c) => {
         invalidateCachePattern("staff:tasks:*"),
         invalidateCachePattern("task*"),
         invalidateCachePattern("staff:rewards:leaderboard:*"),
+        invalidateTaskSummaryCache(),
       ]).catch(() => {});
 
       return c.json({ success: true, message: "Đã từ chối nhiệm vụ", data: updated });
@@ -3002,10 +3010,12 @@ adminRoute.post("/tasks/:id/review", async (c) => {
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to review task" }, 500);
   }
-});
+};
+adminRoute.post("/tasks/:id/review", reviewTaskHandler);
+adminRoute.patch("/tasks/:id/review", reviewTaskHandler);
 
-// DELETE /api/admin/tasks/stale-pending (Delete stale unapproved tasks from Feb-May)
-adminRoute.delete("/tasks/stale-pending", async (c) => {
+// DELETE & POST /api/admin/tasks/stale-pending (Delete stale unapproved tasks from Feb-May)
+const stalePendingHandler = async (c: any) => {
   try {
     const beforeDate = c.req.query("before") || "2026-06-01T00:00:00.000Z";
     const dateLimit = new Date(beforeDate);
@@ -3023,6 +3033,7 @@ adminRoute.delete("/tasks/stale-pending", async (c) => {
       invalidateCachePattern("staff-tasks:stats:*"),
       invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("staff:rewards:leaderboard:*"),
+      invalidateTaskSummaryCache(),
     ]).catch(() => {});
     return c.json({
       success: true,
@@ -3035,10 +3046,12 @@ adminRoute.delete("/tasks/stale-pending", async (c) => {
       500
     );
   }
-});
+};
+adminRoute.delete("/tasks/stale-pending", stalePendingHandler);
+adminRoute.post("/tasks/stale-pending", stalePendingHandler);
 
 // DELETE /api/admin/tasks/:id
-adminRoute.delete("/tasks/:id", async (c) => {
+const deleteTaskHandler = async (c: any) => {
   try {
     const id = c.req.param("id");
     const task = await prisma.userTask.findUnique({ where: { id } });
@@ -3053,6 +3066,7 @@ adminRoute.delete("/tasks/:id", async (c) => {
       invalidateCachePattern("staff-tasks:stats:*"),
       invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("staff:rewards:leaderboard:*"),
+      invalidateTaskSummaryCache(),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa nhiệm vụ thành công" });
@@ -3062,7 +3076,8 @@ adminRoute.delete("/tasks/:id", async (c) => {
       500
     );
   }
-});
+};
+adminRoute.delete("/tasks/:id", deleteTaskHandler);
 
 // ============================================================================
 // LUCKY WHEEL MANAGEMENT

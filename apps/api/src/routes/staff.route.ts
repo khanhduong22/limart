@@ -19,6 +19,7 @@ import {
   invalidateShiftDutyCache,
   invalidatePayrollCache,
   invalidateCachePattern,
+  invalidateTaskSummaryCache,
 } from "../lib/cache";
 import { assertPeriodOpen } from "../lib/payroll-period";
 import { isShiftLocked } from "../lib/schedule-lock";
@@ -1521,6 +1522,7 @@ staffRoute.post("/tasks/submit", authMiddleware, async (c) => {
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("staff:rewards:leaderboard:*"),
+      invalidateTaskSummaryCache(userId),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Nộp kết quả thành công!", data: userTask });
@@ -1537,7 +1539,7 @@ staffRoute.get("/tasks/packing-summary", authMiddleware, async (c) => {
     const { startDate, endDate } = getVietnamMonthRange();
 
     const cacheKey = `staff:tasks:packing-summary:${userId}`;
-    const data = await getOrSetCache(cacheKey, 60, async () => {
+    const data = await getOrSetCache(cacheKey, 120, async () => {
       const [priceList, userTasks] = await Promise.all([
         getOrSetCache("meta:task-definitions:packing", 600, () =>
           prisma.taskDefinition.findMany({
@@ -1598,7 +1600,7 @@ staffRoute.get("/tasks/carrying-summary", authMiddleware, async (c) => {
     const { startDate, endDate } = getVietnamMonthRange();
 
     const cacheKey = `staff:tasks:carrying-summary:${userId}`;
-    const data = await getOrSetCache(cacheKey, 60, async () => {
+    const data = await getOrSetCache(cacheKey, 120, async () => {
       const [conversionList, userTasks] = await Promise.all([
         getOrSetCache("meta:task-definitions:carrying", 600, () =>
           prisma.taskDefinition.findMany({
@@ -1698,6 +1700,7 @@ staffRoute.post("/tasks/submit-packing", authMiddleware, async (c) => {
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("staff:rewards:leaderboard:*"),
+      invalidateTaskSummaryCache(userId),
     ]).catch(() => {});
 
     return c.json({
@@ -1755,6 +1758,7 @@ staffRoute.post("/tasks/submit-carrying", authMiddleware, async (c) => {
       invalidateCachePattern("admin:tasks:*"),
       invalidateCachePattern("staff:tasks:*"),
       invalidateCachePattern("staff:rewards:leaderboard:*"),
+      invalidateTaskSummaryCache(userId),
     ]).catch(() => {});
 
     return c.json({

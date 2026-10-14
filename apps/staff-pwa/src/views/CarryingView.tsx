@@ -3,52 +3,20 @@ import { useAppQuery } from "@/lib/api-query";
 import {
   ChevronLeft,
   Clock,
-  CheckCircle2,
-  AlertCircle,
   Plus,
   Sparkles,
 } from "lucide-react";
 import { useRouter } from "@/lib/router";
 import { Button } from "@/components/ui/button";
+import type {
+  CarryingPriceItem,
+  CarryingHistoryItem,
+} from "@/components/carrying/CarryingHistoryList";
 
 const CarryingSubmitModal = React.lazy(() => import("@/components/carrying/CarryingSubmitModal"));
-
-interface CarryingPriceItem {
-  id: string;
-  name?: string;
-  title?: string;
-  description?: string;
-  baseReward: number;
-  unit: string;
-}
-
-interface CarryingHistoryItem {
-  id: string;
-  status: "PENDING" | "SUBMITTED" | "APPROVED" | "REJECTED";
-  quantity: number;
-  finalAmount?: number;
-  unitPrice: number;
-  note?: string;
-  evidenceLink?: string;
-  rejectReason?: string;
-  adminNote?: string;
-  createdAt: string;
-  submittedAt?: string;
-  taskDefinition?: {
-    id?: string;
-    name?: string;
-    title?: string;
-    unit?: string;
-    baseReward?: number;
-  };
-  taskDef?: {
-    id?: string;
-    name?: string;
-    title?: string;
-    unit?: string;
-    baseReward?: number;
-  };
-}
+const CarryingHistoryList = React.lazy(
+  () => import("@/components/carrying/CarryingHistoryList")
+);
 
 interface CarryingSummaryData {
   totalPoints: number;
@@ -213,119 +181,20 @@ export const CarryingView: React.FC = () => {
 
       {/* TAB 2: LỊCH SỬ KHAI BÁO */}
       {activeTab === "history" && (
-        <div className="space-y-2.5">
-          {isLoading ? (
-            <div className="p-8 text-center text-xs text-stone-400">Đang tải lịch sử...</div>
-          ) : history.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-stone-200 bg-white/60 p-8 text-center space-y-1">
-              <span className="text-2xl">🛗</span>
-              <p className="text-xs font-bold text-stone-700">Chưa có lượt khai báo bưng hàng nào</p>
-              <p className="text-[11px] text-stone-500">
-                Hãy chuyển sang tab Bảng Quy Đổi Điểm để gửi báo cáo nhé!
-              </p>
+        <React.Suspense
+          fallback={
+            <div className="h-64 w-full animate-pulse rounded-2xl bg-stone-100 flex items-center justify-center text-xs text-stone-400">
+              Đang tải lịch sử bưng hàng...
             </div>
-          ) : (
-            (history || []).map((t) => {
-              const taskDef = t.taskDefinition || (t as any).taskDef || {};
-              const title = taskDef.name || taskDef.title || (t as any).title || "Khai báo bưng hàng";
-              const unit = taskDef.unit || "lượt";
-
-              return (
-                <div
-                  key={t.id}
-                  className={`rounded-2xl border p-3.5 shadow-xs space-y-2 ${
-                    t.status === "APPROVED"
-                      ? "bg-emerald-50/40 border-emerald-200"
-                      : t.status === "REJECTED"
-                      ? "bg-rose-50/50 border-rose-200"
-                      : "bg-white border-stone-200"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="text-xs font-bold text-stone-900">
-                        {title}
-                      </h3>
-                      <p className="text-[11px] text-stone-500 mt-0.5">
-                        Số lượt: <span className="font-semibold text-stone-800">{t.quantity} {unit}</span>
-                        {t.submittedAt && (
-                          <span className="text-stone-400 ml-2">
-                            {new Date(t.submittedAt).toLocaleDateString("vi-VN")}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                    <div>
-                      {t.status === "APPROVED" && (
-                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> +{t.finalAmount || t.quantity} điểm bưng
-                        </span>
-                      )}
-                      {(t.status === "SUBMITTED" || t.status === "PENDING") && (
-                        <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <Clock className="w-3 h-3" /> Đang chờ duyệt
-                        </span>
-                      )}
-                      {t.status === "REJECTED" && (
-                        <span className="text-[10px] font-bold text-rose-800 bg-rose-100 border border-rose-300 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3" /> Bị từ chối
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {t.note && (
-                    <p className="text-[11px] text-stone-600 bg-stone-50 p-2 rounded-lg">
-                      📝 {t.note}
-                    </p>
-                  )}
-
-                  {/* Reject Reason Alert */}
-                  {t.status === "REJECTED" && (t.rejectReason || t.adminNote) && (
-                    <div className="bg-rose-100/70 border border-rose-200 p-2 rounded-lg text-xs text-rose-800">
-                      <p className="font-bold text-[11px]">Lý do từ chối:</p>
-                      <p className="text-[11px] mt-0.5">{t.rejectReason || t.adminNote}</p>
-                    </div>
-                  )}
-
-                  {t.evidenceLink && (
-                    <div className="text-[11px] text-amber-700 truncate">
-                      🔗 <a href={t.evidenceLink} target="_blank" rel="noreferrer" className="underline hover:text-amber-900">
-                        {t.evidenceLink}
-                      </a>
-                    </div>
-                  )}
-
-                  {/* Actions for rejected carrying item */}
-                  {t.status === "REJECTED" && (
-                    <div className="flex justify-end pt-1 border-t border-stone-100">
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const def = t.taskDefinition || t.taskDef;
-                          if (def) {
-                            handleOpenModal({
-                              id: (t as any).taskDefId || def.id || (t as any).id,
-                              name: def.name || def.title,
-                              title: def.title || def.name,
-                              baseReward: def.baseReward || t.unitPrice || 0,
-                              unit: def.unit || "điểm-bưng",
-                            });
-                          } else {
-                            setActiveTab("conversion");
-                          }
-                        }}
-                        className="h-7 text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold px-3 cursor-pointer"
-                      >
-                        Khai báo nộp lại
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
+          }
+        >
+          <CarryingHistoryList
+            history={history}
+            isLoading={isLoading}
+            onOpenModal={handleOpenModal}
+            onSwitchTab={() => setActiveTab("conversion")}
+          />
+        </React.Suspense>
       )}
 
       {/* SUBMISSION MODAL */}

@@ -59,6 +59,7 @@ vi.mock("@checkin/db", () => ({
 vi.mock("../src/lib/cache", () => ({
   invalidateCachePattern: vi.fn().mockResolvedValue(undefined),
   invalidatePayrollCache: vi.fn().mockResolvedValue(undefined),
+  invalidateTaskSummaryCache: vi.fn().mockResolvedValue(undefined),
   getOrSetCache: vi.fn().mockImplementation((_k, _t, fn) => fn()),
 }));
 

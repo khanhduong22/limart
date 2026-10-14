@@ -11,7 +11,7 @@
 set -euo pipefail
 
 TYPE="${1:-diff}"
-CONTAINER="checkin-db"
+CONTAINER="limart-db"
 STANZA="checkin"
 DB_USER="kido"
 DB_NAME="checkin_db"
@@ -130,7 +130,7 @@ SUCCESS_MSG=":white_check_mark: *[checkin-app] pgBackRest Backup PASSED* (Daily 
 • *Last Backup Time:* $BACKUP_TIME
 • *Database Size:* $DB_SIZE (Compressed Backup: $BACKUP_SIZE)
 • *Live Metrics:* 👤 Staff: $USER_COUNT, ⏱️ CheckIns: $CHECKIN_COUNT, 📅 WorkShifts: $SHIFT_COUNT
-• *Quick Restore:* \`docker exec -u postgres checkin-db pgbackrest --stanza=checkin --set=$BACKUP_LABEL --delta restore\`
+• *Quick Restore:* \`docker exec -u postgres limart-db pgbackrest --stanza=checkin --set=$BACKUP_LABEL --delta restore\`
 • *Continuous WAL Stream (PITR):* \`$WAL_RANGE\`"
 
 send_slack "$SUCCESS_MSG"

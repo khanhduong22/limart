@@ -62,7 +62,6 @@ jobs:
               - 'packages/audit-trail/**'
               - 'packages/shared/**'
               - 'packages/zero-downtime-deploy/**'
-              - 'docker-compose*.yml'
               - 'package.json'
               - 'bun.lock'
               - 'tsconfig.base.json'
@@ -72,7 +71,6 @@ jobs:
               - 'packages/shared/**'
               - 'packages/spa-version-guard/**'
               - 'packages/deferred-telemetry/**'
-              - 'docker-compose*.yml'
               - 'package.json'
               - 'bun.lock'
               - 'tsconfig.base.json'
@@ -82,13 +80,14 @@ jobs:
               - 'packages/shared/**'
               - 'packages/spa-version-guard/**'
               - 'packages/deferred-telemetry/**'
-              - 'docker-compose*.yml'
               - 'package.json'
               - 'bun.lock'
               - 'tsconfig.base.json'
               - 'turbo.json'
             scripts:
               - 'scripts/**'
+              - 'docker/**'
+              - 'docker-compose*.yml'
               - '.github/workflows/deploy-monorepo.yml'
 
       - name: Determine Target Services

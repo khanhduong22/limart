@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-CONTAINER="checkin-db"
+CONTAINER="limart-db"
 STANZA="checkin"
 DB_USER="kido"
 DB_NAME="checkin_db"
@@ -81,7 +81,7 @@ if [ "$FORCE" != "true" ]; then
 fi
 
 echo "[1/4] Stopping application services to drain active connections..."
-docker stop checkin-app checkin-api-v2 checkin-admin-v2 checkin-staff-v2 2>/dev/null || true
+docker stop limart-api limart-admin limart-staff 2>/dev/null || true
 
 echo "[2/4] Stopping PostgreSQL inside $CONTAINER..."
 docker exec -u postgres "$CONTAINER" pg_ctl -D /var/lib/postgresql/data stop -m fast 2>/dev/null || true
@@ -109,7 +109,7 @@ until docker exec "$CONTAINER" pg_isready -U "$DB_USER" -d "$DB_NAME" >/dev/null
 done
 
 echo "Restarting application containers..."
-docker start checkin-app checkin-api-v2 checkin-admin-v2 checkin-staff-v2 2>/dev/null || true
+docker start limart-api limart-admin limart-staff 2>/dev/null || true
 
 USER_COUNT=$(docker exec -u postgres "$CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -t -A -c "SELECT count(*) FROM \"User\";" 2>/dev/null || echo "0")
 echo "========================================================================"

@@ -104,9 +104,11 @@ deploy_dual_run() {
     # Step 1: Legacy container status (permanently decommissioned)
     log_info "Legacy monolith container (checkin-app) is permanently decommissioned."
 
-    # Step 2: Start persistent database & cache if not running
+    # Step 2: Start persistent database & cache if not running (with pgBackRest built into limart-db)
     log_info "Ensuring backing services (limart-db, limart-valkey) are running..."
-    docker compose -f "${COMPOSE_FILE}" up -d limart-db limart-valkey
+    docker volume create checkin-app_checkin_pgbackrest_data >/dev/null 2>&1 || true
+    docker compose -f "${COMPOSE_FILE}" up -d --build limart-db limart-valkey
+    docker exec -u postgres limart-db pgbackrest --stanza=checkin stanza-create >/dev/null 2>&1 || true
 
     # Step 3: Launch/update frontend Monorepo containers (limart-admin, limart-staff)
     FRONTEND_TARGETS=()

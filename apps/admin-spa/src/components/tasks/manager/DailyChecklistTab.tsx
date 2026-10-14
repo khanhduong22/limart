@@ -20,12 +20,17 @@ import {
   WeeklyTaskItem,
   getSelectedWeekRangeStr,
 } from "@/types/manager-tasks";
-import { WeeklyTaskDialogs } from "./WeeklyTaskDialogs";
+const WeeklyTaskDialogs = React.lazy(() =>
+  import("./WeeklyTaskDialogs").then((m) => ({ default: m.WeeklyTaskDialogs }))
+);
 
 export function DailyChecklistTab() {
   const {
     selectedUserId,
     selectedDate,
+    isWeeklyCreateOpen,
+    isWeeklyEditOpen,
+    isWeeklyCarryOverOpen,
     openCreateDialog,
     openWeeklyCreateDialog,
     openWeeklyEditDialog,
@@ -539,7 +544,11 @@ export function DailyChecklistTab() {
       </div>
 
       {/* Weekly Dialogs */}
-      <WeeklyTaskDialogs onSuccess={() => mutateWeekly()} />
+      {(isWeeklyCreateOpen || isWeeklyEditOpen || isWeeklyCarryOverOpen) && (
+        <React.Suspense fallback={null}>
+          <WeeklyTaskDialogs onSuccess={() => mutateWeekly()} />
+        </React.Suspense>
+      )}
     </>
   );
 }

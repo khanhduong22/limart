@@ -103,26 +103,26 @@ managerTasksRoute.get("/checklist", authMiddleware, async (c) => {
       async () => {
         await ensureChecklistTemplatesSeeded(targetUserId);
 
-        // 1. Get checklist templates active/scheduled for this specific date
-        const templates = await prisma.managerChecklistTask.findMany({
-          where: {
-            assigneeId: targetUserId,
-            OR: [
-              { targetDate: null },
-              { targetDate: "" },
-              { targetDate: dateStr },
-            ],
-          },
-          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-        });
-
-        // 2. Fetch completions for the selected date
-        const completions = await prisma.managerChecklistCompletion.findMany({
-          where: {
-            date: dateStr,
-            task: { assigneeId: targetUserId },
-          },
-        });
+        // 1. Get checklist templates active/scheduled for this specific date and completions in parallel
+        const [templates, completions] = await Promise.all([
+          prisma.managerChecklistTask.findMany({
+            where: {
+              assigneeId: targetUserId,
+              OR: [
+                { targetDate: null },
+                { targetDate: "" },
+                { targetDate: dateStr },
+              ],
+            },
+            orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+          }),
+          prisma.managerChecklistCompletion.findMany({
+            where: {
+              date: dateStr,
+              task: { assigneeId: targetUserId },
+            },
+          }),
+        ]);
 
         // 3. Map template tasks with completion status
         return templates.map((task) => {
@@ -195,9 +195,12 @@ const handleChecklistToggle = async (c: any) => {
     });
 
     const targetUserId = task.assigneeId || callerId;
-    await invalidateCachePattern("manager-tasks:checklist:" + (targetUserId || callerId) + ":*");
-    await invalidateCachePattern("stats:*");
-    await invalidateCachePattern("payroll:*");
+    await Promise.all([
+      invalidateCachePattern("manager-tasks:checklist:" + (targetUserId || callerId) + ":*"),
+      invalidateCachePattern("manager-tasks:stats-history:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("payroll:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: completion });
   } catch (err: any) {
@@ -644,8 +647,10 @@ managerTasksRoute.post("/weekly", authMiddleware, async (c) => {
       },
     });
 
-    await invalidateCachePattern("manager-tasks:weekly:*");
-    await invalidateCachePattern("manager-tasks:stats-history:*");
+    await Promise.all([
+      invalidateCachePattern("manager-tasks:weekly:*"),
+      invalidateCachePattern("manager-tasks:stats-history:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: task });
   } catch (err: any) {
@@ -695,10 +700,12 @@ managerTasksRoute.patch("/weekly/:id", authMiddleware, async (c) => {
       data,
     });
 
-    await invalidateCachePattern("manager-tasks:weekly:*");
-    await invalidateCachePattern("manager-tasks:stats-history:*");
-    await invalidateCachePattern("stats:*");
-    await invalidateCachePattern("payroll:*");
+    await Promise.all([
+      invalidateCachePattern("manager-tasks:weekly:*"),
+      invalidateCachePattern("manager-tasks:stats-history:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("payroll:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: task });
   } catch (err: any) {
@@ -735,8 +742,10 @@ managerTasksRoute.delete("/weekly/:id", authMiddleware, async (c) => {
       where: { id },
     });
 
-    await invalidateCachePattern("manager-tasks:weekly:*");
-    await invalidateCachePattern("manager-tasks:stats-history:*");
+    await Promise.all([
+      invalidateCachePattern("manager-tasks:weekly:*"),
+      invalidateCachePattern("manager-tasks:stats-history:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true });
   } catch (err: any) {
@@ -775,10 +784,12 @@ managerTasksRoute.post("/weekly/:id/toggle", authMiddleware, async (c) => {
       },
     });
 
-    await invalidateCachePattern("manager-tasks:weekly:*");
-    await invalidateCachePattern("manager-tasks:stats-history:*");
-    await invalidateCachePattern("stats:*");
-    await invalidateCachePattern("payroll:*");
+    await Promise.all([
+      invalidateCachePattern("manager-tasks:weekly:*"),
+      invalidateCachePattern("manager-tasks:stats-history:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("payroll:*"),
+    ]).catch(() => {});
 
     return c.json({ success: true, data: task });
   } catch (err: any) {
@@ -811,45 +822,48 @@ managerTasksRoute.post("/weekly/:id/carry-over", authMiddleware, async (c) => {
       return c.json({ success: false, error: "Nhiệm vụ tuần không tồn tại" }, 404);
     }
 
-    // 1. Update current task with explanation
-    const updatedTask = await prisma.managerWeeklyTask.update({
-      where: { id },
-      data: { explanation: explanation.trim() },
-    });
-
-    // 2. Create copy for next week
     const nextWeekStart = new Date(task.weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
     const nextWeekEnd = new Date(task.weekEnd.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-    const carriedOverTask = await prisma.managerWeeklyTask.create({
-      data: {
-        title: task.title,
-        description: task.description
-          ? `${task.description} (Chuyển tiếp)`
-          : "(Chuyển tiếp từ tuần trước)",
-        assigneeId: task.assigneeId,
-        weekStart: nextWeekStart,
-        weekEnd: nextWeekEnd,
-        completed: false,
-        isCarriedOver: true,
-      },
-    });
+    // 1. Update current task, 2. Create copy for next week, and 3. Create Request of type WEEKLY_TASK in parallel
+    const [updatedTask, carriedOverTask] = await Promise.all([
+      prisma.managerWeeklyTask.update({
+        where: { id },
+        data: { explanation: explanation.trim() },
+      }),
+      prisma.managerWeeklyTask.create({
+        data: {
+          title: task.title,
+          description: task.description
+            ? `${task.description} (Chuyển tiếp)`
+            : "(Chuyển tiếp từ tuần trước)",
+          assigneeId: task.assigneeId,
+          weekStart: nextWeekStart,
+          weekEnd: nextWeekEnd,
+          completed: false,
+          isCarriedOver: true,
+        },
+      }),
+      prisma.request.create({
+        data: {
+          userId: task.assigneeId,
+          date: new Date(),
+          type: "WEEKLY_TASK",
+          reason: `[Giải trình việc tuần: ${task.title}] Lý do: ${explanation.trim()}. Đã chuyển tiếp sang tuần sau.`,
+          status: "PENDING",
+        },
+      }),
+    ]);
 
-    // 3. Create Request of type WEEKLY_TASK
-    await prisma.request.create({
-      data: {
-        userId: task.assigneeId,
-        date: new Date(),
-        type: "WEEKLY_TASK",
-        reason: `[Giải trình việc tuần: ${task.title}] Lý do: ${explanation.trim()}. Đã chuyển tiếp sang tuần sau.`,
-        status: "PENDING",
-      },
-    });
-
-    await invalidateCachePattern("manager-tasks:weekly:*");
-    await invalidateCachePattern("manager-tasks:stats-history:*");
-    await invalidateCachePattern("stats:*");
-    await invalidateCachePattern("payroll:*");
+    await Promise.all([
+      invalidateCachePattern("manager-tasks:weekly:*"),
+      invalidateCachePattern("manager-tasks:stats-history:*"),
+      invalidateCachePattern("stats:*"),
+      invalidateCachePattern("payroll:*"),
+      invalidateCachePattern("user:requests:" + task.assigneeId + "*"),
+      invalidateCachePattern("admin:requests:*"),
+      invalidateCachePattern("admin:dashboard*"),
+    ]).catch(() => {});
 
     return c.json({
       success: true,

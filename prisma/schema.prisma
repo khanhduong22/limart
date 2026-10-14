@@ -533,6 +533,8 @@ model ManagerChecklistTask {
 
   @@index([assigneeId, active])
   @@index([assigneeId, active, order])
+  @@index([assigneeId, order, createdAt])
+  @@index([assigneeId, targetDate, order])
   @@index([targetDate])
 }
 
@@ -575,6 +577,7 @@ model ManagerWeeklyTask {
   @@index([weekStart])
   @@index([weekStart, weekEnd])
   @@index([assigneeId, weekStart, weekEnd])
+  @@index([assigneeId, weekStart, createdAt])
   @@index([createdAt])
 }
 
@@ -604,6 +607,8 @@ model ShiftDuty {
   @@index([shiftId])
   @@index([shiftId, userId])
   @@index([shiftId, isCompleted])
+  @@index([shiftId, createdAt])
+  @@index([shiftId, userId, createdAt])
   @@index([date, isCompleted])
 }
 

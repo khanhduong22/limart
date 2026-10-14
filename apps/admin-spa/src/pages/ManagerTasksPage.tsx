@@ -35,6 +35,8 @@ export function ManagerTasksPage() {
     setSelectedUserId,
     selectedDate,
     setSelectedDate,
+    isCreateOpen,
+    isEditOpen,
   } = useManagerTasksStore();
 
   // Fetch users for manager tasks
@@ -191,12 +193,16 @@ export function ManagerTasksPage() {
       )}
 
       {/* Dialogs */}
-      <React.Suspense fallback={null}>
-        <CreateChecklistDialog />
-      </React.Suspense>
-      <React.Suspense fallback={null}>
-        <EditChecklistDialog />
-      </React.Suspense>
+      {isCreateOpen && (
+        <React.Suspense fallback={null}>
+          <CreateChecklistDialog />
+        </React.Suspense>
+      )}
+      {isEditOpen && (
+        <React.Suspense fallback={null}>
+          <EditChecklistDialog />
+        </React.Suspense>
+      )}
     </div>
   );
 }

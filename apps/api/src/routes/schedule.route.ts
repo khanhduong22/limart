@@ -366,10 +366,12 @@ scheduleRoute.get("/:id/duties", authMiddleware, async (c) => {
   try {
     const shiftId = parseInt(c.req.param("id") || "", 10);
     if (isNaN(shiftId)) return c.json({ success: false, error: "Invalid shift id" }, 400);
-    const duties = await prisma.shiftDuty.findMany({
-      where: { shiftId },
-      include: { user: { select: { id: true, name: true, email: true, image: true } } },
-      orderBy: { createdAt: "asc" },
+    const duties = await getOrSetCache(`shift-duties:shift:${shiftId}`, 60, async () => {
+      return prisma.shiftDuty.findMany({
+        where: { shiftId },
+        include: { user: { select: { id: true, name: true, email: true, image: true } } },
+        orderBy: { createdAt: "asc" },
+      });
     });
     return c.json({ success: true, data: duties });
   } catch (err: any) {

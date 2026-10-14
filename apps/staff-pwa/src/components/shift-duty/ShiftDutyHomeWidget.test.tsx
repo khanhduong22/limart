@@ -50,7 +50,7 @@ describe("ShiftDutyHomeWidget", () => {
     },
   ];
 
-  it("calculates otherDutyUsers correctly excluding current user and displays count in Tab 2", () => {
+  it("calculates otherDutyUsers correctly excluding current user and displays count in Tab 2", async () => {
     render(
       <ShiftDutyHomeWidget
         currentUserId={mockCurrentUserId}
@@ -64,13 +64,13 @@ describe("ShiftDutyHomeWidget", () => {
     fireEvent.click(openBtn);
 
     // Tab 1 should show 1 duty for current user
-    expect(screen.getByText("Việc của tôi (1)")).toBeDefined();
+    expect(await screen.findByText("Việc của tôi (1)")).toBeDefined();
 
     // Tab 2 should only count user-2 (count = 1) instead of all users (2)
     expect(screen.getByText("Cả ca làm (1)")).toBeDefined();
   });
 
-  it("renders only colleagues with duties today with status icons and duty details in Tab 2", () => {
+  it("renders only colleagues with duties today with status icons and duty details in Tab 2", async () => {
     render(
       <ShiftDutyHomeWidget
         currentUserId={mockCurrentUserId}
@@ -82,7 +82,7 @@ describe("ShiftDutyHomeWidget", () => {
     fireEvent.click(screen.getByText("Xem chi tiết"));
 
     // Switch to Tab 2
-    fireEvent.click(screen.getByText("Cả ca làm (1)"));
+    fireEvent.click(await screen.findByText("Cả ca làm (1)"));
 
     // Colleague name and duties count
     expect(screen.getByText("Trần Thị Lan")).toBeDefined();
@@ -102,7 +102,7 @@ describe("ShiftDutyHomeWidget", () => {
     expect(screen.queryByText("Nguyễn Văn Bạn")).toBeNull();
   });
 
-  it("displays friendly message when no colleagues have duties today", () => {
+  it("displays friendly message when no colleagues have duties today", async () => {
     // Only current user has duties
     const usersWithOnlyMe = [mockActiveUsers[0]];
 
@@ -115,7 +115,7 @@ describe("ShiftDutyHomeWidget", () => {
     );
 
     fireEvent.click(screen.getByText("Xem chi tiết"));
-    fireEvent.click(screen.getByText("Cả ca làm (0)"));
+    fireEvent.click(await screen.findByText("Cả ca làm (0)"));
 
     expect(
       screen.getByText("Hôm nay chưa có đồng nghiệp nào được giao nhiệm vụ ca trực.")

@@ -1,5 +1,8 @@
 import React from "react";
-import AnnouncementAdminClient from "@/components/admin/AnnouncementAdminClient";
+
+const AnnouncementAdminClient = React.lazy(
+  () => import("@/components/admin/AnnouncementAdminClient")
+);
 
 export function AnnouncementsPage() {
   return (
@@ -15,7 +18,15 @@ export function AnnouncementsPage() {
         </div>
       </div>
 
-      <AnnouncementAdminClient />
+      <React.Suspense
+        fallback={
+          <div className="h-96 w-full animate-pulse rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-xs text-slate-400">
+            Đang tải danh sách thông báo...
+          </div>
+        }
+      >
+        <AnnouncementAdminClient />
+      </React.Suspense>
     </div>
   );
 }

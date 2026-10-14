@@ -382,6 +382,7 @@ model UserTask {
   @@index([taskItemId])
   @@index([status, updatedAt])
   @@index([status, submittedAt])
+  @@index([status, submittedAt, userId])
 }
 
 model PayrollPeriod {
@@ -499,6 +500,7 @@ model StaffTask {
   @@index([createdById])
   @@index([assigneeId, status])
   @@index([assigneeId, status, createdAt])
+  @@index([assigneeId, status, submittedAt])
   @@index([status])
   @@index([status, createdAt])
   @@index([createdAt])
@@ -536,6 +538,7 @@ model ManagerChecklistCompletion {
   @@unique([taskId, date])
   @@index([taskId])
   @@index([taskId, completed])
+  @@index([taskId, completed, date])
   @@index([date, completed])
 }
 
@@ -605,6 +608,7 @@ model SessionAuditLog {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+  @@index([userId, action, createdAt])
   @@index([action, createdAt])
   @@index([status, createdAt])
   @@index([action, status, createdAt])

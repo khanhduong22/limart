@@ -220,6 +220,7 @@ export async function invalidateScheduleCache(): Promise<void> {
     await invalidateCachePattern("staff:schedule:*");
     await invalidateCachePattern("admin:dashboard*");
     await invalidateCachePattern("staff:rewards:leaderboard:*");
+    await invalidateCachePattern("staff:reports:*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate schedule cache:", e);
   }
@@ -240,6 +241,7 @@ export async function invalidatePayrollCache(): Promise<void> {
     await invalidateCachePattern("stats:monthly:*");
     await invalidateCachePattern("admin:dashboard*");
     await invalidateCachePattern("admin:reports:*");
+    await invalidateCachePattern("staff:reports:*");
   } catch (e) {
     console.warn("[Cache Warning] Failed to invalidate payroll cache:", e);
   }

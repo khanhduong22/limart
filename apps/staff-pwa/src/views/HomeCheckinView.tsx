@@ -15,17 +15,15 @@ const SpecialDaysWidget = lazy(() => import("@/components/home/SpecialDaysWidget
 import { Button } from "@/components/ui/button";
 import { Link, useRouter } from "@/lib/router";
 import { useHomeCheckinStore } from "@/stores/useHomeCheckinStore";
-import {
-  CheckinHeaderCard,
-  CheckinTimerCard,
-  LateWarningBanner,
-  PartnerWelcomeBanner,
-  HomeNavGrid,
-  RejectedTasksAlertBanner,
-} from "@/components/home";
+import { CheckinHeaderCard } from "@/components/home/CheckinHeaderCard";
+import { CheckinTimerCard } from "@/components/home/CheckinTimerCard";
+import { LateWarningBanner } from "@/components/home/LateWarningBanner";
+import { PartnerWelcomeBanner } from "@/components/home/PartnerWelcomeBanner";
+import { HomeNavGrid } from "@/components/home/HomeNavGrid";
+import { RejectedTasksAlertBanner } from "@/components/home/RejectedTasksAlertBanner";
 
 const RejectedTasksModal = lazy(() =>
-  import("@/components/home").then((m) => ({ default: m.RejectedTasksModal }))
+  import("@/components/home/RejectedTasksModal").then((m) => ({ default: m.RejectedTasksModal }))
 );
 
 export const HomeCheckinView: React.FC = () => {

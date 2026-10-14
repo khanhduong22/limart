@@ -1705,6 +1705,8 @@ adminRoute.post("/schedule", async (c) => {
       invalidateShiftDutyCache(shift.userId, shift.id),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("admin:schedule:history:*"),
+      invalidateCachePattern("staff:schedule:*"),
+      invalidateCachePattern("shifts:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, data: event, id: shift.id }, 201);
@@ -1778,6 +1780,8 @@ adminRoute.put("/schedule/:id", async (c) => {
       invalidateShiftDutyCache(existing.userId, id),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("admin:schedule:history:*"),
+      invalidateCachePattern("staff:schedule:*"),
+      invalidateCachePattern("shifts:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, data: event });
@@ -1816,6 +1820,8 @@ adminRoute.delete("/schedule/:id", async (c) => {
       invalidateShiftDutyCache(existing.userId, id),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("admin:schedule:history:*"),
+      invalidateCachePattern("staff:schedule:*"),
+      invalidateCachePattern("shifts:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, message: "Đã xóa ca trực" });
@@ -1844,6 +1850,7 @@ const clearUserScheduleHandler = async (c: any) => {
       invalidateCachePattern("shifts:*"),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("admin:schedule:history:*"),
+      invalidateCachePattern("staff:schedule:*"),
       invalidateShiftDutyCache(userId),
     ]).catch(() => {});
 

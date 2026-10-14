@@ -109,6 +109,7 @@ model WorkShift {
   @@index([isOpenForSwap, start])
   @@index([status, start])
   @@index([userId, status])
+  @@index([userId, status, start])
 }
 
 model ShiftAuditLog {
@@ -175,6 +176,7 @@ model AnnouncementRead {
   @@unique([announcementId, userId])
   @@index([userId])
   @@index([announcementId])
+  @@index([userId, readAt])
 }
 
 model StickyNote {

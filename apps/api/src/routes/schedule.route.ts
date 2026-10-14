@@ -210,6 +210,7 @@ const handleCreateOrRegisterShift = async (c: any) => {
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("shifts:*"),
       invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
 
     return c.json({ success: true, data: newShift }, 201);
@@ -278,6 +279,7 @@ scheduleRoute.post("/:id/swap", authMiddleware, async (c) => {
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("shifts:*"),
       invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -346,6 +348,7 @@ scheduleRoute.post("/:id/take", authMiddleware, async (c) => {
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("shifts:*"),
       invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -371,5 +374,72 @@ scheduleRoute.get("/:id/duties", authMiddleware, async (c) => {
     return c.json({ success: true, data: duties });
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to fetch duties" }, 500);
+  }
+});
+
+// DELETE /api/schedule/:id
+scheduleRoute.delete("/:id", authMiddleware, async (c) => {
+  try {
+    const tokenPayload = c.get("user");
+    const userId = tokenPayload.sub;
+    const userRole = tokenPayload.role;
+    const paramId = c.req.param("id");
+    const shiftId = parseInt(paramId || "", 10);
+
+    if (isNaN(shiftId)) {
+      return c.json({ success: false, error: "Mã ca làm việc không hợp lệ" }, 400);
+    }
+
+    const existing = await prisma.workShift.findUnique({
+      where: { id: shiftId },
+    });
+
+    if (!existing) {
+      return c.json({ success: false, error: "Ca làm không tồn tại" }, 404);
+    }
+
+    if (existing.userId !== userId && userRole !== "ADMIN") {
+      return c.json({ success: false, error: "Bạn không có quyền xóa ca này" }, 403);
+    }
+
+    if (userRole !== "ADMIN" && isShiftLocked(existing.start)) {
+      return c.json(
+        {
+          success: false,
+          error: "Lịch tuần này đã khóa (Khóa vào Chủ Nhật tuần trước), không thể thay đổi ca.",
+        },
+        403
+      );
+    }
+
+    await assertPeriodOpen(existing.start);
+
+    await prisma.shiftAuditLog.create({
+      data: {
+        shiftId,
+        userId: existing.userId,
+        action: "DELETE",
+        changedById: userId,
+        oldStart: existing.start,
+        oldEnd: existing.end,
+      },
+    }).catch(() => {});
+
+    await prisma.workShift.delete({ where: { id: shiftId } });
+
+    await Promise.all([
+      invalidateShiftDutyCache(),
+      invalidatePayrollCache(),
+      invalidateCachePattern(`shifts:my-shifts:${existing.userId}:*`),
+      invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
+      invalidateCachePattern("admin:schedule:*"),
+      invalidateCachePattern("shifts:*"),
+      invalidateCachePattern("admin:dashboard*"),
+      invalidateCachePattern("staff:schedule:*"),
+    ]).catch(() => {});
+
+    return c.json({ success: true, message: "Đã xóa ca trực" });
+  } catch (err: any) {
+    return c.json({ success: false, error: err?.message || "Failed to delete shift" }, 500);
   }
 });

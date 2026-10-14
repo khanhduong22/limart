@@ -590,6 +590,7 @@ staffRoute.post("/schedule/register", authMiddleware, async (c) => {
       invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("shifts:*"),
+      invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -652,6 +653,7 @@ staffRoute.post("/schedule/cancel", authMiddleware, async (c) => {
       invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("shifts:*"),
+      invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -722,6 +724,7 @@ staffRoute.post("/schedule/:id/swap", authMiddleware, async (c) => {
       invalidateCachePattern(`shifts:my-shifts:${userId}:*`),
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("shifts:*"),
+      invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
 
     return c.json({
@@ -833,6 +836,7 @@ staffRoute.post("/schedule/:id/take", authMiddleware, async (c) => {
       invalidateCachePattern("admin:schedule:*"),
       invalidateCachePattern("admin:schedule:history:*"),
       invalidateCachePattern("shifts:*"),
+      invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
 
     return c.json({

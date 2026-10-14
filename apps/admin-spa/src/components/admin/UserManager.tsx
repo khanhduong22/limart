@@ -14,16 +14,16 @@ import {
   type RoleFilter,
   type EmploymentFilter,
 } from "@/stores/useUserManagerStore";
-import { UserCard } from "./user-manager";
+import { UserCard } from "./user-manager/UserCard";
 
 const AddEmployeeDialog = React.lazy(() =>
-  import("./user-manager").then((m) => ({ default: m.AddEmployeeDialog }))
+  import("./user-manager/AddEmployeeDialog").then((m) => ({ default: m.AddEmployeeDialog }))
 );
 const EditEmployeeDatesDialog = React.lazy(() =>
-  import("./user-manager").then((m) => ({ default: m.EditEmployeeDatesDialog }))
+  import("./user-manager/EditEmployeeDatesDialog").then((m) => ({ default: m.EditEmployeeDatesDialog }))
 );
 const DeleteEmployeeDialog = React.lazy(() =>
-  import("./user-manager").then((m) => ({ default: m.DeleteEmployeeDialog }))
+  import("./user-manager/DeleteEmployeeDialog").then((m) => ({ default: m.DeleteEmployeeDialog }))
 );
 
 export interface UserManagerProps {

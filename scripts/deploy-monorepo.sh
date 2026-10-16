@@ -234,10 +234,11 @@ deploy_dual_run() {
     fi
 
     # Step 9b: Provision & Deploy Isolated Public Demo Tenant (checkin_demo_db + limart-demo-api)
-    log_info "Ensuring isolated demo database 'checkin_demo_db' exists..."
-    docker exec -u postgres limart-db psql -U kido -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'checkin_demo_db'" | grep -q 1 || \
-        docker exec -u postgres limart-db psql -U kido -d postgres -c "CREATE DATABASE checkin_demo_db;"
-    docker exec -u postgres limart-db psql -U kido -d checkin_demo_db -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1 || true
+    log_info "Ensuring isolated demo database 'checkin_demo_db' exists and schema is synced..."
+    docker exec limart-db psql -U kido -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'checkin_demo_db'" | grep -q 1 || \
+        docker exec limart-db psql -U kido -d postgres -c "CREATE DATABASE checkin_demo_db;"
+    docker exec limart-db psql -U kido -d checkin_demo_db -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1 || true
+    docker exec limart-db sh -c "pg_dump -U kido --schema-only --no-owner --no-privileges checkin_db | psql -U kido -d checkin_demo_db >/dev/null 2>&1 || true"
 
     log_info "Deploying isolated Public Demo API container (limart-demo-api on port 4010)..."
     DEMO_API_IMAGE=$(docker inspect --format='{{.Config.Image}}' "${ACTIVE_API_CONTAINER}" 2>/dev/null || echo "ghcr.io/khanhduong22/limart/checkin-api:latest")
@@ -274,20 +275,10 @@ deploy_dual_run() {
         docker network connect limart-infra limart-demo-api 2>/dev/null || true
     fi
 
-    log_info "Syncing demo database schema via Prisma in limart-demo-api..."
-    docker exec limart-demo-api node -e "
-      const { execSync } = require('child_process');
-      try {
-        console.log(execSync('npx prisma db push --skip-generate --schema=packages/db/prisma/schema.prisma').toString());
-      } catch (e) {
-        console.log('Demo database push completed or logged:', e.message);
-      }
-    " || log_warn "Demo Prisma push check completed."
-
     if wait_for_health "limart-demo-api" "http://127.0.0.1:4010/health" 20 2; then
         log_info "Triggering initial anonymized data sync on limart-demo-api (POST /api/demo/reset)..."
         docker exec limart-demo-api wget -q -O - --post-data="" http://127.0.0.1:4010/api/demo/reset >/dev/null 2>&1 || \
-            docker exec limart-demo-api node -e "fetch('http://127.0.0.1:4010/api/demo/reset', {method:'POST'}).then(()=>process.exit(0)).catch(()=>process.exit(1))" >/dev/null 2>&1 || \
+            docker exec limart-demo-api bun -e "fetch('http://127.0.0.1:4010/api/demo/reset', {method:'POST'}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1 || \
             log_warn "Initial demo reset trigger deferred (will lazy-seed on first request)."
         log_success "Public Demo API (limart-demo-api) is ready and synced!"
     else
@@ -297,7 +288,12 @@ deploy_dual_run() {
     # Step 10: Reload Caddy Reverse Proxy
     log_info "Reloading Caddy reverse proxy..."
     if docker inspect caddy >/dev/null 2>&1; then
-        docker exec caddy caddy reload --config /etc/caddy/Caddyfile || true
+        if [ -f "/opt/kido-infra/caddy/Caddyfile" ] && ! docker exec caddy grep -q "limart-demo-api" /etc/caddy/Caddyfile 2>/dev/null; then
+            log_info "Refreshing Caddy single-file bind mount inode..."
+            docker restart caddy >/dev/null 2>&1 || true
+        else
+            docker exec caddy caddy reload --config /etc/caddy/Caddyfile || true
+        fi
         log_success "Caddy container reloaded successfully."
     elif command -v caddy >/dev/null 2>&1 && [ -f "infra/caddy/Caddyfile.monorepo" ]; then
         caddy reload --config infra/caddy/Caddyfile.monorepo || log_warn "Caddy reload via CLI skipped."

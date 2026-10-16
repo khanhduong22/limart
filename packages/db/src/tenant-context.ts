@@ -52,6 +52,9 @@ export const TENANT_SCOPED_MODELS = new Set([
   "ManagerWeeklyTask",
   "ShiftDuty",
   "SessionAuditLog",
+  "PushSubscription",
+  "NotificationRule",
+  "NotificationLog",
 ]);
 
 const READ_FILTER_OPERATIONS = new Set([

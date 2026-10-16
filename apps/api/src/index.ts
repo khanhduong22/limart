@@ -10,7 +10,12 @@ export { tasksRoute } from "./routes/tasks.route";
 export { specialDaysRoute } from "./routes/special-days.route";
 export { cronRoute } from "./routes/cron.route";
 export { demoRoute } from "./routes/demo.route";
+export { notificationsRoute } from "./routes/notifications.route";
 import { isDemoSandboxEnabled, seedAndSanitizeDemoDatabase } from "./lib/demo-sandbox";
+import {
+  ensureDefaultNotificationRules,
+  runShiftReminderCheck,
+} from "./lib/shift-notifications";
 
 const port = Number(process.env.PORT) || 4000;
 let server: ServerType | null = null;
@@ -31,6 +36,17 @@ if (typeof (globalThis as any).Bun === "undefined" && process.env.NODE_ENV !== "
 // - When DEMO_SANDBOX_MODE === "true", seed & sanitize the isolated demo database on startup
 // - When DEMO_SANDBOX_MODE !== "true", ensure phuckhanh22 has PARTNER role, staffTasksAllowed enabled, and clear old work shifts
 if (process.env.NODE_ENV !== "test") {
+  ensureDefaultNotificationRules().catch((err) => {
+    console.error("[Checkin API] Failed to ensure default notification rules:", err);
+  });
+
+  const shiftReminderTimer = setInterval(() => {
+    runShiftReminderCheck().catch(() => {});
+  }, 60_000);
+  if (typeof (shiftReminderTimer as any)?.unref === "function") {
+    (shiftReminderTimer as any).unref();
+  }
+
   if (isDemoSandboxEnabled()) {
     seedAndSanitizeDemoDatabase({ force: false })
       .then((res) => {

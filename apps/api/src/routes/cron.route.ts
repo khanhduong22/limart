@@ -4,6 +4,7 @@ import { runBirthdayBonus, runCarryingBonus, runPackingBonus } from "@checkin/sh
 import { autoScheduleAdminNa } from "../lib/auto-schedule";
 import { closePayrollMonth } from "../lib/payroll-close";
 import { invalidatePayrollCache, invalidateCachePattern } from "../lib/cache";
+import { runShiftReminderCheck } from "../lib/shift-notifications";
 
 export const cronRoute = new Hono();
 
@@ -190,6 +191,35 @@ cronRoute.get("/payroll-close", handlePayrollClose);
 cronRoute.post("/payroll-close", handlePayrollClose);
 
 /**
+ * GET /api/cron/shift-reminders
+ * POST /api/cron/shift-reminders
+ * Kiểm tra các ca trực hôm nay và gửi thông báo nhắc trước 30 phút / 15 phút khi vào ca & tan ca
+ */
+const handleShiftReminders = async (c: any) => {
+  try {
+    const forceRuleCode = c.req.query("ruleCode") || undefined;
+    const forceAllToday = c.req.query("force") === "true";
+    const result = await runShiftReminderCheck({
+      forceRuleCode,
+      forceAllToday,
+    });
+    return c.json({
+      success: true,
+      result,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    return c.json(
+      { success: false, error: err?.message || "Failed shift reminders check" },
+      500
+    );
+  }
+};
+
+cronRoute.get("/shift-reminders", handleShiftReminders);
+cronRoute.post("/shift-reminders", handleShiftReminders);
+
+/**
  * GET /api/cron/all
  * Chạy đồng loạt tất cả các job cron và trả về kết quả tổng hợp
  */
@@ -221,6 +251,12 @@ cronRoute.get("/all", async (c) => {
     results.packingBonus = { ok: true };
   } catch (e: any) {
     results.packingBonus = { error: e.message };
+  }
+
+  try {
+    results.shiftReminders = await runShiftReminderCheck();
+  } catch (e: any) {
+    results.shiftReminders = { error: e.message };
   }
 
   await Promise.all([

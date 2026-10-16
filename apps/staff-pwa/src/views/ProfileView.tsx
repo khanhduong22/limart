@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import {
   Shield,
   LogOut,
@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { StaffProfile, removeAuthToken } from "@/lib/api-client";
 import { useRouter } from "@/lib/router";
 import { triggerPwaInstallPrompt } from "@/lib/pwa/usePwaInstallPrompt";
+
+const NotificationOptInCard = lazy(() => import("@/components/NotificationOptInCard"));
 
 interface ProfileViewProps {
   profile: StaffProfile;
@@ -116,6 +118,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile }) => {
           </a>
         </div>
       )}
+
+      {/* Automatic Shift Notification Opt-In Card */}
+      <Suspense fallback={null}>
+        <NotificationOptInCard userId={profile?.id} />
+      </Suspense>
 
       {/* PWA Installation Guide Button */}
       <div className="rounded-2xl bg-white/95 border border-orange-100 p-3 shadow-xs">

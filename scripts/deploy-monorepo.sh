@@ -278,6 +278,52 @@ deploy_dual_run() {
           ALTER TABLE "SessionAuditLog" ADD COLUMN IF NOT EXISTS "device" TEXT;
           ALTER TABLE "SessionAuditLog" ADD COLUMN IF NOT EXISTS "city" TEXT;
           ALTER TABLE "SessionAuditLog" ADD COLUMN IF NOT EXISTS "details" JSONB;
+          CREATE TABLE IF NOT EXISTS "PushSubscription" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "tenantId" TEXT NOT NULL DEFAULT '\''limart'\'',
+            "userId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,
+            "endpoint" TEXT NOT NULL UNIQUE,
+            "p256dh" TEXT NOT NULL,
+            "auth" TEXT NOT NULL,
+            "userAgent" TEXT,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX IF NOT EXISTS "PushSubscription_userId_idx" ON "PushSubscription"("userId");
+          CREATE INDEX IF NOT EXISTS "PushSubscription_tenantId_userId_idx" ON "PushSubscription"("tenantId", "userId");
+          CREATE TABLE IF NOT EXISTS "NotificationRule" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "tenantId" TEXT NOT NULL DEFAULT '\''limart'\'',
+            "code" TEXT NOT NULL UNIQUE,
+            "name" TEXT NOT NULL,
+            "triggerType" TEXT NOT NULL,
+            "offsetMinutes" INTEGER NOT NULL DEFAULT 15,
+            "titleTemplate" TEXT NOT NULL,
+            "bodyTemplate" TEXT NOT NULL,
+            "targetUrl" TEXT NOT NULL DEFAULT '\''/'\'',
+            "active" BOOLEAN NOT NULL DEFAULT true,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX IF NOT EXISTS "NotificationRule_tenantId_active_idx" ON "NotificationRule"("tenantId", "active");
+          CREATE INDEX IF NOT EXISTS "NotificationRule_triggerType_active_idx" ON "NotificationRule"("triggerType", "active");
+          CREATE TABLE IF NOT EXISTS "NotificationLog" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "tenantId" TEXT NOT NULL DEFAULT '\''limart'\'',
+            "userId" TEXT,
+            "shiftId" INTEGER,
+            "ruleCode" TEXT,
+            "title" TEXT NOT NULL,
+            "body" TEXT NOT NULL,
+            "targetUrl" TEXT NOT NULL DEFAULT '\''/'\'',
+            "channel" TEXT NOT NULL DEFAULT '\''WEB_PUSH'\'',
+            "deliveredCount" INTEGER NOT NULL DEFAULT 0,
+            "readAt" TIMESTAMP(3),
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE INDEX IF NOT EXISTS "NotificationLog_tenantId_createdAt_idx" ON "NotificationLog"("tenantId", "createdAt");
+          CREATE INDEX IF NOT EXISTS "NotificationLog_userId_createdAt_idx" ON "NotificationLog"("userId", "createdAt");
+          CREATE INDEX IF NOT EXISTS "NotificationLog_shiftId_ruleCode_idx" ON "NotificationLog"("shiftId", "ruleCode");
           DO $$
           DECLARE
             t TEXT;
@@ -288,7 +334,7 @@ deploy_dual_run() {
               '\''CheckIn'\'', '\''AllowedIP'\'', '\''Holiday'\'', '\''TaskDefinition'\'', '\''TaskItem'\'',
               '\''UserTask'\'', '\''PayrollPeriod'\'', '\''Payslip'\'', '\''Document'\'', '\''ManagerTask'\'',
               '\''StaffTask'\'', '\''ManagerChecklistTask'\'', '\''ManagerWeeklyTask'\'', '\''ShiftDuty'\'',
-              '\''SessionAuditLog'\''
+              '\''SessionAuditLog'\'', '\''PushSubscription'\'', '\''NotificationRule'\'', '\''NotificationLog'\''
             ]
             LOOP
               EXECUTE format('\''ALTER TABLE %I ADD COLUMN IF NOT EXISTS "tenantId" TEXT NOT NULL DEFAULT %L'\'', t, '\''limart'\'');
@@ -334,6 +380,8 @@ deploy_dual_run() {
     fi
 
     if wait_for_health "limart-demo-api" "http://127.0.0.1:4010/health" 20 2; then
+        log_info "Syncing demo database schema via Prisma in limart-demo-api..."
+        docker exec limart-demo-api bunx prisma db push --skip-generate --schema=packages/db/prisma/schema.prisma >/dev/null 2>&1 || true
         log_info "Triggering initial anonymized data sync on limart-demo-api (POST /api/demo/reset)..."
         docker exec limart-demo-api wget -q -O - --post-data="" http://127.0.0.1:4010/api/demo/reset >/dev/null 2>&1 || \
             docker exec limart-demo-api bun -e "fetch('http://127.0.0.1:4010/api/demo/reset', {method:'POST'}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1 || \

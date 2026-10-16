@@ -9,6 +9,7 @@ import PrivacyStats from "@/components/PrivacyStats";
 const HomeAnnouncements = lazy(() => import("@/components/HomeAnnouncements"));
 const AnnouncementBar = lazy(() => import("@/components/AnnouncementBar"));
 const ShiftDutyHomeWidget = lazy(() => import("@/components/shift-duty/ShiftDutyHomeWidget"));
+const NotificationOptInCard = lazy(() => import("@/components/NotificationOptInCard"));
 const GachaButton = lazy(() => import("@/components/GachaButton"));
 const CapyAssistant = lazy(() => import("@/components/CapyAssistant"));
 const SpecialDaysWidget = lazy(() => import("@/components/home/SpecialDaysWidget"));
@@ -191,6 +192,13 @@ export const HomeCheckinView: React.FC = () => {
                   duties={todayDuties || []}
                   activeUsers={activeUsers || []}
                 />
+              </Suspense>
+            </div>
+
+            {/* Automatic Shift Notification Opt-In Card */}
+            <div id="home-shift-notifications" className="pt-2">
+              <Suspense fallback={null}>
+                <NotificationOptInCard userId={user?.id} compact />
               </Suspense>
             </div>
 

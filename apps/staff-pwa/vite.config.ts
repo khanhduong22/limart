@@ -22,7 +22,8 @@ export default defineConfig(({ mode }) => ({
         "favicon.png",
         "apple-touch-icon.png",
         "logo.png",
-        "icon-192.png"
+        "icon-192.png",
+        "push-sw.js"
       ],
       manifest: {
         name: "LimArt Chấm Công",
@@ -59,6 +60,7 @@ export default defineConfig(({ mode }) => ({
         ]
       },
       workbox: {
+        importScripts: ["/push-sw.js"],
         navigateFallbackDenylist: [/^\/admin/, /^\/api/],
         globPatterns: ["**/*.{js,css,html,svg,webp,woff,woff2}"],
         globIgnores: ["**/capybara_bg.png", "**/capybara_mascot.png", "**/icons/capy_*.png"],

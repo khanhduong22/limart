@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { isLikelyDemoHost } from "@/lib/demo-mode";
 import { DocumentItem } from "@/components/help/types";
 
 export type { DocumentItem };
@@ -55,6 +56,8 @@ function getDocCategory(path: string): string {
 }
 
 export function HelpPage() {
+  const isEnterpriseDemo = isLikelyDemoHost();
+
   // Fetch dynamic documents from /documents (normalized to /api/documents)
   const { data, isLoading, mutate } = useAdminQuery<any>(
     "/documents",
@@ -129,24 +132,34 @@ export function HelpPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center p-2 shadow-sm shrink-0">
-            <img
-              src="/admin/icons/capy_ai.webp"
-              alt="Capy AI"
-              className="w-full h-full object-contain"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                (e.currentTarget as HTMLImageElement).src =
-                  "/admin/icons/capy_dashboard.webp";
-              }}
-            />
-          </div>
+          {isEnterpriseDemo ? (
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-sm shrink-0">
+              <Bot className="w-6 h-6 text-white" />
+            </div>
+          ) : (
+            <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center p-2 shadow-sm shrink-0">
+              <img
+                src="/admin/icons/capy_ai.webp"
+                alt="Capy AI"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  (e.currentTarget as HTMLImageElement).src =
+                    "/admin/icons/capy_dashboard.webp";
+                }}
+              />
+            </div>
+          )}
           <div>
             <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900">
-              Trợ lý Capy AI & Kho Tài Liệu Quy Chế
+              {isEnterpriseDemo
+                ? "Trợ lý AI Quy trình & Kho Tài Liệu SOP"
+                : "Trợ lý Capy AI & Kho Tài Liệu Quy Chế"}
             </h2>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Hệ thống {rawDocs.length} tài liệu quy chuẩn vận hành, bảng lương và quy chế nội bộ LimArt 🍊
+              {isEnterpriseDemo
+                ? `Hệ thống ${rawDocs.length} tài liệu quy chuẩn vận hành, bảng lương và quy chế nội bộ doanh nghiệp`
+                : `Hệ thống ${rawDocs.length} tài liệu quy chuẩn vận hành, bảng lương và quy chế nội bộ LimArt 🍊`}
             </p>
           </div>
         </div>
@@ -190,7 +203,9 @@ export function HelpPage() {
               className="rounded-lg data-[state=active]:bg-orange-50 data-[state=active]:text-orange-900 font-semibold whitespace-nowrap text-xs sm:text-sm min-h-[38px] py-2"
             >
               <Bot className="w-4 h-4 mr-2 text-orange-600" />
-              Trò chuyện cùng Capy AI
+              {isEnterpriseDemo
+                ? "Trò chuyện cùng Trợ lý AI"
+                : "Trò chuyện cùng Capy AI"}
             </TabsTrigger>
           </TabsList>
         </div>

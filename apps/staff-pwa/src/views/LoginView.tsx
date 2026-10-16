@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Building2, Info } from "lucide-react";
 import { getAuthToken } from "../lib/api-client";
-import { fetchDemoStatus, switchDemoRole } from "../lib/demo-mode";
+import { fetchDemoStatus, isLikelyDemoHost, switchDemoRole } from "../lib/demo-mode";
 import { useRouter } from "../lib/router";
 
 export const LoginView: React.FC = () => {
   const router = useRouter();
   const [demoEnabled, setDemoEnabled] = useState<boolean>(false);
   const [switchingRole, setSwitchingRole] = useState<string | null>(null);
+  const isEnterpriseDemo = isLikelyDemoHost();
 
   // Check if already authenticated or if Demo Mode is active on mount
   useEffect(() => {
@@ -115,43 +116,76 @@ export const LoginView: React.FC = () => {
 
   return (
     <div
-      className="flex min-h-screen items-center justify-center p-3 sm:p-4 relative bg-[#faf6f0] select-none"
-      style={{
-        backgroundImage: "url(/capybara_bg.webp)",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
+      className={`flex min-h-screen items-center justify-center p-3 sm:p-4 relative select-none ${
+        isEnterpriseDemo ? "bg-slate-100" : "bg-[#faf6f0]"
+      }`}
+      style={
+        isEnterpriseDemo
+          ? {
+              backgroundImage:
+                "radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.1) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.1) 0px, transparent 50%), linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%)",
+            }
+          : {
+              backgroundImage: "url(/capybara_bg.webp)",
+              backgroundSize: "cover",
+              backgroundPosition: "center",
+            }
+      }
     >
-      <div className="absolute inset-0 bg-orange-50/75 backdrop-blur-xs"></div>
+      <div
+        className={`absolute inset-0 backdrop-blur-xs ${
+          isEnterpriseDemo ? "bg-slate-100/60" : "bg-orange-50/75"
+        }`}
+      />
 
-      <div className="w-full max-w-[400px] p-6 sm:p-7 text-center relative z-10 bg-white/95 border border-orange-100 shadow-2xl rounded-3xl animate-in fade-in zoom-in-95 duration-300">
-        {/* Capybara Mascot Avatar */}
+      <div
+        className={`w-full max-w-[400px] p-6 sm:p-7 text-center relative z-10 bg-white/95 shadow-2xl rounded-3xl animate-in fade-in zoom-in-95 duration-300 ${
+          isEnterpriseDemo ? "border border-slate-200/80" : "border border-orange-100"
+        }`}
+      >
+        {/* Brand / Mascot Avatar */}
         <div className="mb-4 flex justify-center">
-          <div className="h-24 w-24 overflow-hidden rounded-full bg-orange-100 shadow-lg border-4 border-orange-300 flex items-center justify-center">
-            <img
-              src="/capybara_mascot.webp"
-              alt="Bé Capybara ngoại giao"
-              width="96"
-              height="96"
-              decoding="async"
-              fetchPriority="high"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                const target = e.currentTarget;
-                if (!target.src.endsWith("/logo.png")) {
-                  target.src = "/logo.png";
-                }
-              }}
-            />
-          </div>
+          {isEnterpriseDemo ? (
+            <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-700 shadow-lg border-2 border-indigo-200 flex items-center justify-center">
+              <Building2 className="w-10 h-10 text-white" />
+            </div>
+          ) : (
+            <div className="h-24 w-24 overflow-hidden rounded-full bg-orange-100 shadow-lg border-4 border-orange-300 flex items-center justify-center">
+              <img
+                src="/capybara_mascot.webp"
+                alt="Bé Capybara ngoại giao"
+                width="96"
+                height="96"
+                decoding="async"
+                fetchPriority="high"
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  const target = e.currentTarget;
+                  if (!target.src.endsWith("/logo.png")) {
+                    target.src = "/logo.png";
+                  }
+                }}
+              />
+            </div>
+          )}
         </div>
 
-        <h1 className="mb-1 text-2xl font-extrabold text-orange-950 font-sans tracking-tight">
-          Boop Boop!
+        <h1
+          className={`mb-1 text-2xl font-extrabold font-sans tracking-tight ${
+            isEnterpriseDemo ? "text-slate-900" : "text-orange-950"
+          }`}
+        >
+          {isEnterpriseDemo ? "DemoMart Workforce OS" : "Boop Boop!"}
         </h1>
-        <p className="mb-5 text-xs text-orange-800/80 font-medium">
-          Bạn hãy đăng nhập nhé 🍊
+        <p
+          className={`mb-5 text-xs font-medium ${
+            isEnterpriseDemo ? "text-slate-500" : "text-orange-800/80"
+          }`}
+        >
+          {isEnterpriseDemo
+            ? "Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ"
+            : "Bạn hãy đăng nhập nhé 🍊"}
         </p>
 
         {/* URL Notice Banner */}
@@ -246,7 +280,9 @@ export const LoginView: React.FC = () => {
 
         {/* Footer info */}
         <p className="mt-5 text-[10px] text-stone-400">
-          Chấm công LimArt • Bảo mật & Đồng bộ thời gian thực
+          {isEnterpriseDemo
+            ? "DemoMart Enterprise • Bảo mật & Đồng bộ thời gian thực"
+            : "Chấm công LimArt • Bảo mật & Đồng bộ thời gian thực"}
         </p>
       </div>
     </div>

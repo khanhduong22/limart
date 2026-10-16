@@ -1,11 +1,12 @@
 import React from "react";
 import { useLocation } from "react-router-dom";
-import { Menu, LogOut, ExternalLink, Sparkles, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Menu, LogOut, ExternalLink, Sparkles, PanelLeftClose, PanelLeftOpen, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import AdminNavLinks from "./AdminNavLinks";
 import { useDashboardStats } from "@/hooks/useAdminData";
 import { removeToken } from "@/lib/api";
+import { isLikelyDemoHost } from "@/lib/demo-mode";
 import { toast } from "sonner";
 
 const ROUTE_TITLES: Record<string, string> = {
@@ -39,7 +40,11 @@ export function Header({
   const location = useLocation();
   const { stats } = useDashboardStats();
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
-  const currentTitle = ROUTE_TITLES[location.pathname] || "Admin Panel";
+  const isEnterpriseDemo = isLikelyDemoHost();
+  const currentTitle =
+    isEnterpriseDemo && location.pathname === "/help"
+      ? "Trợ lý AI Quy trình (SOP)"
+      : ROUTE_TITLES[location.pathname] || "Admin Panel";
 
   const handleLogout = async () => {
     if (confirm("Bạn có chắc chắn muốn đăng xuất khỏi Admin Panel?")) {
@@ -85,7 +90,9 @@ export function Header({
           </SheetTrigger>
           <SheetContent side="left" className="w-[280px] p-0 bg-white overflow-y-auto">
             <div className="flex h-14 items-center border-b px-6">
-              <span className="font-semibold text-lg">Admin Panel</span>
+              <span className="font-semibold text-lg">
+                {isEnterpriseDemo ? "DemoMart Enterprise" : "Admin Panel"}
+              </span>
             </div>
             <div className="py-2 pb-8">
               <AdminNavLinks
@@ -102,6 +109,11 @@ export function Header({
         >
           {currentTitle}
         </h1>
+        {isEnterpriseDemo && (
+          <span className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+            <Building2 className="w-3 h-3" /> DemoMart Enterprise
+          </span>
+        )}
       </div>
 
       {/* Right: Actions */}

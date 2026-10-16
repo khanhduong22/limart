@@ -3,11 +3,15 @@ import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { DemoSandboxWidget } from "./DemoSandboxWidget";
 import { LoginView } from "../views/LoginView";
+import { CheckinHeaderCard } from "./home/CheckinHeaderCard";
+import CapyAssistant from "./CapyAssistant";
 import { RouterProvider } from "../lib/router";
 import {
   DEFAULT_DEMO_MODULES,
   DEMO_MODULES_STORAGE_KEY,
   getDemoModules,
+  getEnterpriseInitials,
+  isLikelyDemoHost,
   toggleDemoModule,
 } from "../lib/demo-mode";
 
@@ -286,5 +290,37 @@ describe("DemoSandboxWidget & demo-mode utilities", () => {
     expect(screen.getByText(/👑 Xem Giao Diện Chủ Shop \(Admin\)/i)).toBeDefined();
     expect(screen.getByText(/📋 Xem Giao Diện Quản Lý \(Partner\)/i)).toBeDefined();
     expect(screen.getByText(/👷 Xem Giao Diện Nhân Viên \(Staff\)/i)).toBeDefined();
+  });
+
+  it("extracts enterprise initials accurately and detects demo hosts", () => {
+    expect(getEnterpriseInitials("Nguyễn Minh Khôi (Chủ Shop Demo)")).toBe("MK");
+    expect(getEnterpriseInitials("Hoàng Gia Huy")).toBe("GH");
+    expect(getEnterpriseInitials("Trần Bảo Ngọc (Quản Lý Ca)")).toBe("BN");
+    expect(getEnterpriseInitials("")).toBe("DM");
+    expect(getEnterpriseInitials(undefined)).toBe("DM");
+    expect(typeof isLikelyDemoHost()).toBe("boolean");
+  });
+
+  it("renders Corporate Initials Avatar and Enterprise AI Assistant for @demomart.vn users", () => {
+    const demoUser = {
+      id: "demo_u1",
+      name: "Nguyễn Minh Khôi (Chủ Shop Demo)",
+      email: "khoi.nguyen@demomart.vn",
+      role: "ADMIN",
+    };
+
+    render(
+      <RouterProvider>
+        <CheckinHeaderCard user={demoUser as any} />
+        <CapyAssistant currentUser={demoUser} />
+      </RouterProvider>
+    );
+
+    const avatar = screen.getByTestId("enterprise-initials-avatar");
+    expect(avatar.textContent).toBe("MK");
+    expect(screen.getByText("Trợ lý AI Quy trình (SOP)")).toBeDefined();
+    expect(
+      screen.getByPlaceholderText("Hỏi quy trình vận hành, nhân sự, bảng lương...")
+    ).toBeDefined();
   });
 });

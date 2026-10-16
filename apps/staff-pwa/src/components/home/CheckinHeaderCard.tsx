@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Link } from "@/lib/router";
 import { StaffUser } from "@/lib/api-client";
 import { Badge } from "@/components/ui/badge";
+import { isLikelyDemoHost, getEnterpriseInitials } from "@/lib/demo-mode";
 
 export interface CheckinHeaderCardProps {
   user?: StaffUser;
@@ -19,6 +20,8 @@ export const CheckinHeaderCard: React.FC<CheckinHeaderCardProps> = ({
   todayCheckins = [],
 }) => {
   const [currentDateTime, setCurrentDateTime] = useState<string>("");
+  const isEnterpriseDemo =
+    isLikelyDemoHost() || Boolean(user?.email?.endsWith("@demomart.vn"));
 
   useEffect(() => {
     const updateTime = () => {
@@ -77,27 +80,39 @@ export const CheckinHeaderCard: React.FC<CheckinHeaderCardProps> = ({
       {/* User Welcome Header */}
       <div className="p-4 sm:p-5 pb-3 flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <div className="relative h-12 w-12 rounded-2xl bg-amber-50 border border-amber-200/80 overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
-            <img
-              src={user?.image || "/capybara_mascot.webp"}
-              alt="Mascot Capybara"
-              width="48"
-              height="48"
-              loading="lazy"
-              decoding="async"
-              className="h-full w-full object-cover"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                const target = e.currentTarget;
-                if (!target.src.endsWith("/capybara_mascot.webp")) {
-                  target.src = "/capybara_mascot.webp";
-                }
-              }}
-            />
-            {isWorking && (
-              <span className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
-            )}
-          </div>
+          {isEnterpriseDemo ? (
+            <div
+              data-testid="enterprise-initials-avatar"
+              className="relative h-12 w-12 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white font-extrabold text-sm tracking-wider shadow-sm shrink-0 flex items-center justify-center border border-indigo-400/30"
+            >
+              {getEnterpriseInitials(user?.name)}
+              {isWorking && (
+                <span className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
+              )}
+            </div>
+          ) : (
+            <div className="relative h-12 w-12 rounded-2xl bg-amber-50 border border-amber-200/80 overflow-hidden shadow-xs shrink-0 flex items-center justify-center">
+              <img
+                src={user?.image || "/capybara_mascot.webp"}
+                alt="Mascot Capybara"
+                width="48"
+                height="48"
+                loading="lazy"
+                decoding="async"
+                className="h-full w-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.onerror = null;
+                  const target = e.currentTarget;
+                  if (!target.src.endsWith("/capybara_mascot.webp")) {
+                    target.src = "/capybara_mascot.webp";
+                  }
+                }}
+              />
+              {isWorking && (
+                <span className="absolute bottom-0.5 right-0.5 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white animate-pulse" />
+              )}
+            </div>
+          )}
 
           <div>
             <div className="flex items-center gap-2">

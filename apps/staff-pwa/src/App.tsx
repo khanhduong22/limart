@@ -37,12 +37,15 @@ const PwaInstallModal = lazy(() => import("./components/pwa").then((m) => ({ def
 const DemoSandboxWidget = lazy(() => import("./components/DemoSandboxWidget"));
 import { useAppVersionGuard, VersionGuardBanner } from "@checkin/spa-version-guard";
 import { DeferredTelemetryProvider } from "@checkin/deferred-telemetry";
+import { Building2 } from "lucide-react";
+import { isLikelyDemoHost } from "./lib/demo-mode";
 
 function AppContent() {
   const rawPathname = usePathname();
   const pathname = rawPathname ? rawPathname.split("?")[0] : "/";
   const router = useRouter();
   const [hasCheckedSession, setHasCheckedSession] = useState<boolean>(false);
+  const isEnterpriseDemo = isLikelyDemoHost();
 
   // Extract token from URL on mount (e.g. Google OAuth redirect callback)
   useEffect(() => {
@@ -248,8 +251,40 @@ function AppContent() {
     else router.push(`/${tab}`);
   };
 
+  const outerBackgroundStyle: React.CSSProperties = isEnterpriseDemo
+    ? {
+        backgroundImage:
+          "radial-gradient(at 0% 0%, rgba(79, 70, 229, 0.08) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(14, 165, 233, 0.08) 0px, transparent 50%), linear-gradient(180deg, #f1f5f9 0%, #e2e8f0 100%)",
+        backgroundAttachment: "fixed",
+      }
+    : {
+        backgroundImage: "url(/capybara_bg.webp)",
+        backgroundAttachment: "fixed",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      };
+
+  const overlayClassName = isEnterpriseDemo
+    ? "fixed inset-0 bg-slate-100/70 pointer-events-none -z-10"
+    : "fixed inset-0 bg-[#faf6f0]/85 pointer-events-none -z-10";
+
   // While verifying cookie session for protected routes
   if (!hasCheckedSession && pathname !== "/login") {
+    if (isEnterpriseDemo) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+          <div className="text-center">
+            <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-md mx-auto mb-3 animate-pulse">
+              <Building2 className="w-7 h-7" />
+            </div>
+            <p className="text-xs text-slate-600 font-semibold">
+              Đang khởi tạo không gian làm việc doanh nghiệp...
+            </p>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#faf6f0] flex items-center justify-center p-4">
         <div className="text-center">
@@ -274,14 +309,9 @@ function AppContent() {
     return (
       <div
         className="min-h-screen text-stone-900 font-sans selection:bg-amber-400 selection:text-stone-950 flex flex-col justify-center relative"
-        style={{
-          backgroundImage: 'url(/capybara_bg.webp)',
-          backgroundAttachment: 'fixed',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
+        style={outerBackgroundStyle}
       >
-        <div className="fixed inset-0 bg-[#faf6f0]/85 pointer-events-none -z-10" />
+        <div className={overlayClassName} />
         <Toaster position="top-center" richColors theme="light" closeButton />
         <LoginView />
         <Suspense fallback={null}>
@@ -297,20 +327,19 @@ function AppContent() {
   return (
     <div
       className="min-h-screen text-stone-900 font-sans selection:bg-amber-400 selection:text-stone-950 flex flex-col relative"
-      style={{
-        backgroundImage: 'url(/capybara_bg.webp)',
-        backgroundAttachment: 'fixed',
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-      }}
+      style={outerBackgroundStyle}
     >
-      <div className="fixed inset-0 bg-[#faf6f0]/85 pointer-events-none -z-10" />
+      <div className={overlayClassName} />
       {/* Toast Notifications */}
       <Toaster position="top-center" richColors theme="light" closeButton />
 
       {/* Responsive Shell Frame: Expands on iPad / Desktop for PARTNER or Staff Tasks */}
       <div
-        className={`w-full mx-auto min-h-screen bg-[#faf6f0]/95 shadow-2xl border-x border-orange-100/60 flex flex-col relative backdrop-blur-xs transition-all duration-200 ${
+        className={`w-full mx-auto min-h-screen ${
+          isEnterpriseDemo
+            ? "bg-white/95 shadow-xl border-x border-slate-200/80"
+            : "bg-[#faf6f0]/95 shadow-2xl border-x border-orange-100/60"
+        } flex flex-col relative backdrop-blur-xs transition-all duration-200 ${
           isWide
             ? "max-w-4xl lg:max-w-5xl xl:max-w-6xl px-2 sm:px-6 md:px-8"
             : "max-w-md"

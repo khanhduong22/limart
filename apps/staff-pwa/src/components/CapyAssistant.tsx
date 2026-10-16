@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { isLikelyDemoHost } from "@/lib/demo-mode";
 
 type Message = {
   id: string;
@@ -30,6 +31,8 @@ const LOCAL_KNOWLEDGE: Record<string, string> = {
 };
 
 export default function CapyAssistant({ currentUser }: { currentUser: any }) {
+  const isEnterpriseDemo =
+    isLikelyDemoHost() || Boolean(currentUser?.email?.endsWith("@demomart.vn"));
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -106,13 +109,15 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
         throw new Error("Chat fallback");
       }
     } catch {
-      // Smart Friendly Capybara Fallback
+      // Smart Fallback
       setMessages((prev) =>
         prev.map((m) =>
           m.id === aiMessageId
             ? {
                 ...m,
-                content: `Capy đã nhận câu hỏi của bạn: "${textToSend}".\n\nBạn có thể thực hiện chấm công trên trang chủ, xem chi tiết lịch làm việc tại tab Lịch hoặc kiểm tra bảng lương tạm tính bất kỳ lúc nào. Nếu cần hỗ trợ thêm, hãy nhắn quản lý nhé! 🦫✨`,
+                content: isEnterpriseDemo
+                  ? `Trợ lý AI đã nhận câu hỏi của bạn: "${textToSend}".\n\nBạn có thể thực hiện chấm công trên trang chủ, xem chi tiết lịch làm việc tại tab Lịch hoặc kiểm tra bảng lương tạm tính bất kỳ lúc nào.`
+                  : `Capy đã nhận câu hỏi của bạn: "${textToSend}".\n\nBạn có thể thực hiện chấm công trên trang chủ, xem chi tiết lịch làm việc tại tab Lịch hoặc kiểm tra bảng lương tạm tính bất kỳ lúc nào. Nếu cần hỗ trợ thêm, hãy nhắn quản lý nhé! 🦫✨`,
               }
             : m
         )
@@ -177,27 +182,52 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
   };
 
   return (
-    <div className="flex flex-col bg-white/70 backdrop-blur-md rounded-2xl border border-orange-100 shadow-sm overflow-hidden h-[420px] transition-all hover:shadow-md">
+    <div
+      className={cn(
+        "flex flex-col bg-white/70 backdrop-blur-md rounded-2xl shadow-sm overflow-hidden h-[420px] transition-all hover:shadow-md",
+        isEnterpriseDemo ? "border border-slate-200" : "border border-orange-100"
+      )}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-100/50 shrink-0">
+      <div
+        className={cn(
+          "flex items-center justify-between px-4 py-3 shrink-0",
+          isEnterpriseDemo
+            ? "bg-gradient-to-r from-slate-50 to-indigo-50/60 border-b border-slate-200/70"
+            : "bg-gradient-to-r from-orange-50 to-amber-50 border-b border-orange-100/50"
+        )}
+      >
         <div className="flex items-center gap-2">
           <div className="relative">
-            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-tr from-orange-400 to-amber-400 text-white shadow-sm overflow-hidden">
-              <img
-                src="/capybara_mascot.webp"
-                alt="Capy"
-                className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as any).style.display = "none";
-                }}
-              />
-            </div>
+            {isEnterpriseDemo ? (
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-blue-600 text-white shadow-sm overflow-hidden">
+                <Bot className="w-5 h-5 text-white" />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-tr from-orange-400 to-amber-400 text-white shadow-sm overflow-hidden">
+                <img
+                  src="/capybara_mascot.webp"
+                  alt="Capy"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    (e.target as any).style.display = "none";
+                  }}
+                />
+              </div>
+            )}
             <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white animate-pulse" />
           </div>
           <div>
             <h4 className="text-sm font-bold text-gray-800 flex items-center gap-1">
-              Trợ lí Capy
-              <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500 animate-bounce" />
+              {isEnterpriseDemo ? "Trợ lý AI Quy trình (SOP)" : "Trợ lí Capy"}
+              <Sparkles
+                className={cn(
+                  "w-3.5 h-3.5 animate-bounce",
+                  isEnterpriseDemo
+                    ? "text-indigo-500 fill-indigo-500"
+                    : "text-amber-500 fill-amber-500"
+                )}
+              />
             </h4>
             <p className="text-[10px] text-gray-500 font-medium">Hỗ trợ nội bộ 24/7</p>
           </div>
@@ -217,19 +247,38 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
       </div>
 
       {/* Message Area */}
-      <div className="flex-1 overflow-hidden relative bg-gradient-to-b from-transparent to-orange-50/10">
+      <div
+        className={cn(
+          "flex-1 overflow-hidden relative bg-gradient-to-b from-transparent",
+          isEnterpriseDemo ? "to-slate-50/40" : "to-orange-50/10"
+        )}
+      >
         <ScrollArea className="h-full p-4">
           {messages.length === 0 ? (
             <div className="flex flex-col h-full items-center justify-center text-center space-y-4 py-4">
-              <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center overflow-hidden shadow-inner">
-                <img src="/capybara_mascot.webp" alt="Capy" className="w-10 h-10 object-contain" />
-              </div>
+              {isEnterpriseDemo ? (
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-600 flex items-center justify-center overflow-hidden shadow-md">
+                  <Bot className="w-6 h-6 text-white" />
+                </div>
+              ) : (
+                <div className="w-12 h-12 rounded-2xl bg-orange-100 flex items-center justify-center overflow-hidden shadow-inner">
+                  <img src="/capybara_mascot.webp" alt="Capy" className="w-10 h-10 object-contain" />
+                </div>
+              )}
               <div className="space-y-1">
                 <p className="text-sm font-bold text-gray-800">
                   Xin chào, {currentUser?.name || "bạn"}! 👋
                 </p>
                 <p className="text-xs text-gray-500 max-w-[240px] mx-auto leading-relaxed">
-                  Tôi là <b>Trợ lí Capy</b>. Hãy hỏi tôi về hướng dẫn, chấm công, quy trình, hoặc bảng lương!
+                  {isEnterpriseDemo ? (
+                    <>
+                      Tôi là <b>Trợ lý AI Doanh nghiệp</b>. Hãy hỏi tôi về quy trình vận hành, chấm công, ca làm việc hoặc bảng lương!
+                    </>
+                  ) : (
+                    <>
+                      Tôi là <b>Trợ lí Capy</b>. Hãy hỏi tôi về hướng dẫn, chấm công, quy trình, hoặc bảng lương!
+                    </>
+                  )}
                 </p>
               </div>
 
@@ -243,7 +292,12 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
                     <button
                       key={s}
                       onClick={() => handleSuggestionClick(s)}
-                      className="text-left text-xs bg-white hover:bg-orange-50 border border-gray-100 hover:border-orange-200 p-2 rounded-xl transition-all shadow-2xs hover:scale-[1.01] text-gray-700 font-medium cursor-pointer"
+                      className={cn(
+                        "text-left text-xs bg-white border border-gray-100 p-2 rounded-xl transition-all shadow-2xs hover:scale-[1.01] text-gray-700 font-medium cursor-pointer",
+                        isEnterpriseDemo
+                          ? "hover:bg-indigo-50/70 hover:border-indigo-200"
+                          : "hover:bg-orange-50 hover:border-orange-200"
+                      )}
                     >
                       💡 {s}
                     </button>
@@ -259,7 +313,9 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
                   className={cn(
                     "flex flex-col max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed",
                     m.role === "user"
-                      ? "ml-auto bg-gradient-to-tr from-orange-500 to-amber-500 text-white rounded-br-xs"
+                      ? isEnterpriseDemo
+                        ? "ml-auto bg-gradient-to-tr from-indigo-600 to-blue-600 text-white rounded-br-xs"
+                        : "ml-auto bg-gradient-to-tr from-orange-500 to-amber-500 text-white rounded-br-xs"
                       : "mr-auto bg-white border border-gray-100 text-gray-800 shadow-2xs rounded-bl-xs"
                   )}
                 >
@@ -268,8 +324,15 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
               ))}
               {isLoading && (
                 <div className="flex items-center gap-1.5 text-xs text-slate-400 p-2">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin text-orange-500" />
-                  <span>Capy đang suy nghĩ...</span>
+                  <Loader2
+                    className={cn(
+                      "w-3.5 h-3.5 animate-spin",
+                      isEnterpriseDemo ? "text-indigo-600" : "text-orange-500"
+                    )}
+                  />
+                  <span>
+                    {isEnterpriseDemo ? "Trợ lý AI đang phản hồi..." : "Capy đang suy nghĩ..."}
+                  </span>
                 </div>
               )}
               <div ref={messagesEndRef} />
@@ -279,7 +342,15 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
       </div>
 
       {/* Input Footer */}
-      <form onSubmit={handleSubmit} className="p-2.5 bg-white border-t border-orange-100/50 flex items-center gap-2">
+      <form
+        onSubmit={handleSubmit}
+        className={cn(
+          "p-2.5 bg-white flex items-center gap-2",
+          isEnterpriseDemo
+            ? "border-t border-slate-200/70"
+            : "border-t border-orange-100/50"
+        )}
+      >
         <button
           type="button"
           onClick={handleMic}
@@ -295,7 +366,11 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Hỏi Capy bất cứ điều gì..."
+          placeholder={
+            isEnterpriseDemo
+              ? "Hỏi quy trình vận hành, nhân sự, bảng lương..."
+              : "Hỏi Capy bất cứ điều gì..."
+          }
           className="flex-1 h-9 text-xs rounded-xl bg-gray-50/70 border-gray-200 focus:bg-white"
         />
 
@@ -303,7 +378,12 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
           type="submit"
           size="sm"
           disabled={!input.trim() || isLoading}
-          className="h-9 w-9 p-0 rounded-xl bg-orange-500 hover:bg-orange-600 text-white cursor-pointer shrink-0"
+          className={cn(
+            "h-9 w-9 p-0 rounded-xl text-white cursor-pointer shrink-0",
+            isEnterpriseDemo
+              ? "bg-indigo-600 hover:bg-indigo-700"
+              : "bg-orange-500 hover:bg-orange-600"
+          )}
         >
           <Send className="w-4 h-4" />
         </Button>

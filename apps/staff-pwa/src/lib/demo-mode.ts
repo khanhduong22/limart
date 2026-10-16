@@ -113,6 +113,36 @@ export interface ResetDemoDataResponse {
 export const DEMO_MODULES_STORAGE_KEY = "limart_demo_modules";
 const DEMO_MODULES_EVENT = "limart:demo-modules-changed";
 
+export function isLikelyDemoHost(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const host = (window.location.hostname || "").toLowerCase();
+    const search = window.location.search || "";
+    return (
+      host.startsWith("limart2.") ||
+      host.startsWith("demo") ||
+      search.includes("demo=1")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function getEnterpriseInitials(name?: string | null): string {
+  if (!name || typeof name !== "string") return "DM";
+  const cleaned = name.replace(/\([^)]*\)/g, "").trim();
+  if (!cleaned) return "DM";
+  const parts = cleaned.split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "DM";
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase() || "DM";
+  }
+  const secondLast = parts[parts.length - 2]?.[0] || "";
+  const last = parts[parts.length - 1]?.[0] || "";
+  const initials = `${secondLast}${last}`.toUpperCase();
+  return initials || "DM";
+}
+
 export function getDemoModules(): DemoModulesConfig {
   try {
     if (typeof localStorage === "undefined") {

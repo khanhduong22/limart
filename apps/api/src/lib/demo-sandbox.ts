@@ -165,6 +165,37 @@ function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+export function buildCorporateAvatarSvg(name: string, role: string): string {
+  const cleaned = String(name || "")
+    .replace(/\([^)]*\)/g, "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/gi, "D")
+    .replace(/[^a-zA-Z0-9\s]/g, " ")
+    .trim();
+
+  const words = cleaned.split(/\s+/).filter(Boolean);
+  let initials = "DM";
+  if (words.length >= 2) {
+    const lastTwo = words.slice(-2);
+    initials = `${lastTwo[0][0]}${lastTwo[1][0]}`.toUpperCase();
+  } else if (words.length === 1) {
+    initials = words[0].slice(0, 2).toUpperCase();
+  }
+
+  const normalizedRole = String(role || "USER").toUpperCase();
+  const [startColor, endColor] =
+    normalizedRole === "ADMIN"
+      ? ["#4f46e5", "#1d4ed8"]
+      : normalizedRole === "PARTNER"
+        ? ["#0d9488", "#047857"]
+        : ["#334155", "#0f172a"];
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="${initials}"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="${startColor}"/><stop offset="100%" stop-color="${endColor}"/></linearGradient></defs><rect width="128" height="128" rx="64" fill="url(#g)"/><text x="50%" y="50%" dy="0.35em" text-anchor="middle" fill="#ffffff" font-family="Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" font-size="48" font-weight="700" letter-spacing="1">${initials}</text></svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 /**
  * Sanitizes free-text strings by scrubbing brand names, emails, phone numbers,
  * external URLs, and mapped real employee names.
@@ -208,7 +239,7 @@ export function sanitizeText(
   // 6. Restore safe Demo URL
   output = output.replace(
     new RegExp(URL_PLACEHOLDER, "g"),
-    "https://limart2.khanhdp.com/icons/capy_dashboard.webp"
+    "https://limart2.khanhdp.com/admin"
   );
 
   return output;
@@ -385,6 +416,17 @@ export interface DemoPersona {
   monthlySalary: number;
 }
 
+function resolveCorporateAvatar(
+  image: string | null | undefined,
+  name: string,
+  role: string
+): string {
+  if (image && image.startsWith("data:image/svg+xml;utf8,")) {
+    return image;
+  }
+  return buildCorporateAvatarSvg(name, role);
+}
+
 export async function getDemoPersonas(prismaClient: any = defaultPrisma): Promise<DemoPersona[]> {
   try {
     const users = await prismaClient.user.findMany({
@@ -413,12 +455,13 @@ export async function getDemoPersonas(prismaClient: any = defaultPrisma): Promis
 
       const personas: DemoPersona[] = [];
       if (admin) {
+        const adminName = admin.name || "Nguyễn Minh Khôi (Chủ Shop Demo)";
         personas.push({
           id: admin.id,
-          name: admin.name || "Nguyễn Minh Khôi (Chủ Shop Demo)",
+          name: adminName,
           email: admin.email || "owner@demomart.vn",
           role: "ADMIN",
-          image: admin.image || "/icons/capy_dashboard.webp",
+          image: resolveCorporateAvatar(admin.image, adminName, "ADMIN"),
           label: "Chủ Cửa Hàng (Admin)",
           employmentType: admin.employmentType || "FULL_TIME",
           hourlyRate: admin.hourlyRate || 0,
@@ -426,12 +469,13 @@ export async function getDemoPersonas(prismaClient: any = defaultPrisma): Promis
         });
       }
       if (partner) {
+        const partnerName = partner.name || "Trần Bảo Ngọc (Quản Lý Ca)";
         personas.push({
           id: partner.id,
-          name: partner.name || "Trần Bảo Ngọc (Quản Lý Ca)",
+          name: partnerName,
           email: partner.email || "manager@demomart.vn",
           role: "PARTNER",
-          image: partner.image || "/icons/capy_manager.webp",
+          image: resolveCorporateAvatar(partner.image, partnerName, "PARTNER"),
           label: "Quản Lý Ca (Partner)",
           employmentType: partner.employmentType || "FULL_TIME",
           hourlyRate: partner.hourlyRate || 0,
@@ -439,12 +483,13 @@ export async function getDemoPersonas(prismaClient: any = defaultPrisma): Promis
         });
       }
       for (const s of staffList.slice(0, 5)) {
+        const staffName = s.name || "Lê Hoàng Nam";
         personas.push({
           id: s.id,
-          name: s.name || "Lê Hoàng Nam",
+          name: staffName,
           email: s.email || "nv01@demomart.vn",
           role: "USER",
-          image: s.image || "/capybara_mascot.webp",
+          image: resolveCorporateAvatar(s.image, staffName, "USER"),
           label: "Nhân Viên (Staff)",
           employmentType: s.employmentType || "PART_TIME",
           hourlyRate: s.hourlyRate || 25000,
@@ -465,7 +510,7 @@ export async function getDemoPersonas(prismaClient: any = defaultPrisma): Promis
       name: "Nguyễn Minh Khôi (Chủ Shop Demo)",
       email: "owner@demomart.vn",
       role: "ADMIN",
-      image: "/icons/capy_dashboard.webp",
+      image: buildCorporateAvatarSvg("Nguyễn Minh Khôi (Chủ Shop Demo)", "ADMIN"),
       label: "Chủ Cửa Hàng (Admin)",
       employmentType: "FULL_TIME",
       hourlyRate: 0,
@@ -476,7 +521,7 @@ export async function getDemoPersonas(prismaClient: any = defaultPrisma): Promis
       name: "Trần Bảo Ngọc (Quản Lý Ca)",
       email: "manager@demomart.vn",
       role: "PARTNER",
-      image: "/icons/capy_manager.webp",
+      image: buildCorporateAvatarSvg("Trần Bảo Ngọc (Quản Lý Ca)", "PARTNER"),
       label: "Quản Lý Ca (Partner)",
       employmentType: "FULL_TIME",
       hourlyRate: 0,
@@ -487,7 +532,7 @@ export async function getDemoPersonas(prismaClient: any = defaultPrisma): Promis
       name: "Lê Hoàng Nam",
       email: "nv01@demomart.vn",
       role: "USER",
-      image: "/capybara_mascot.webp",
+      image: buildCorporateAvatarSvg("Lê Hoàng Nam", "USER"),
       label: "Nhân Viên (Staff)",
       employmentType: "PART_TIME",
       hourlyRate: 25000,
@@ -759,7 +804,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           id: u.id,
           name: demoName,
           email: "owner@demomart.vn",
-          image: "/icons/capy_dashboard.webp",
+          image: buildCorporateAvatarSvg(demoName, "ADMIN"),
           role: "ADMIN",
           isActive: true,
           luckyWheelAllowed: true,
@@ -777,7 +822,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           id: u.id,
           name: demoName,
           email: "manager@demomart.vn",
-          image: "/icons/capy_manager.webp",
+          image: buildCorporateAvatarSvg(demoName, "PARTNER"),
           role: "PARTNER",
           isActive: true,
           luckyWheelAllowed: true,
@@ -803,7 +848,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           id: u.id,
           name: assignedName,
           email: `nv${emailNum}@demomart.vn`,
-          image: "/capybara_mascot.webp",
+          image: buildCorporateAvatarSvg(assignedName, "USER"),
           role: "USER",
           isActive: u.isActive !== false,
           luckyWheelAllowed: true,
@@ -819,11 +864,12 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
 
     // Ensure a PARTNER exists if source had none
     if (!sanitizedUsers.some((u) => u.role === "PARTNER")) {
+      const partnerName = "Trần Bảo Ngọc (Quản Lý Ca)";
       sanitizedUsers.splice(1, 0, {
         id: "demo-partner-manager",
-        name: "Trần Bảo Ngọc (Quản Lý Ca)",
+        name: partnerName,
         email: "manager@demomart.vn",
-        image: "/icons/capy_manager.webp",
+        image: buildCorporateAvatarSvg(partnerName, "PARTNER"),
         role: "PARTNER",
         isActive: true,
         luckyWheelAllowed: true,
@@ -837,12 +883,14 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     }
   } else {
     // Rich fallback users when no source DB is provided
+    const ownerName = "Nguyễn Minh Khôi (Chủ Shop Demo)";
+    const partnerName = "Trần Bảo Ngọc (Quản Lý Ca)";
     sanitizedUsers.push(
       {
         id: "demo-admin-owner",
-        name: "Nguyễn Minh Khôi (Chủ Shop Demo)",
+        name: ownerName,
         email: "owner@demomart.vn",
-        image: "/icons/capy_dashboard.webp",
+        image: buildCorporateAvatarSvg(ownerName, "ADMIN"),
         role: "ADMIN",
         isActive: true,
         luckyWheelAllowed: true,
@@ -855,9 +903,9 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
       },
       {
         id: "demo-partner-manager",
-        name: "Trần Bảo Ngọc (Quản Lý Ca)",
+        name: partnerName,
         email: "manager@demomart.vn",
-        image: "/icons/capy_manager.webp",
+        image: buildCorporateAvatarSvg(partnerName, "PARTNER"),
         role: "PARTNER",
         isActive: true,
         luckyWheelAllowed: true,
@@ -874,11 +922,12 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
       const idx = i + 1;
       const emailNum = String(idx).padStart(2, "0");
       const isFT = i === 0;
+      const staffName = staffPool[i % staffPool.length];
       sanitizedUsers.push({
         id: `demo-staff-${emailNum}`,
-        name: staffPool[i % staffPool.length],
+        name: staffName,
         email: `nv${emailNum}@demomart.vn`,
-        image: "/capybara_mascot.webp",
+        image: buildCorporateAvatarSvg(staffName, "USER"),
         role: "USER",
         isActive: true,
         luckyWheelAllowed: true,
@@ -1088,7 +1137,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           quantity: (idx + 1) * 15,
           status: idx % 2 === 0 ? "APPROVED" : "SUBMITTED",
           note: "Đã hoàn thành đóng gói đầy đủ, có chụp ảnh đối chiếu tại bàn đóng hàng DemoMart",
-          evidenceLink: "https://limart2.khanhdp.com/icons/capy_dashboard.webp",
+          evidenceLink: "https://limart2.khanhdp.com/admin",
           bonusPenalty: 0,
         }));
 
@@ -1108,7 +1157,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           unitPrice,
           quantity,
           status: ut.status || "APPROVED",
-          evidenceLink: "https://limart2.khanhdp.com/icons/capy_dashboard.webp",
+          evidenceLink: "https://limart2.khanhdp.com/admin",
           note: sanitizeText(ut.note || "Hoàn thành định mức công việc tại DemoMart", nameMap),
           adminNote: ut.adminNote ? sanitizeText(ut.adminNote, nameMap) : null,
           bonusPenalty,
@@ -1131,7 +1180,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
             id: "demo-prize-1",
             name: "Thưởng nóng +50.000đ vào kỳ lương",
             description: "Cộng trực tiếp vào bảng lương tháng của nhân viên",
-            image: "/icons/capy_reward.webp",
+            image: buildCorporateAvatarSvg("Thưởng Nóng", "ADMIN"),
             quantity: 30,
             remaining: 25,
             probability: 20,
@@ -1140,9 +1189,9 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           },
           {
             id: "demo-prize-2",
-            name: "Voucher Trà Sữa Full Topping",
-            description: "Đổi ngay 1 ly trà sữa tự chọn tại quầy pha chế",
-            image: "/icons/capy_tea.webp",
+            name: "Voucher Cà Phê & Đồ Uống Cao Cấp",
+            description: "Phiếu quà tặng thức uống dành cho nhân viên đạt KPI ca",
+            image: buildCorporateAvatarSvg("Voucher Cafe", "PARTNER"),
             quantity: 40,
             remaining: 30,
             probability: 40,
@@ -1151,9 +1200,9 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           },
           {
             id: "demo-prize-3",
-            name: "Gấu Bông Capybara Đội Quất",
-            description: "Quà tặng lưu niệm độc quyền cho nhân viên chăm chỉ",
-            image: "/capybara_mascot.webp",
+            name: "Bộ Quà Tặng Văn Phòng DemoMart Enterprise",
+            description: "Quà tặng lưu niệm doanh nghiệp dành cho nhân viên xuất sắc",
+            image: buildCorporateAvatarSvg("DemoMart Gift", "USER"),
             quantity: 20,
             remaining: 18,
             probability: 40,
@@ -1165,13 +1214,18 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   const validPrizeIds = new Set<string>();
   for (const p of prizesToSeed) {
     validPrizeIds.add(p.id);
+    const sanitizedPrizeName = sanitizeText(p.name, nameMap);
+    const prizeImage =
+      p.image && !String(p.image).toLowerCase().includes("capy")
+        ? p.image
+        : buildCorporateAvatarSvg(sanitizedPrizeName || "DemoMart Prize", "ADMIN");
     await safeExec(() =>
       targetPrisma.luckyWheelPrize?.create?.({
         data: {
           id: p.id,
-          name: sanitizeText(p.name, nameMap),
+          name: sanitizedPrizeName,
           description: sanitizeText(p.description || "", nameMap),
-          image: p.image || "/capybara_mascot.webp",
+          image: prizeImage,
           quantity: Math.max(20, Number(p.quantity) || 20),
           remaining: Math.max(15, Number(p.remaining) || 15),
           probability: Number(p.probability) || 25,
@@ -1402,7 +1456,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
             status: "APPROVED",
             assigneeId: defaultStaffUser.id,
             createdById: partnerUser.id,
-            evidenceLink: "https://limart2.khanhdp.com/icons/capy_dashboard.webp",
+            evidenceLink: "https://limart2.khanhdp.com/admin",
             evidenceNote: "Đã hoàn thành trưng bày tại quầy trung tâm DemoMart",
           },
         ];
@@ -1425,7 +1479,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           completedAt: st.completedAt ? new Date(st.completedAt) : null,
           adminNote: st.adminNote ? sanitizeText(st.adminNote, nameMap) : null,
           evidenceLink: st.evidenceLink
-            ? "https://limart2.khanhdp.com/icons/capy_dashboard.webp"
+            ? "https://limart2.khanhdp.com/admin"
             : null,
           evidenceNote: st.evidenceNote ? sanitizeText(st.evidenceNote, nameMap) : null,
         },
@@ -1492,9 +1546,9 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     targetPrisma.announcement?.create?.({
       data: {
         id: "demo-welcome-announcement",
-        title: "🎉 Chào mừng đến với DemoMart — Không gian Trải nghiệm Sản phẩm!",
+        title: "Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise",
         content:
-          "Bạn đang ở chế độ Demo Sandbox độc lập. Mọi tên nhân viên và mức lương đều là dữ liệu mẫu ngẫu nhiên. Bạn có thể thoải mái bấm Chấm công, Quay thưởng, Giao việc, Tính lương hoặc Chuyển đổi vai trò (Chủ Shop / Quản lý / Nhân viên) ở thanh công cụ phía trên!",
+          "Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise. Bạn đang ở môi trường Demo Sandbox độc lập với dữ liệu nhân sự và bảng lương đã được ẩn danh hoàn toàn. Hãy sử dụng thanh công cụ phía trên để chuyển đổi vai trò (Chủ Cửa Hàng / Quản Lý Ca / Nhân Viên) và trải nghiệm toàn bộ quy trình vận hành.",
         type: "INFO",
         active: true,
       },
@@ -1524,16 +1578,16 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           {
             id: "demo-doc-sop-1",
             path: "noi-quy-cham-cong-demomart.md",
-            title: "Nội quy Chấm công & Ca làm việc tại DemoMart",
+            title: "Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise — Nội quy Chấm công & Ca làm việc",
             content:
-              "Nhân viên thực hiện Check-in trên ứng dụng khi kết nối WiFi cửa hàng DemoMart hoặc bật định vị GPS trong bán kính 150m. Đi trễ quá 5 phút sẽ ghi nhận nhắc nhở tự động.",
+              "Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise. Nhân viên thực hiện Check-in trên ứng dụng khi kết nối WiFi cửa hàng DemoMart hoặc bật định vị GPS trong bán kính 150m. Đi trễ quá 5 phút sẽ ghi nhận nhắc nhở tự động.",
           },
           {
             id: "demo-doc-sop-2",
             path: "quy-trinh-dong-goi-khoan.md",
-            title: "Quy trình Đóng gói Đơn hàng & Tính thưởng Khoán",
+            title: "Quy trình Đóng gói Đơn hàng & Tính thưởng Khoán DemoMart Enterprise",
             content:
-              "Mỗi đơn hàng đóng gói đạt chuẩn có quay video/chụp ảnh đối chiếu tại bàn đóng gói DemoMart được cộng tự động vào bảng lương khoán cuối tháng.",
+              "Mỗi đơn hàng đóng gói đạt chuẩn có quay video/chụp ảnh đối chiếu tại bàn đóng gói DemoMart Enterprise được cộng tự động vào bảng lương khoán cuối tháng.",
           },
         ];
 

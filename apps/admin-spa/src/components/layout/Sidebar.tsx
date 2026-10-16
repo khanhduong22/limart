@@ -1,7 +1,9 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { Building2 } from "lucide-react";
 import AdminNavLinks from "./AdminNavLinks";
 import { useDashboardStats } from "@/hooks/useAdminData";
+import { isLikelyDemoHost } from "@/lib/demo-mode";
 
 import { cn } from "@/lib/utils";
 
@@ -15,6 +17,7 @@ export function Sidebar({
   style?: React.CSSProperties;
 }) {
   const { stats } = useDashboardStats();
+  const isEnterpriseDemo = isLikelyDemoHost();
 
   return (
     <div
@@ -27,24 +30,42 @@ export function Sidebar({
     >
       <div className="flex h-14 items-center border-b px-6 lg:h-[60px] bg-white dark:bg-gray-950">
         <Link className="flex items-center gap-2.5 font-bold text-slate-800" to="/">
-          <div className="h-8 w-8 rounded-lg bg-orange-100 flex items-center justify-center border border-orange-200 shadow-sm shrink-0">
-            <img
-              src="/admin/logo.png"
-              alt="LimArt"
-              width="24"
-              height="24"
-              decoding="async"
-              className="h-6 w-6 object-contain"
-              onError={(e) => {
-                e.currentTarget.onerror = null;
-                (e.currentTarget as HTMLImageElement).src =
-                  "/admin/icons/capy_dashboard.webp";
-              }}
-            />
-          </div>
-          <span className="text-base tracking-tight text-slate-900">
-            Admin Panel
-          </span>
+          {isEnterpriseDemo ? (
+            <>
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-indigo-600 to-blue-700 text-white flex items-center justify-center shadow-sm shrink-0">
+                <Building2 className="h-4 w-4 text-white" />
+              </div>
+              <div className="flex flex-col leading-none">
+                <span className="text-sm font-extrabold tracking-tight text-slate-900">
+                  DemoMart OS
+                </span>
+                <span className="text-[9px] font-bold uppercase tracking-widest text-indigo-600 mt-0.5">
+                  Enterprise Suite
+                </span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="h-8 w-8 rounded-lg bg-orange-100 flex items-center justify-center border border-orange-200 shadow-sm shrink-0">
+                <img
+                  src="/admin/logo.png"
+                  alt="LimArt"
+                  width="24"
+                  height="24"
+                  decoding="async"
+                  className="h-6 w-6 object-contain"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    (e.currentTarget as HTMLImageElement).src =
+                      "/admin/icons/capy_dashboard.webp";
+                  }}
+                />
+              </div>
+              <span className="text-base tracking-tight text-slate-900">
+                Admin Panel
+              </span>
+            </>
+          )}
         </Link>
       </div>
       <div className="flex-1 overflow-y-auto py-2">

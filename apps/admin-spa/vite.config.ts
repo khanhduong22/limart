@@ -12,7 +12,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     viteVersionPlugin({
-      version: "1.0.1",
+      version: "1.0.2",
       title: "LimArt Admin Portal",
     }),
   ],

@@ -94,8 +94,10 @@ vi.mock("@checkin/db", () => ({
 import { app } from "../src/app";
 import {
   _resetDemoModulesMemory,
+  buildCorporateAvatarSvg,
   DEMO_STAFF_NAMES,
   FULL_TIME_SALARIES,
+  getDemoPersonas,
   PART_TIME_RATES,
   sanitizePayslipRecord,
   sanitizeText,
@@ -128,7 +130,33 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
     process.env.DATABASE_URL = originalDbUrl;
   });
 
-  describe("sanitizeText & sanitizePayslipRecord", () => {
+  describe("buildCorporateAvatarSvg, sanitizeText & sanitizePayslipRecord", () => {
+    it("generates corporate SVG Data-URI avatars with 2 uppercase Vietnamese initials and role-based enterprise gradients", () => {
+      const adminAvatar = buildCorporateAvatarSvg("Nguyễn Minh Khôi (Chủ Shop Demo)", "ADMIN");
+      expect(adminAvatar.startsWith("data:image/svg+xml;utf8,")).toBe(true);
+      expect(adminAvatar).not.toContain("capy");
+      const decodedAdmin = decodeURIComponent(adminAvatar);
+      expect(decodedAdmin).toContain(">MK</text>");
+      expect(decodedAdmin).toContain("#4f46e5");
+      expect(decodedAdmin).toContain("#1d4ed8");
+
+      const partnerAvatar = buildCorporateAvatarSvg("Trần Bảo Ngọc (Quản Lý Ca)", "PARTNER");
+      expect(partnerAvatar.startsWith("data:image/svg+xml;utf8,")).toBe(true);
+      expect(partnerAvatar).not.toContain("capy");
+      const decodedPartner = decodeURIComponent(partnerAvatar);
+      expect(decodedPartner).toContain(">BN</text>");
+      expect(decodedPartner).toContain("#0d9488");
+      expect(decodedPartner).toContain("#047857");
+
+      const userAvatar = buildCorporateAvatarSvg("Hoàng Gia Huy", "USER");
+      expect(userAvatar.startsWith("data:image/svg+xml;utf8,")).toBe(true);
+      expect(userAvatar).not.toContain("capy");
+      const decodedUser = decodeURIComponent(userAvatar);
+      expect(decodedUser).toContain(">GH</text>");
+      expect(decodedUser).toContain("#334155");
+      expect(decodedUser).toContain("#0f172a");
+    });
+
     it("scrubs LimArt brand, emails, phone numbers, URLs, and mapped employee names", () => {
       const nameMap = new Map<string, string>([
         ["Mai Thị Na", "Nguyễn Minh Khôi"],
@@ -152,7 +180,8 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
       expect(cleaned).not.toContain("maithina4040@gmail.com");
       expect(cleaned).toContain("contact@demomart.vn");
       expect(cleaned).not.toContain("drive.google.com");
-      expect(cleaned).toContain("https://limart2.khanhdp.com/icons/capy_dashboard.webp");
+      expect(cleaned).not.toContain("capy");
+      expect(cleaned).toContain("https://limart2.khanhdp.com/admin");
     });
 
     it("completely rewrites Payslip.content and netSalary so zero real names or real salaries remain", () => {
@@ -327,18 +356,35 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
 
       expect(admin?.name).toBe("Nguyễn Minh Khôi (Chủ Shop Demo)");
       expect(admin?.email).toBe("owner@demomart.vn");
+      expect(admin?.image).toMatch(/^data:image\/svg\+xml;utf8,/);
+      expect(admin?.image).not.toContain("capy");
+
       expect(partner?.name).toBe("Trần Bảo Ngọc (Quản Lý Ca)");
       expect(partner?.email).toBe("manager@demomart.vn");
+      expect(partner?.image).toMatch(/^data:image\/svg\+xml;utf8,/);
+      expect(partner?.image).not.toContain("capy");
 
       expect(DEMO_STAFF_NAMES).toContain(ptStaff?.name);
       expect(ptStaff?.email).toBe("nv01@demomart.vn");
+      expect(ptStaff?.image).toMatch(/^data:image\/svg\+xml;utf8,/);
+      expect(ptStaff?.image).not.toContain("capy");
       expect(PART_TIME_RATES).toContain(ptStaff?.hourlyRate);
       expect(ptStaff?.monthlySalary).toBe(0);
 
       expect(DEMO_STAFF_NAMES).toContain(ftStaff?.name);
       expect(ftStaff?.email).toBe("nv02@demomart.vn");
+      expect(ftStaff?.image).toMatch(/^data:image\/svg\+xml;utf8,/);
+      expect(ftStaff?.image).not.toContain("capy");
       expect(FULL_TIME_SALARIES).toContain(ftStaff?.monthlySalary);
       expect(ftStaff?.hourlyRate).toBe(0);
+
+      // Verify fallback personas also use corporate SVG avatars
+      mockUserFindMany.mockResolvedValueOnce([]);
+      const fallbackPersonas = await getDemoPersonas();
+      for (const persona of fallbackPersonas) {
+        expect(persona.image).toMatch(/^data:image\/svg\+xml;utf8,/);
+        expect(persona.image).not.toContain("capy");
+      }
 
       // Verify AllowedIP includes 0.0.0.0/0
       const createdIps = mockAllowedIPCreate.mock.calls.map((c) => c[0].data);
@@ -395,7 +441,7 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
           name: "Nguyễn Minh Khôi (Chủ Shop Demo)",
           email: "owner@demomart.vn",
           role: "ADMIN",
-          image: "/icons/capy_dashboard.webp",
+          image: buildCorporateAvatarSvg("Nguyễn Minh Khôi (Chủ Shop Demo)", "ADMIN"),
           employmentType: "FULL_TIME",
           hourlyRate: 0,
           monthlySalary: 15000000,
@@ -405,7 +451,7 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
           name: "Trần Bảo Ngọc (Quản Lý Ca)",
           email: "manager@demomart.vn",
           role: "PARTNER",
-          image: "/icons/capy_manager.webp",
+          image: buildCorporateAvatarSvg("Trần Bảo Ngọc (Quản Lý Ca)", "PARTNER"),
           employmentType: "FULL_TIME",
           hourlyRate: 0,
           monthlySalary: 10500000,
@@ -415,7 +461,7 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
           name: "Lê Hoàng Nam",
           email: "nv01@demomart.vn",
           role: "USER",
-          image: "/capybara_mascot.webp",
+          image: buildCorporateAvatarSvg("Lê Hoàng Nam", "USER"),
           employmentType: "PART_TIME",
           hourlyRate: 25000,
           monthlySalary: 0,
@@ -437,6 +483,10 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
         ai_sop: true,
       });
       expect(statusData.personas.length).toBeGreaterThanOrEqual(3);
+      for (const p of statusData.personas) {
+        expect(p.image).toMatch(/^data:image\/svg\+xml;utf8,/);
+        expect(p.image).not.toContain("capy");
+      }
 
       // 2. POST /api/demo/switch-role -> ADMIN
       mockUserCount.mockResolvedValue(3);
@@ -445,7 +495,7 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
         name: "Nguyễn Minh Khôi (Chủ Shop Demo)",
         email: "owner@demomart.vn",
         role: "ADMIN",
-        image: "/icons/capy_dashboard.webp",
+        image: buildCorporateAvatarSvg("Nguyễn Minh Khôi (Chủ Shop Demo)", "ADMIN"),
         employmentType: "FULL_TIME",
         hourlyRate: 0,
         monthlySalary: 15000000,

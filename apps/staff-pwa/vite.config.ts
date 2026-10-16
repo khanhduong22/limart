@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     viteVersionPlugin({
-      version: "1.0.1",
+      version: "1.0.2",
       title: "LimArt Chấm Công Staff",
     }),
     VitePWA({
@@ -87,7 +87,7 @@ export default defineConfig(({ mode }) => ({
                 request.destination === "font"),
             handler: "CacheFirst",
             options: {
-              cacheName: "limart-v3-static-assets",
+              cacheName: "limart-v4-static-assets",
               expiration: {
                 maxEntries: 120,
                 maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days

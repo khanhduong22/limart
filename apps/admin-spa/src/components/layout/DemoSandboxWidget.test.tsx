@@ -305,4 +305,57 @@ describe("Super App Demo Studio & Dynamic Module Filtering", () => {
   it("validates isLikelyDemoHost helper", () => {
     expect(typeof isLikelyDemoHost()).toBe("boolean");
   });
+
+  it("renders enterprise labels and vector icons without capy_*.webp images in AdminNavLinks on demo host (limart2.khanhdp.com)", () => {
+    const originalLocation = window.location;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      writable: true,
+      value: {
+        ...originalLocation,
+        hostname: "limart2.khanhdp.com",
+        search: "",
+      },
+    });
+
+    try {
+      expect(isLikelyDemoHost()).toBe(true);
+
+      const { container } = render(
+        <MemoryRouter>
+          <AdminNavLinks />
+        </MemoryRouter>
+      );
+
+      // Verify enterprise labels are rendered
+      expect(screen.getByText("Tổng quan vận hành")).toBeDefined();
+      expect(screen.getByText("Quản trị Nhân sự")).toBeDefined();
+      expect(screen.getByText("Điều phối Lịch ca")).toBeDefined();
+      expect(screen.getByText("Báo cáo Hiệu suất")).toBeDefined();
+      expect(screen.getByText("Phê duyệt Đơn từ")).toBeDefined();
+      expect(screen.getByText("Bản tin Nội bộ")).toBeDefined();
+      expect(screen.getByText("Bảng lương & Chi trả")).toBeDefined();
+      expect(screen.getByText("Phúc lợi & Thưởng")).toBeDefined();
+      expect(screen.getByText("Khoán Đóng gói & WFH")).toBeDefined();
+      expect(screen.getByText("Checklist Quản lý")).toBeDefined();
+      expect(screen.getByText("Giao việc & KPI")).toBeDefined();
+      expect(screen.getByText("Cấu hình & Bảo mật IP")).toBeDefined();
+      expect(screen.getByText("Nhật ký Bảo mật")).toBeDefined();
+      expect(screen.getByText("Trợ lý AI Quy trình")).toBeDefined();
+
+      // Verify zero capy_*.webp cartoon images are rendered
+      const images = container.querySelectorAll("img");
+      expect(images.length).toBe(0);
+
+      // Verify Lucide SVG vector icons are rendered instead
+      const svgs = container.querySelectorAll("svg");
+      expect(svgs.length).toBe(14);
+    } finally {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        writable: true,
+        value: originalLocation,
+      });
+    }
+  });
 });

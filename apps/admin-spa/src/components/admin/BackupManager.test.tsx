@@ -13,10 +13,24 @@ vi.mock("sonner", () => ({
 
 describe("BackupManager — Excel Backup & Surgical Per-Tenant Snapshot", () => {
   const originalFetch = globalThis.fetch;
+  const originalLocation = window.location;
   const store = new Map<string, string>();
+
+  const setHostname = (hostname: string, search = "") => {
+    Object.defineProperty(window, "location", {
+      writable: true,
+      configurable: true,
+      value: {
+        ...originalLocation,
+        hostname,
+        search,
+      },
+    });
+  };
 
   beforeEach(() => {
     store.clear();
+    setHostname("limart.khanhdp.com");
     Object.defineProperty(window, "localStorage", {
       writable: true,
       value: {
@@ -32,41 +46,15 @@ describe("BackupManager — Excel Backup & Surgical Per-Tenant Snapshot", () => 
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    Object.defineProperty(window, "location", {
+      writable: true,
+      configurable: true,
+      value: originalLocation,
+    });
     store.clear();
   });
 
-  it("renders both the Excel backup section and the Tenant Snapshot Backup/Restore section", () => {
-    const { container } = render(<BackupManager />);
-
-    // 1. Existing Excel Backup section remains intact
-    const excelSection = container.querySelector("#backup-data-section");
-    expect(excelSection).not.toBeNull();
-    expect(screen.getByText("Sao lưu dữ liệu")).toBeDefined();
-    expect(screen.getByText("📥 Tải về bản Backup (.xlsx)")).toBeDefined();
-
-    // 2. New Tenant Snapshot section
-    expect(
-      screen.getByText(
-        "🛡️ Sao lưu & Khôi phục Phẫu thuật theo Cửa hàng (Tenant Snapshot)"
-      )
-    ).toBeDefined();
-    expect(
-      screen.getByText(
-        /Xuất hoặc khôi phục dữ liệu riêng biệt của từng cửa hàng \(Tenant\)/i
-      )
-    ).toBeDefined();
-    expect(
-      screen.getByText("📦 Tải Snapshot Cửa hàng (.json)")
-    ).toBeDefined();
-    expect(
-      screen.getByText("♻️ Khôi phục Phẫu thuật từ file Snapshot (.json)")
-    ).toBeDefined();
-    expect(
-      screen.getByText("♻️ Xác nhận Khôi phục vào Cửa hàng")
-    ).toBeDefined();
-  });
-
-  it("calls /api/admin/tenants/backup?tenantId=limart&scope=all when clicking snapshot download button", async () => {
+  it("renders both cards without #tenant-select on Production (limart.khanhdp.com) and calls /api/admin/tenants/backup?scope=all", async () => {
     const mockSnapshot = {
       tenantId: "limart",
       scope: "all",
@@ -83,14 +71,38 @@ describe("BackupManager — Excel Backup & Surgical Per-Tenant Snapshot", () => 
     });
     globalThis.fetch = fetchMock as unknown as typeof fetch;
 
-    render(<BackupManager />);
+    const { container } = render(<BackupManager />);
+
+    // 1. Existing Excel Backup section remains intact
+    const excelSection = container.querySelector("#backup-data-section");
+    expect(excelSection).not.toBeNull();
+    expect(screen.getByText("Sao lưu dữ liệu")).toBeDefined();
+    expect(screen.getByText("📥 Tải về bản Backup (.xlsx)")).toBeDefined();
+
+    // 2. Tenant Snapshot section renders without cross-shop dropdown (#tenant-select)
+    expect(container.querySelector("#tenant-snapshot-section")).not.toBeNull();
+    expect(container.querySelector("#tenant-select")).toBeNull();
+    expect(
+      screen.getByText(
+        "🛡️ Sao lưu & Khôi phục Phẫu thuật theo Cửa hàng (Tenant Snapshot)"
+      )
+    ).toBeDefined();
+    expect(
+      screen.getByText("📦 Tải Snapshot Cửa hàng (.json)")
+    ).toBeDefined();
+    expect(
+      screen.getByText("♻️ Khôi phục Phẫu thuật từ file Snapshot (.json)")
+    ).toBeDefined();
+    expect(
+      screen.getByText("♻️ Xác nhận Khôi phục vào Cửa hàng")
+    ).toBeDefined();
 
     const downloadBtn = screen.getByText("📦 Tải Snapshot Cửa hàng (.json)");
     fireEvent.click(downloadBtn);
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
-        "/api/admin/tenants/backup?tenantId=limart&scope=all",
+        "/api/admin/tenants/backup?scope=all",
         expect.objectContaining({
           method: "GET",
           credentials: "include",
@@ -105,7 +117,7 @@ describe("BackupManager — Excel Backup & Surgical Per-Tenant Snapshot", () => 
     });
   });
 
-  it("previews uploaded snapshot JSON metadata and posts to /api/admin/tenants/restore on confirm", async () => {
+  it("previews uploaded snapshot JSON metadata and posts { snapshot } to /api/admin/tenants/restore on confirm", async () => {
     const sampleSnapshot = {
       tenantId: "limart",
       scope: "schedule",
@@ -163,13 +175,22 @@ describe("BackupManager — Excel Backup & Surgical Per-Tenant Snapshot", () => 
           }),
           body: JSON.stringify({
             snapshot: sampleSnapshot,
-            targetTenantId: "limart",
           }),
         })
       );
       expect(toast.success).toHaveBeenCalledWith(
-        expect.stringContaining("workShifts: 2, shiftDuties: 1")
+        "Khôi phục dữ liệu cửa hàng thành công (workShifts: 2, shiftDuties: 1)!"
       );
     });
   });
+
+  it("returns null (completely hidden) on the Public Demo host (limart2.khanhdp.com)", () => {
+    setHostname("limart2.khanhdp.com");
+
+    const { container } = render(<BackupManager />);
+    expect(container.firstChild).toBeNull();
+    expect(container.querySelector("#backup-data-section")).toBeNull();
+    expect(container.querySelector("#tenant-snapshot-section")).toBeNull();
+  });
 });
+

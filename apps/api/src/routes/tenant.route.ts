@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { prisma } from "@checkin/db";
 import { authMiddleware, adminMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { DEFAULT_TENANT_ID, getCurrentTenantId } from "../middleware/tenant.middleware";
+import { isDemoSandboxEnabled } from "../lib/demo-sandbox";
 import {
   exportTenantSnapshot,
   restoreTenantSnapshot,
@@ -13,75 +14,98 @@ export const tenantRoute = new Hono<AppEnv>();
 
 tenantRoute.use("*", authMiddleware, adminMiddleware);
 
-// GET /api/admin/tenants - List all registered tenants (auto-including "limart" and "demo") with user/shift counts
+tenantRoute.use("*", async (c, next) => {
+  if (isDemoSandboxEnabled()) {
+    return c.json(
+      {
+        success: false,
+        error: "Tính năng sao lưu & quản trị dữ liệu cửa hàng bị khóa trên môi trường Demo công khai",
+      },
+      403
+    );
+  }
+  await next();
+});
+
+// GET /api/admin/tenants - Return only the current tenant with user/shift counts
 tenantRoute.get("/", async (c) => {
   try {
+    const currentTenantId = (getCurrentTenantId() || DEFAULT_TENANT_ID).trim().toLowerCase();
     const db = prisma as Record<string, any>;
-    let dbTenants: Record<string, any>[] = [];
 
-    if (db.tenant && typeof db.tenant.findMany === "function") {
+    const defaultMeta: Record<string, any> =
+      currentTenantId === "limart"
+        ? {
+            id: "limart",
+            slug: "limart",
+            name: "LimArt Flagship Store",
+            domain: "limart.khanhdp.com",
+            isActive: true,
+          }
+        : currentTenantId === "demo"
+          ? {
+              id: "demo",
+              slug: "demo",
+              name: "LimArt Demo Sandbox",
+              domain: "limart2.khanhdp.com",
+              isActive: true,
+            }
+          : {
+              id: currentTenantId,
+              slug: currentTenantId,
+              name: `Cửa hàng ${currentTenantId}`,
+              domain: `${currentTenantId}.limart.vn`,
+              isActive: true,
+            };
+
+    let dbTenant: Record<string, any> | null = null;
+    if (db.tenant && typeof db.tenant.findUnique === "function") {
+      try {
+        dbTenant = await db.tenant.findUnique({
+          where: { id: currentTenantId },
+        });
+      } catch {
+        dbTenant = null;
+      }
+    }
+    if (!dbTenant && db.tenant && typeof db.tenant.findMany === "function") {
       try {
         const found = await db.tenant.findMany({
-          orderBy: { createdAt: "asc" },
+          where: { id: currentTenantId },
         });
         if (Array.isArray(found)) {
-          dbTenants = found;
+          dbTenant = found.find((t: any) => t && t.id === currentTenantId) || null;
         }
       } catch {
-        dbTenants = [];
+        dbTenant = null;
       }
     }
 
-    const tenantMap = new Map<string, Record<string, any>>();
-    tenantMap.set("limart", {
-      id: "limart",
-      slug: "limart",
-      name: "LimArt Flagship Store",
-      domain: "limart.khanhdp.com",
-      isActive: true,
-    });
-    tenantMap.set("demo", {
-      id: "demo",
-      slug: "demo",
-      name: "LimArt Demo Sandbox",
-      domain: "limart2.khanhdp.com",
-      isActive: true,
-    });
-
-    for (const t of dbTenants) {
-      if (t && t.id) {
-        tenantMap.set(t.id, {
-          ...tenantMap.get(t.id),
-          ...t,
-        });
+    let userCount = 0;
+    let shiftCount = 0;
+    if (db.user && typeof db.user.count === "function") {
+      try {
+        userCount = await db.user.count({ where: { tenantId: currentTenantId } });
+      } catch {
+        userCount = 0;
+      }
+    }
+    if (db.workShift && typeof db.workShift.count === "function") {
+      try {
+        shiftCount = await db.workShift.count({ where: { tenantId: currentTenantId } });
+      } catch {
+        shiftCount = 0;
       }
     }
 
-    const tenants = await Promise.all(
-      Array.from(tenantMap.values()).map(async (t) => {
-        let userCount = 0;
-        let shiftCount = 0;
-        if (db.user && typeof db.user.count === "function") {
-          try {
-            userCount = await db.user.count({ where: { tenantId: t.id } });
-          } catch {
-            userCount = 0;
-          }
-        }
-        if (db.workShift && typeof db.workShift.count === "function") {
-          try {
-            shiftCount = await db.workShift.count({ where: { tenantId: t.id } });
-          } catch {
-            shiftCount = 0;
-          }
-        }
-        return {
-          ...t,
-          userCount: userCount || 0,
-          shiftCount: shiftCount || 0,
-        };
-      })
-    );
+    const currentTenant = {
+      ...defaultMeta,
+      ...(dbTenant || {}),
+      userCount: userCount || 0,
+      shiftCount: shiftCount || 0,
+    };
+
+    const tenants = [currentTenant];
 
     return c.json({
       success: true,
@@ -159,13 +183,19 @@ tenantRoute.post("/", async (c) => {
 // GET /api/admin/tenants/backup - Surgical Per-Tenant Snapshot Export
 tenantRoute.get("/backup", async (c) => {
   try {
-    const tenantId = (
-      c.req.query("tenantId") ||
-      getCurrentTenantId() ||
-      DEFAULT_TENANT_ID
-    )
-      .trim()
-      .toLowerCase();
+    const currentTenantId = (getCurrentTenantId() || DEFAULT_TENANT_ID).trim().toLowerCase();
+    const requestedTenantId = c.req.query("tenantId")?.trim().toLowerCase();
+
+    if (requestedTenantId && requestedTenantId !== currentTenantId) {
+      return c.json(
+        {
+          success: false,
+          error: "Forbidden: Bạn chỉ được phép sao lưu dữ liệu của chính cửa hàng mình",
+        },
+        403
+      );
+    }
+
     const rawScope = (c.req.query("scope") || "all").trim().toLowerCase() as TenantBackupScope;
 
     if (!VALID_BACKUP_SCOPES.includes(rawScope)) {
@@ -178,7 +208,7 @@ tenantRoute.get("/backup", async (c) => {
       );
     }
 
-    const snapshot = await exportTenantSnapshot(tenantId, rawScope);
+    const snapshot = await exportTenantSnapshot(currentTenantId, rawScope);
     return c.json({
       success: true,
       ...snapshot,
@@ -201,14 +231,34 @@ tenantRoute.post("/restore", async (c) => {
     }
 
     const snapshot = body.snapshot || (body.version && body.data ? body : null);
-    const targetTenantId = body.targetTenantId || undefined;
     const scopes = Array.isArray(body.scopes) ? body.scopes : undefined;
 
     if (!snapshot) {
       return c.json({ success: false, error: "Thiếu dữ liệu snapshot cần khôi phục" }, 400);
     }
 
-    const result = await restoreTenantSnapshot(snapshot, { targetTenantId, scopes });
+    const currentTenantId = (getCurrentTenantId() || DEFAULT_TENANT_ID).trim().toLowerCase();
+    const requestedTarget =
+      typeof body.targetTenantId === "string" ? body.targetTenantId.trim().toLowerCase() : undefined;
+    const snapshotTenantId =
+      typeof (snapshot?.tenantId || snapshot?.meta?.tenantId) === "string"
+        ? String(snapshot?.tenantId || snapshot?.meta?.tenantId).trim().toLowerCase()
+        : undefined;
+
+    if (
+      (requestedTarget && requestedTarget !== currentTenantId) ||
+      (snapshotTenantId && snapshotTenantId !== currentTenantId)
+    ) {
+      return c.json(
+        {
+          success: false,
+          error: "Forbidden: Bạn chỉ được phép khôi phục dữ liệu thuộc về chính cửa hàng mình",
+        },
+        403
+      );
+    }
+
+    const result = await restoreTenantSnapshot(snapshot, { targetTenantId: currentTenantId, scopes });
     return c.json({
       success: true,
       message: "Khôi phục dữ liệu cửa hàng thành công!",

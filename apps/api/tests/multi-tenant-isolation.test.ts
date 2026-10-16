@@ -319,7 +319,7 @@ describe("Multi-Tenant Isolation, Cache Scoping & Surgical Snapshot Backup/Resto
     }
   });
 
-  it("3. X-Tenant-Id header and <shop>.limart.vn subdomain propagate tenant context and echo X-Tenant-Id response header", async () => {
+  it("3. X-Tenant-Id header and <shop>.limart.vn subdomain propagate tenant context, echo X-Tenant-Id response header, and only return the current tenant", async () => {
     const resDefault = await app.request("/api/admin/tenants", {
       headers: {
         Authorization: `Bearer ${adminToken}`,
@@ -327,6 +327,10 @@ describe("Multi-Tenant Isolation, Cache Scoping & Surgical Snapshot Backup/Resto
     });
     expect(resDefault.status).toBe(200);
     expect(resDefault.headers.get("X-Tenant-Id")).toBe("limart");
+    const defaultBody = await resDefault.json();
+    expect(defaultBody.success).toBe(true);
+    expect(defaultBody.tenants).toHaveLength(1);
+    expect(defaultBody.tenants[0].id).toBe("limart");
 
     const resHeader = await app.request("/api/admin/tenants", {
       headers: {
@@ -338,9 +342,10 @@ describe("Multi-Tenant Isolation, Cache Scoping & Surgical Snapshot Backup/Resto
     expect(resHeader.headers.get("X-Tenant-Id")).toBe("shop-b");
     const body = await resHeader.json();
     expect(body.success).toBe(true);
-    expect(body.tenants.some((t: any) => t.id === "limart")).toBe(true);
-    expect(body.tenants.some((t: any) => t.id === "demo")).toBe(true);
-    expect(body.tenants.some((t: any) => t.id === "shop-b")).toBe(true);
+    expect(body.tenants).toHaveLength(1);
+    expect(body.tenants[0].id).toBe("shop-b");
+    expect(body.tenants.some((t: any) => t.id === "limart")).toBe(false);
+    expect(body.tenants.some((t: any) => t.id === "demo")).toBe(false);
 
     const resSubdomain = await app.request("http://shop-q3.limart.vn/api/admin/tenants", {
       headers: {
@@ -350,12 +355,16 @@ describe("Multi-Tenant Isolation, Cache Scoping & Surgical Snapshot Backup/Resto
     });
     expect(resSubdomain.status).toBe(200);
     expect(resSubdomain.headers.get("X-Tenant-Id")).toBe("shop-q3");
+    const subBody = await resSubdomain.json();
+    expect(subBody.tenants).toHaveLength(1);
+    expect(subBody.tenants[0].id).toBe("shop-q3");
   });
 
-  it("4. GET /api/admin/tenants/backup exports a valid SHA-256 signed snapshot for a tenant", async () => {
+  it("4. GET /api/admin/tenants/backup exports a valid SHA-256 signed snapshot for the current tenant", async () => {
     const res = await app.request("/api/admin/tenants/backup?tenantId=shop-b&scope=all", {
       headers: {
         Authorization: `Bearer ${adminToken}`,
+        "X-Tenant-Id": "shop-b",
       },
     });
 
@@ -378,6 +387,7 @@ describe("Multi-Tenant Isolation, Cache Scoping & Surgical Snapshot Backup/Resto
     const backupRes = await app.request("/api/admin/tenants/backup?tenantId=shop-b&scope=all", {
       headers: {
         Authorization: `Bearer ${adminToken}`,
+        "X-Tenant-Id": "shop-b",
       },
     });
     const backupPayload = await backupRes.json();
@@ -391,6 +401,7 @@ describe("Multi-Tenant Isolation, Cache Scoping & Surgical Snapshot Backup/Resto
       headers: {
         Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
+        "X-Tenant-Id": "shop-b",
       },
       body: JSON.stringify({
         snapshot: tamperedSnapshot,
@@ -409,6 +420,7 @@ describe("Multi-Tenant Isolation, Cache Scoping & Surgical Snapshot Backup/Resto
       headers: {
         Authorization: `Bearer ${adminToken}`,
         "Content-Type": "application/json",
+        "X-Tenant-Id": "shop-b",
       },
       body: JSON.stringify({
         snapshot: backupPayload.snapshot,
@@ -426,5 +438,97 @@ describe("Multi-Tenant Isolation, Cache Scoping & Surgical Snapshot Backup/Resto
     expect(validJson.result.restoredCounts.holidays).toBe(1);
     expect(mockDocumentUpsert).toHaveBeenCalledTimes(1);
     expect(mockWorkShiftUpsert).toHaveBeenCalledTimes(1);
+  });
+
+  it("6. GET /api/admin/tenants/backup?tenantId=other-shop when current tenant is 'limart' returns 403 Forbidden", async () => {
+    const res = await app.request("/api/admin/tenants/backup?tenantId=other-shop", {
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+      },
+    });
+
+    expect(res.status).toBe(403);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error).toContain("Forbidden");
+  });
+
+  it("7. POST /api/admin/tenants/restore with a snapshot from 'other-shop' when current tenant is 'limart' returns 403 Forbidden", async () => {
+    const backupRes = await app.request("/api/admin/tenants/backup?tenantId=shop-b&scope=all", {
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "X-Tenant-Id": "shop-b",
+      },
+    });
+    const backupPayload = await backupRes.json();
+    const otherShopSnapshot = {
+      ...structuredClone(backupPayload.snapshot),
+      tenantId: "other-shop",
+    };
+
+    const resCrossSnapshot = await app.request("/api/admin/tenants/restore", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        snapshot: otherShopSnapshot,
+      }),
+    });
+
+    expect(resCrossSnapshot.status).toBe(403);
+    const jsonCrossSnapshot = await resCrossSnapshot.json();
+    expect(jsonCrossSnapshot.success).toBe(false);
+    expect(jsonCrossSnapshot.error).toContain("Forbidden");
+
+    // Also reject when targetTenantId is a different tenant
+    const resCrossTarget = await app.request("/api/admin/tenants/restore", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${adminToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        snapshot: { ...structuredClone(backupPayload.snapshot), tenantId: "limart" },
+        targetTenantId: "other-shop",
+      }),
+    });
+
+    expect(resCrossTarget.status).toBe(403);
+    const jsonCrossTarget = await resCrossTarget.json();
+    expect(jsonCrossTarget.success).toBe(false);
+    expect(jsonCrossTarget.error).toContain("Forbidden");
+  });
+
+  it("8. When DEMO_SANDBOX_MODE === 'true', GET /api/admin/tenants/backup and GET /api/admin/export return 403 Forbidden", async () => {
+    const prevDemoMode = process.env.DEMO_SANDBOX_MODE;
+    process.env.DEMO_SANDBOX_MODE = "true";
+
+    try {
+      const backupRes = await app.request("/api/admin/tenants/backup", {
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(backupRes.status).toBe(403);
+      const backupJson = await backupRes.json();
+      expect(backupJson.success).toBe(false);
+
+      const exportRes = await app.request("/api/admin/export", {
+        headers: {
+          Authorization: `Bearer ${adminToken}`,
+        },
+      });
+      expect(exportRes.status).toBe(403);
+      const exportJson = await exportRes.json();
+      expect(exportJson.success).toBe(false);
+    } finally {
+      if (prevDemoMode === undefined) {
+        delete process.env.DEMO_SANDBOX_MODE;
+      } else {
+        process.env.DEMO_SANDBOX_MODE = prevDemoMode;
+      }
+    }
   });
 });

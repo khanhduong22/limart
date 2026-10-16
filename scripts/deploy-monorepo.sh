@@ -243,16 +243,17 @@ deploy_dual_run() {
         docker exec limart-db psql -U kido -d "$DB_TARGET" -c '
           CREATE TABLE IF NOT EXISTS "Tenant" (
             "id" TEXT NOT NULL PRIMARY KEY,
-            "name" TEXT NOT NULL,
             "slug" TEXT NOT NULL UNIQUE,
+            "name" TEXT NOT NULL,
             "domain" TEXT UNIQUE,
-            "isActive" BOOLEAN NOT NULL DEFAULT true,
-            "settings" JSONB,
+            "plan" TEXT NOT NULL DEFAULT '\''ENTERPRISE'\'',
+            "modules" JSONB,
+            "active" BOOLEAN NOT NULL DEFAULT true,
             "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
             "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
           );
-          INSERT INTO "Tenant" ("id", "name", "slug", "domain", "isActive")
-          VALUES ('\''limart'\'', '\''LimArt Store'\'', '\''limart'\'', '\''limart.khanhdp.com'\'', true)
+          INSERT INTO "Tenant" ("id", "slug", "name", "domain", "plan", "active", "updatedAt")
+          VALUES ('\''limart'\'', '\''limart'\'', '\''LimArt Flagship Store'\'', '\''limart.khanhdp.com'\'', '\''ENTERPRISE'\'', true, CURRENT_TIMESTAMP)
           ON CONFLICT ("id") DO NOTHING;
           CREATE TABLE IF NOT EXISTS "Document" (
             "id" TEXT NOT NULL PRIMARY KEY,

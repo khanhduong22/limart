@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { isLikelyDemoHost } from "@/lib/demo-mode";
 import { toast } from "sonner";
 
 export type TenantSnapshotScope =
@@ -24,11 +25,6 @@ export interface ParsedTenantSnapshot {
   };
   [key: string]: unknown;
 }
-
-const TENANT_OPTIONS = [
-  { value: "limart", label: "LimArt (Cửa hàng chính - limart)" },
-  { value: "demo", label: "DemoMart (Bản Demo - demo)" },
-] as const;
 
 const SCOPE_OPTIONS: { value: TenantSnapshotScope; label: string }[] = [
   {
@@ -83,14 +79,17 @@ export default function BackupManager() {
   const [endDate, setEndDate] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  // Surgical Per-Tenant Snapshot state
-  const [tenantId, setTenantId] = useState<string>("limart");
+  // Surgical Per-Tenant Snapshot state (scoped strictly to current shop)
   const [scope, setScope] = useState<TenantSnapshotScope>("all");
   const [isExportingSnapshot, setIsExportingSnapshot] = useState(false);
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   const [parsedSnapshot, setParsedSnapshot] =
     useState<ParsedTenantSnapshot | null>(null);
   const [isRestoringSnapshot, setIsRestoringSnapshot] = useState(false);
+
+  if (isLikelyDemoHost()) {
+    return null;
+  }
 
   const handleDownload = async () => {
     try {
@@ -122,12 +121,8 @@ export default function BackupManager() {
   const handleDownloadSnapshot = async () => {
     try {
       setIsExportingSnapshot(true);
-      const params = new URLSearchParams({
-        tenantId,
-        scope,
-      });
       const response = await fetch(
-        `/api/admin/tenants/backup?${params.toString()}`,
+        `/api/admin/tenants/backup?${new URLSearchParams({ scope }).toString()}`,
         {
           method: "GET",
           headers: getAuthHeaders(),
@@ -141,7 +136,8 @@ export default function BackupManager() {
 
       const snapshotData = await response.json();
       const dateStr = new Date().toISOString().split("T")[0];
-      const fileName = `tenant-snapshot-${tenantId}-${scope}-${dateStr}.json`;
+      const resolvedTenant = snapshotData?.tenantId || "shop";
+      const fileName = `tenant-snapshot-${resolvedTenant}-${scope}-${dateStr}.json`;
       const jsonString = JSON.stringify(snapshotData, null, 2);
 
       const link = document.createElement("a");
@@ -209,10 +205,7 @@ export default function BackupManager() {
         method: "POST",
         headers: getAuthHeaders({ "Content-Type": "application/json" }),
         credentials: "include",
-        body: JSON.stringify({
-          snapshot: parsedSnapshot,
-          targetTenantId: tenantId,
-        }),
+        body: JSON.stringify({ snapshot: parsedSnapshot }),
       });
 
       if (!response.ok) {
@@ -232,8 +225,8 @@ export default function BackupManager() {
 
       toast.success(
         countsSummary
-          ? `Khôi phục dữ liệu vào cửa hàng ${tenantId} thành công (${countsSummary})!`
-          : `Khôi phục dữ liệu vào cửa hàng ${tenantId} thành công!`
+          ? `Khôi phục dữ liệu cửa hàng thành công (${countsSummary})!`
+          : "Khôi phục dữ liệu cửa hàng thành công!"
       );
     } catch {
       toast.error("Không thể khôi phục dữ liệu từ gói Snapshot");
@@ -329,45 +322,27 @@ export default function BackupManager() {
             🛡️ Sao lưu & Khôi phục Phẫu thuật theo Cửa hàng (Tenant Snapshot)
           </h3>
           <p className="text-sm text-muted-foreground">
-            Xuất hoặc khôi phục dữ liệu riêng biệt của từng cửa hàng (Tenant) hoặc từng phân hệ (Lịch ca, Tài liệu SOP, Công việc) kèm chữ ký bảo mật SHA-256 mà không ảnh hưởng tới các cửa hàng khác trên cùng Database.
+            Xuất hoặc khôi phục dữ liệu riêng biệt của cửa hàng hiện tại hoặc từng phân hệ (Lịch ca, Tài liệu SOP, Công việc) kèm chữ ký bảo mật SHA-256.
           </p>
         </div>
 
         <div className="p-3.5 sm:p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="tenant-select">Chọn Cửa hàng (Tenant)</Label>
-              <select
-                id="tenant-select"
-                value={tenantId}
-                onChange={(e) => setTenantId(e.target.value)}
-                className="flex h-10 sm:h-9 min-h-[38px] w-full rounded-md border border-input bg-white px-3 py-1 text-base sm:text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {TENANT_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="scope-select">Phạm vi dữ liệu (Scope)</Label>
-              <select
-                id="scope-select"
-                value={scope}
-                onChange={(e) =>
-                  setScope(e.target.value as TenantSnapshotScope)
-                }
-                className="flex h-10 sm:h-9 min-h-[38px] w-full rounded-md border border-input bg-white px-3 py-1 text-base sm:text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-              >
-                {SCOPE_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="grid w-full max-w-md items-center gap-1.5">
+            <Label htmlFor="scope-select">Phạm vi dữ liệu (Scope)</Label>
+            <select
+              id="scope-select"
+              value={scope}
+              onChange={(e) =>
+                setScope(e.target.value as TenantSnapshotScope)
+              }
+              className="flex h-10 sm:h-9 min-h-[38px] w-full rounded-md border border-input bg-white px-3 py-1 text-base sm:text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            >
+              {SCOPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2">
@@ -389,7 +364,7 @@ export default function BackupManager() {
                 ♻️ Khôi phục Phẫu thuật từ file Snapshot (.json)
               </h4>
               <p className="text-xs text-muted-foreground">
-                Chọn file Snapshot (.json) đã sao lưu trước đó để kiểm tra chữ ký SHA-256 và khôi phục vào cửa hàng đích đã chọn.
+                Chọn file Snapshot (.json) đã sao lưu trước đó để kiểm tra chữ ký SHA-256 và khôi phục vào cửa hàng hiện tại.
               </p>
             </div>
 
@@ -465,4 +440,5 @@ export default function BackupManager() {
     </div>
   );
 }
+
 

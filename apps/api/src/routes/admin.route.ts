@@ -15,6 +15,7 @@ import { recordSecureAuditLog } from "../lib/audit";
 import { applyLateSchedulePenalty } from "../lib/schedule-penalty";
 import { ensureAdminNaSchedule } from "../lib/auto-schedule";
 import { closePayrollMonth } from "../lib/payroll-close";
+import { isDemoSandboxEnabled } from "../lib/demo-sandbox";
 import {
   getDefinitionsHandler,
   createDefinitionHandler,
@@ -421,6 +422,16 @@ adminRoute.get("/dashboard-stats", async (c) => {
 // ============================================================================
 adminRoute.get("/export", async (c) => {
   try {
+    if (isDemoSandboxEnabled()) {
+      return c.json(
+        {
+          success: false,
+          error: "Tính năng xuất dữ liệu bị khóa trên môi trường Demo công khai",
+        },
+        403
+      );
+    }
+
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
     const filename = `backup_data_${timestamp}.xlsx`;
     const workbook = XLSX.utils.book_new();

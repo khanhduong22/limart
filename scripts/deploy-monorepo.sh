@@ -259,6 +259,7 @@ deploy_dual_run() {
         --restart unless-stopped \
         --label "com.docker.compose.project=limart" \
         --label "com.docker.compose.service=limart-demo-api" \
+        --health-cmd="wget --no-verbose --tries=1 --spider http://127.0.0.1:4010/health || exit 1" \
         -m 192m \
         ${ENV_ARG:-} \
         -e PORT=4010 \

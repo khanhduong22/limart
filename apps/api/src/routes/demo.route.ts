@@ -4,6 +4,8 @@ import { prisma } from "@checkin/db";
 import { signAccessToken, TOKEN_EXPIRY_SECONDS } from "../lib/auth";
 import { AppEnv } from "../middleware/auth.middleware";
 import { getRedisClient, invalidateCachePattern } from "../lib/cache";
+import { getClientIP } from "../lib/ip-utils";
+import { recordSecureAuditLog } from "../lib/audit";
 import {
   DEMO_MODULE_METADATA,
   getDemoModulesConfig,
@@ -123,6 +125,26 @@ demoRoute.post("/switch-role", async (c) => {
       maxAge: TOKEN_EXPIRY_SECONDS,
       path: "/",
     });
+
+    const clientIp = getClientIP(c) || "103.199.18.88";
+    const userAgent =
+      c.req.header("user-agent") ||
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/129.0.0.0";
+    await recordSecureAuditLog({
+      userId: user.id,
+      action: "LOGIN",
+      status: "SUCCESS",
+      ipAddress: clientIp,
+      userAgent,
+      device: /Mobile|Android|iPhone|iPad/i.test(userAgent) ? "Mobile" : "Desktop",
+      city: "TP. Hồ Chí Minh",
+      details: {
+        note: `Chuyển đổi vai trò nhanh trong Demo Sandbox sang ${user.role} (${user.email})`,
+        switchedRole: user.role,
+      },
+      requestId: c.var.requestId || c.get("requestId"),
+    }).catch(() => null);
+    await invalidateCachePattern("auth:audit-logs:*").catch(() => null);
 
     const redirectTo =
       user.role === "ADMIN" ? "/admin" : user.role === "PARTNER" ? "/staff-tasks" : "/";

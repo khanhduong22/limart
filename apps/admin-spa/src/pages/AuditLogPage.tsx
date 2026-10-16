@@ -4,8 +4,44 @@ import { ShieldAlert, Search, Filter, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { AuditLog } from "@/components/admin/audit/AuditLogTable";
 
-const AuditLogTable = React.lazy(
-  () => import("@/components/admin/audit/AuditLogTable")
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+  chunkKey: string
+) {
+  return React.lazy(async () => {
+    const storageKey = `limart_chunk_retry_${chunkKey}`;
+    try {
+      const component = await factory();
+      try {
+        window.sessionStorage.removeItem(storageKey);
+      } catch {
+        // Ignore storage errors
+      }
+      return component;
+    } catch (error) {
+      let hasRetried = false;
+      try {
+        hasRetried = window.sessionStorage.getItem(storageKey) === "1";
+      } catch {
+        // Ignore storage errors
+      }
+      if (!hasRetried && typeof window !== "undefined") {
+        try {
+          window.sessionStorage.setItem(storageKey, "1");
+        } catch {
+          // Ignore storage errors
+        }
+        window.location.reload();
+        return { default: (() => null) as unknown as T };
+      }
+      throw error;
+    }
+  });
+}
+
+const AuditLogTable = lazyWithRetry(
+  () => import("@/components/admin/audit/AuditLogTable"),
+  "AuditLogTable"
 );
 
 interface AuditLogResponse {

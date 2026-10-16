@@ -239,6 +239,33 @@ deploy_dual_run() {
         docker exec limart-db psql -U kido -d postgres -c "CREATE DATABASE checkin_demo_db;"
     docker exec limart-db psql -U kido -d checkin_demo_db -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1 || true
     docker exec limart-db sh -c "pg_dump -U kido --schema-only --no-owner --no-privileges checkin_db | psql -U kido -d checkin_demo_db >/dev/null 2>&1 || true"
+    for DB_TARGET in checkin_db checkin_demo_db; do
+        docker exec limart-db psql -U kido -d "$DB_TARGET" -c '
+          CREATE TABLE IF NOT EXISTS "Document" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "path" TEXT NOT NULL UNIQUE,
+            "title" TEXT NOT NULL,
+            "content" TEXT NOT NULL,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+          CREATE TABLE IF NOT EXISTS "SessionAuditLog" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "userId" TEXT REFERENCES "User"("id") ON DELETE CASCADE,
+            "action" TEXT NOT NULL,
+            "status" TEXT NOT NULL DEFAULT '\''SUCCESS'\'',
+            "ipAddress" TEXT,
+            "userAgent" TEXT,
+            "device" TEXT,
+            "city" TEXT,
+            "details" JSONB,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+          ALTER TABLE "SessionAuditLog" ADD COLUMN IF NOT EXISTS "device" TEXT;
+          ALTER TABLE "SessionAuditLog" ADD COLUMN IF NOT EXISTS "city" TEXT;
+          ALTER TABLE "SessionAuditLog" ADD COLUMN IF NOT EXISTS "details" JSONB;
+        ' >/dev/null 2>&1 || true
+    done
 
     log_info "Deploying isolated Public Demo API container (limart-demo-api on port 4010)..."
     DEMO_API_IMAGE=$(docker inspect --format='{{.Config.Image}}' "${ACTIVE_API_CONTAINER}" 2>/dev/null || echo "ghcr.io/khanhduong22/limart/checkin-api:latest")

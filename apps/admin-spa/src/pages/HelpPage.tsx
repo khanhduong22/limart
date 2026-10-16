@@ -1,14 +1,52 @@
 import React, { useState, useMemo } from "react";
 import { useAdminQuery } from "@/hooks/useAdminQuery";
 
-const MarkdownRenderer = React.lazy(
-  () => import("@/components/help/MarkdownRenderer")
+function lazyWithRetry<T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T }>,
+  chunkKey: string
+) {
+  return React.lazy(async () => {
+    const storageKey = `limart_chunk_retry_${chunkKey}`;
+    try {
+      const component = await factory();
+      try {
+        window.sessionStorage.removeItem(storageKey);
+      } catch {
+        // Ignore storage errors
+      }
+      return component;
+    } catch (error) {
+      let hasRetried = false;
+      try {
+        hasRetried = window.sessionStorage.getItem(storageKey) === "1";
+      } catch {
+        // Ignore storage errors
+      }
+      if (!hasRetried && typeof window !== "undefined") {
+        try {
+          window.sessionStorage.setItem(storageKey, "1");
+        } catch {
+          // Ignore storage errors
+        }
+        window.location.reload();
+        return { default: (() => null) as unknown as T };
+      }
+      throw error;
+    }
+  });
+}
+
+const MarkdownRenderer = lazyWithRetry(
+  () => import("@/components/help/MarkdownRenderer"),
+  "MarkdownRenderer"
 );
-const UploadDocumentDialog = React.lazy(
-  () => import("@/components/help/UploadDocumentDialog")
+const UploadDocumentDialog = lazyWithRetry(
+  () => import("@/components/help/UploadDocumentDialog"),
+  "UploadDocumentDialog"
 );
-const HelpChatTab = React.lazy(
-  () => import("@/components/help/HelpChatTab")
+const HelpChatTab = lazyWithRetry(
+  () => import("@/components/help/HelpChatTab"),
+  "HelpChatTab"
 );
 
 import { Card } from "@/components/ui/card";

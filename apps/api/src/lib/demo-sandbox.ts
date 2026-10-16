@@ -557,6 +557,8 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   shiftsSeeded: number;
   checkinsSeeded: number;
   payslipsSeeded: number;
+  documentsSeeded: number;
+  auditLogsSeeded: number;
 }> {
   // CRITICAL SAFETY LOCK 1
   if (!isDemoSandboxEnabled()) {
@@ -584,6 +586,8 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
         shiftsSeeded: 0,
         checkinsSeeded: 0,
         payslipsSeeded: 0,
+        documentsSeeded: 0,
+        auditLogsSeeded: 0,
       };
     }
   }

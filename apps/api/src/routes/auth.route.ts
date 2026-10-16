@@ -236,52 +236,65 @@ authRoute.all("/logout", async (c) => {
 
 // GET /api/auth/audit-logs (Admin Only, supports pagination and filters)
 authRoute.get("/audit-logs", authMiddleware, adminMiddleware, async (c) => {
-  const page = Math.max(1, parseInt(c.req.query("page") || "1", 10));
-  const limit = Math.min(Math.max(1, parseInt(c.req.query("limit") || "50", 10)), 200);
-  const action = c.req.query("action");
-  const status = c.req.query("status");
-  const userId = c.req.query("userId");
-  const search = c.req.query("search")?.trim();
+  const page = Math.max(1, parseInt(c.req.query("page") || "1", 10) || 1);
+  const limit = Math.min(Math.max(1, parseInt(c.req.query("limit") || "50", 10) || 50), 200);
 
-  const where: any = {};
-  if (action && action !== "ALL") where.action = action;
-  if (status && status !== "ALL") where.status = status;
-  if (userId) where.userId = userId;
-  if (search) {
-    where.OR = [
-      { ipAddress: { contains: search, mode: "insensitive" } },
-      { user: { name: { contains: search, mode: "insensitive" } } },
-      { user: { email: { contains: search, mode: "insensitive" } } },
-    ];
-  }
+  try {
+    const action = c.req.query("action");
+    const status = c.req.query("status");
+    const userId = c.req.query("userId");
+    const search = c.req.query("search")?.trim();
 
-  const cacheKey = `auth:audit-logs:${page}:${limit}:${action || "ALL"}:${status || "ALL"}:${userId || "ALL"}:${search || "NONE"}`;
-  const result = await getOrSetCache(cacheKey, 30, async () => {
-    const [total, logs] = await Promise.all([
-      prisma.sessionAuditLog.count({ where }),
-      prisma.sessionAuditLog.findMany({
-        where,
-        take: limit,
-        skip: (page - 1) * limit,
-        orderBy: { createdAt: "desc" },
-        include: {
-          user: {
-            select: { id: true, name: true, email: true, image: true, role: true },
+    const where: any = {};
+    if (action && action !== "ALL") where.action = action;
+    if (status && status !== "ALL") where.status = status;
+    if (userId) where.userId = userId;
+    if (search) {
+      where.OR = [
+        { ipAddress: { contains: search, mode: "insensitive" } },
+        { user: { name: { contains: search, mode: "insensitive" } } },
+        { user: { email: { contains: search, mode: "insensitive" } } },
+      ];
+    }
+
+    const cacheKey = `auth:audit-logs:${page}:${limit}:${action || "ALL"}:${status || "ALL"}:${userId || "ALL"}:${search || "NONE"}`;
+    const result = await getOrSetCache(cacheKey, 30, async () => {
+      const [total, logs] = await Promise.all([
+        prisma.sessionAuditLog.count({ where }),
+        prisma.sessionAuditLog.findMany({
+          where,
+          take: limit,
+          skip: (page - 1) * limit,
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: {
+              select: { id: true, name: true, email: true, image: true, role: true },
+            },
           },
-        },
-      }),
-    ]);
-    return { total, logs, totalPages: Math.ceil(total / limit) };
-  });
+        }),
+      ]);
+      return { total, logs, totalPages: Math.ceil(total / limit) };
+    });
 
-  return c.json({
-    success: true,
-    total: result.total,
-    page,
-    limit,
-    totalPages: result.totalPages,
-    logs: result.logs,
-  });
+    return c.json({
+      success: true,
+      total: result?.total ?? 0,
+      page,
+      limit,
+      totalPages: result?.totalPages ?? 0,
+      logs: Array.isArray(result?.logs) ? result.logs : [],
+    });
+  } catch (err: any) {
+    console.error("[GET /api/auth/audit-logs] Failed to query sessionAuditLog:", err);
+    return c.json({
+      success: true,
+      total: 0,
+      page,
+      limit,
+      totalPages: 0,
+      logs: [],
+    });
+  }
 });
 
 // GET /api/auth/me (also mounted at /api/me)

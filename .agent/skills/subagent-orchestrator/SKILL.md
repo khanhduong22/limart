@@ -69,10 +69,15 @@ Before launching any subagent:
    - If fullstack: Split into Backend API (`apps/api`) and Frontend Client (`apps/admin-spa` or `apps/staff-pwa`).
    - If single-component: Define the exact files and behavior required.
 
-### Phase 2: Subagent Dispatch & Naming
+### Phase 2: Subagent Dispatch, Model Tiering & Naming
 When invoking subagents via `invoke_subagent`:
 
-1. **Mandatory Naming Standard**:
+1. **Mandatory Model & Effort Tiering**:
+   - **Master Agent**: Runs on **Argon 4 High** (`pro` High).
+   - **Standard Subagents (`Model: "flash"` — Flash 3.8 High Default)**: Explicitly pass `"Model": "flash"` for normal coding, UI components, API routes, unit/E2E test execution, CI/CD deployment monitoring (`gh run watch`), and research. Do **NOT** default every subagent to `"inherit"` (Argon 4).
+   - **Complex Architecture Subagents (`Model: "pro"` — Argon 4 High)**: Use `"Model": "pro"` only for complex core packages (`packages/*`), distributed systems/concurrency algorithms, or deep multi-service debugging.
+
+2. **Mandatory Naming Standard**:
    ```text
    [YYYY-MM-DD HH:mm | #<issue>] <Descriptive Role>
    ```
@@ -81,7 +86,7 @@ When invoking subagents via `invoke_subagent`:
    - `[2026-10-07 11:45 | #e2e] Shift Calendar Playwright Tester`
    - `[2026-10-07 11:45] Valkey Cache Concurrency Benchmarker`
 
-2. **Subagent Briefing Template**:
+3. **Subagent Briefing Template**:
    Always pass a structured, self-contained prompt to the subagent:
    ```text
    ROLE: [Descriptive Role]

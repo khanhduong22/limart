@@ -33,8 +33,14 @@ Whenever a task falls into ANY of the following categories, the Master Agent **M
 
 ---
 
-## 3. Subagent Naming Standard (Mandatory)
+## 3. Subagent Naming & Model Tiering Standard (Mandatory)
 
+### A. Model & Effort Routing (`invoke_subagent`)
+- **Master Agent (Primary Orchestrator)**: Always runs on **Argon 4 High** (`pro` High) for planning, architectural decisions, orchestration, and contract verification.
+- **Standard Execution Subagents (`Model: "flash"` — Flash 3.8 High Default)**: Do **NOT** leave `Model` as `"inherit"` (Argon 4) for normal tasks. Explicitly pass `Model: "flash"` (Flash 3.8 High) for routine UI implementation, scoped API endpoints, unit/E2E test execution, CI/CD deployment monitoring (`gh run watch`), codebase lookups, and doc sync.
+- **Complex Architecture Subagents (`Model: "pro"` / `"inherit"` — Argon 4 High)**: Reserve Argon 4 High (`Model: "pro"`) **strictly** for core shared packages (`packages/*`), distributed concurrency/locking algorithms, or complex multi-table schema refactors.
+
+### B. Naming Format
 Whenever invoking a subagent (via `invoke_subagent` or subagent runner), the **`Role`** field MUST follow this exact format:
 
 ```text

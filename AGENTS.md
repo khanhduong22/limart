@@ -185,6 +185,10 @@ ssh contabo "cd /opt/limart && ./scripts/pgbackrest-restore.sh --time 'YYYY-MM-D
   1. **Đang làm gì**: Tóm tắt ngắn gọn hành động cụ thể đang diễn ra.
   2. **Sắp làm gì**: Bước tiếp theo chuẩn bị thực hiện ngay sau đó.
   3. **Mức độ rủi ro**: Đánh giá rõ ràng (`Thấp` / `Trung bình` / `Cao`) kèm giải thích ngắn gọn nếu có rủi ro đến hệ thống hoặc dữ liệu.
+- **Model & Effort Tiering Policy (`invoke_subagent`)**:
+  - **Master Agent (Orchestrator)**: Always runs on **Argon 4 High** (`pro` High).
+  - **Standard Subagents (`Model: "flash"` — Flash 3.8 High Default)**: Do **NOT** spawn every subagent on Argon 4 (`"inherit"` / `"pro"`). Explicitly pass `Model: "flash"` (Flash 3.8 High) for all normal execution tasks (UI components, scoped API routes, unit/E2E tests, `gh run watch` CI/CD deployment monitoring, codebase research, lint/typecheck fixes, doc sync).
+  - **Complex Architecture Subagents (`Model: "pro"` / `"inherit"` — Argon 4 High)**: Reserved **strictly** for deep architectural tasks (`packages/*`, concurrency/distributed locks, cryptographic audit chains, or complex multi-table migrations).
 - **Mandatory Subagent Naming**:
   ```text
   [YYYY-MM-DD HH:mm | #<issue>] <Descriptive Role>

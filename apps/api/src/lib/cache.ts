@@ -1,6 +1,15 @@
 import Redis from "ioredis";
+import { getCurrentTenantId, DEFAULT_TENANT_ID } from "../middleware/tenant.middleware";
 
 let redisClient: Redis | null = null;
+
+export function resolveTenantCacheKey(key: string): string {
+  const tenantId = getCurrentTenantId();
+  if (!tenantId || tenantId === DEFAULT_TENANT_ID || key.startsWith("tenant:")) {
+    return key;
+  }
+  return `tenant:${tenantId}:${key}`;
+}
 
 function createRedisClient(): Redis | null {
   const redisUrl = process.env.REDIS_URL || process.env.VALKEY_URL;
@@ -63,8 +72,9 @@ export async function getOrSetCache<T>(
   fetcher: () => Promise<T>,
   options?: CacheOptions
 ): Promise<T> {
+  const scopedKey = resolveTenantCacheKey(key);
   // If an in-flight fetch already exists for this key, await that promise (SingleFlight deduplication)
-  const existingInFlight = inFlightPromises.get(key);
+  const existingInFlight = inFlightPromises.get(scopedKey);
   if (existingInFlight) {
     return existingInFlight as Promise<T>;
   }
@@ -73,7 +83,7 @@ export async function getOrSetCache<T>(
   try {
     client = getRedisClient();
     if (client) {
-      const cached = await client.get(key);
+      const cached = await client.get(scopedKey);
       if (cached) {
         return JSON.parse(cached) as T;
       }
@@ -83,8 +93,8 @@ export async function getOrSetCache<T>(
   }
 
   // Cache miss: double-check in-flight map in case another request started fetching during Redis lookup
-  if (inFlightPromises.has(key)) {
-    return inFlightPromises.get(key) as Promise<T>;
+  if (inFlightPromises.has(scopedKey)) {
+    return inFlightPromises.get(scopedKey) as Promise<T>;
   }
 
   // Create deduplicated in-flight fetch promise
@@ -98,7 +108,7 @@ export async function getOrSetCache<T>(
           const actualTTL = options?.disableJitter
             ? baseTTL
             : getJitteredTTL(baseTTL, options?.jitterRatio ?? 0.15);
-          await client.setex(key, actualTTL, JSON.stringify(data));
+          await client.setex(scopedKey, actualTTL, JSON.stringify(data));
         } catch {
           // Ignore cache write error
         }
@@ -106,11 +116,11 @@ export async function getOrSetCache<T>(
 
       return data;
     } finally {
-      inFlightPromises.delete(key);
+      inFlightPromises.delete(scopedKey);
     }
   })();
 
-  inFlightPromises.set(key, fetchPromise);
+  inFlightPromises.set(scopedKey, fetchPromise);
   return fetchPromise;
 }
 
@@ -118,13 +128,14 @@ export async function getOrSetCache<T>(
  * Invalidate a single cache key
  */
 export async function invalidateCache(key: string): Promise<void> {
+  const scopedKey = resolveTenantCacheKey(key);
   try {
     const client = getRedisClient();
     if (client) {
-      await client.del(key);
+      await client.del(scopedKey);
     }
   } catch (error) {
-    console.warn(`[Cache Invalidate Error] Key ${key}:`, error);
+    console.warn(`[Cache Invalidate Error] Key ${scopedKey}:`, error);
   }
 }
 
@@ -132,6 +143,7 @@ export async function invalidateCache(key: string): Promise<void> {
  * Invalidate cache keys matching a pattern (e.g. "payroll:*", "stats:*")
  */
 export async function invalidateCachePattern(pattern: string): Promise<void> {
+  const scopedPattern = resolveTenantCacheKey(pattern);
   try {
     const client = getRedisClient();
     if (!client) {
@@ -140,7 +152,7 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
 
     if (typeof (client as any).scanStream !== "function") {
       if (typeof client.keys === "function") {
-        const keys = await client.keys(pattern);
+        const keys = await client.keys(scopedPattern);
         if (keys && keys.length > 0) {
           await client.del(...keys);
         }
@@ -149,7 +161,7 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
     }
 
     await new Promise<void>((resolve, reject) => {
-      const stream = (client as any).scanStream({ match: pattern, count: 100 });
+      const stream = (client as any).scanStream({ match: scopedPattern, count: 100 });
       const pipelinePromises: Promise<unknown>[] = [];
 
       stream.on("data", (keys: string[]) => {
@@ -174,7 +186,7 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
       });
     });
   } catch (error) {
-    console.warn(`[Cache Invalidate Pattern Error] Pattern ${pattern}:`, error);
+    console.warn(`[Cache Invalidate Pattern Error] Pattern ${scopedPattern}:`, error);
   }
 }
 

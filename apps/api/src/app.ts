@@ -24,8 +24,10 @@ import { tasksRoute } from "./routes/tasks.route";
 import { specialDaysRoute } from "./routes/special-days.route";
 import { cronRoute } from "./routes/cron.route";
 import { demoRoute } from "./routes/demo.route";
+import { tenantRoute } from "./routes/tenant.route";
 import { authMiddleware, AppEnv } from "./middleware/auth.middleware";
 import { serverTiming } from "./middleware/server-timing.middleware";
+import { tenantMiddleware } from "./middleware/tenant.middleware";
 import { prisma } from "@checkin/db";
 import { getOrSetCache } from "./lib/cache";
 
@@ -71,10 +73,20 @@ export function createApp() {
       origin: (origin) => origin || "*",
       credentials: true,
       allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowHeaders: ["Content-Type", "Authorization", "Cookie", "X-Request-Id", "If-None-Match"],
-      exposeHeaders: ["ETag", "Server-Timing"],
+      allowHeaders: [
+        "Content-Type",
+        "Authorization",
+        "Cookie",
+        "X-Request-Id",
+        "X-Tenant-Id",
+        "If-None-Match",
+      ],
+      exposeHeaders: ["ETag", "Server-Timing", "X-Tenant-Id"],
     })
   );
+
+  // 4b. Multi-Tenant Context Resolution
+  app.use("*", tenantMiddleware);
 
   // 5. Server-Timing APM & Network Waterfall Visibility
   app.use("*", serverTiming());
@@ -194,6 +206,7 @@ export function createApp() {
   app.route("/api/special-days", specialDaysRoute);
 
   // Admin Routes
+  app.route("/api/admin/tenants", tenantRoute);
   app.route("/api/admin", adminRoute);
   app.route("/api/tasks", tasksRoute);
   app.route("/api/staff-tasks", staffTasksRoute);

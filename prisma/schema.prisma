@@ -7,6 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Tenant {
+  id        String   @id @default("limart")
+  slug      String   @unique @default("limart")
+  name      String   @default("LimArt Store")
+  domain    String?  @unique
+  plan      String   @default("ENTERPRISE") // STARTER, PRO, ENTERPRISE
+  modules   Json?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug, active])
+  @@index([active])
+}
+
 model Account {
   id                String  @id @default(cuid())
   userId            String
@@ -48,6 +63,7 @@ model VerificationToken {
 
 model User {
   id                    String                 @id @default(cuid())
+  tenantId              String                 @default("limart")
   name                  String?
   email                 String?                @unique
   emailVerified         DateTime?
@@ -88,10 +104,13 @@ model User {
   @@index([isActive])
   @@index([role, isActive])
   @@index([role, employmentType])
+  @@index([tenantId, isActive])
+  @@index([tenantId, role, isActive])
 }
 
 model WorkShift {
   id            Int         @id @default(autoincrement())
+  tenantId      String      @default("limart")
   userId        String
   start         DateTime
   end           DateTime
@@ -111,10 +130,13 @@ model WorkShift {
   @@index([userId, status])
   @@index([userId, status, start])
   @@index([userId, status, start, end])
+  @@index([tenantId, start])
+  @@index([tenantId, userId, start])
 }
 
 model ShiftAuditLog {
   id          Int      @id @default(autoincrement())
+  tenantId    String   @default("limart")
   shiftId     Int
   userId      String
   action      String   // 'CREATE', 'UPDATE', 'DELETE', 'IMPORT', 'TAKE_SWAP'
@@ -135,10 +157,12 @@ model ShiftAuditLog {
   @@index([userId, createdAt])
   @@index([shiftId, createdAt])
   @@index([action, createdAt])
+  @@index([tenantId, createdAt])
 }
 
 model Request {
   id        Int      @id @default(autoincrement())
+  tenantId  String   @default("limart")
   userId    String
   type      String
   date      DateTime
@@ -154,10 +178,13 @@ model Request {
   @@index([userId, type, status, date])
   @@index([status, createdAt])
   @@index([createdAt])
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, userId, createdAt])
 }
 
 model Announcement {
   id        String   @id @default(cuid())
+  tenantId  String   @default("limart")
   title     String
   content   String
   type      String   @default("INFO")
@@ -166,6 +193,7 @@ model Announcement {
 
   @@index([active, createdAt])
   @@index([createdAt])
+  @@index([tenantId, active, createdAt])
 }
 
 model AnnouncementRead {
@@ -182,6 +210,7 @@ model AnnouncementRead {
 
 model StickyNote {
   id        String   @id @default(cuid())
+  tenantId  String   @default("limart")
   content   String
   color     String   @default("yellow")
   userId    String
@@ -190,10 +219,12 @@ model StickyNote {
 
   @@index([userId])
   @@index([userId, createdAt])
+  @@index([tenantId, userId])
 }
 
 model PayrollAdjustment {
   id        String   @id @default(cuid())
+  tenantId  String   @default("limart")
   userId    String
   amount    Int
   reason    String
@@ -206,10 +237,12 @@ model PayrollAdjustment {
   @@index([date])
   @@index([userId, createdAt])
   @@index([userId, date, amount])
+  @@index([tenantId, userId, date])
 }
 
 model LuckyWheelPrize {
   id          String              @id @default(cuid())
+  tenantId    String              @default("limart")
   name        String
   description String?
   image       String?
@@ -225,10 +258,12 @@ model LuckyWheelPrize {
 
   @@index([active, createdAt])
   @@index([active, remaining])
+  @@index([tenantId, active, remaining])
 }
 
 model LuckyWheelHistory {
   id        String           @id @default(cuid())
+  tenantId  String           @default("limart")
   userId    String
   prizeId   String?
   prizeName String
@@ -241,6 +276,7 @@ model LuckyWheelHistory {
   @@index([createdAt])
   @@index([prizeId])
   @@index([prizeId, createdAt])
+  @@index([tenantId, userId, createdAt])
 }
 
 model UserAchievement {
@@ -260,6 +296,7 @@ model UserAchievement {
 
 model CheckIn {
   id        Int      @id @default(autoincrement())
+  tenantId  String   @default("limart")
   userId    String
   type      String
   timestamp DateTime @default(now())
@@ -272,23 +309,30 @@ model CheckIn {
   @@index([userId, type, timestamp])
   @@index([timestamp])
   @@index([type, timestamp])
+  @@index([tenantId, timestamp])
+  @@index([tenantId, userId, timestamp])
 }
 
 model AllowedIP {
   id        Int      @id @default(autoincrement())
+  tenantId  String   @default("limart")
   prefix    String   @unique
   label     String?
   createdAt DateTime @default(now())
+
+  @@index([tenantId])
 }
 
 model Holiday {
   id         String   @id @default(cuid())
+  tenantId   String   @default("limart")
   date       DateTime @unique
   name       String
   multiplier Float    @default(1.0)
   createdAt  DateTime @default(now())
 
   @@index([date, multiplier])
+  @@index([tenantId, date])
 }
 
 enum UserRole {
@@ -311,6 +355,7 @@ enum TaskStatus {
 
 model TaskDefinition {
   id          String     @id @default(cuid())
+  tenantId    String     @default("limart")
   name        String
   description String?
   baseReward  Float      @default(0)
@@ -326,10 +371,12 @@ model TaskDefinition {
   @@index([active])
   @@index([active, name])
   @@index([name])
+  @@index([tenantId, active])
 }
 
 model TaskItem {
   id          String    @id @default(cuid())
+  tenantId    String    @default("limart")
   taskDefId   String
   title       String
   description String?
@@ -351,10 +398,12 @@ model TaskItem {
   @@index([status])
   @@index([status, createdAt])
   @@index([createdAt])
+  @@index([tenantId, status, createdAt])
 }
 
 model UserTask {
   id             String         @id @default(cuid())
+  tenantId       String         @default("limart")
   userId         String
   taskDefId      String
   taskItemId     String?
@@ -392,10 +441,13 @@ model UserTask {
   @@index([status, submittedAt])
   @@index([status, submittedAt, userId])
   @@index([status, taskDefId, submittedAt])
+  @@index([tenantId, status, submittedAt])
+  @@index([tenantId, userId, createdAt])
 }
 
 model PayrollPeriod {
   id                 String           @id @default(cuid())
+  tenantId           String           @default("limart")
   month              Int
   year               Int
   status             String           @default("OPEN") // OPEN, CLOSED, LOCKED
@@ -406,10 +458,12 @@ model PayrollPeriod {
   updatedAt          DateTime         @updatedAt
 
   @@unique([month, year])
+  @@index([tenantId, month, year])
 }
 
 model Payslip {
   id          String    @id @default(cuid())
+  tenantId    String    @default("limart")
   userId      String
   month       Int
   year        Int
@@ -426,10 +480,13 @@ model Payslip {
   @@index([month, year])
   @@index([status, month, year])
   @@index([userId, status, month, year])
+  @@index([tenantId, month, year])
+  @@index([tenantId, userId, month, year])
 }
 
 model Document {
   id        String          @id @default(cuid())
+  tenantId  String          @default("limart")
   path      String          @unique
   title     String
   content   String
@@ -439,6 +496,7 @@ model Document {
 
   @@index([createdAt])
   @@index([title])
+  @@index([tenantId, createdAt])
 }
 
 model DocumentChunk {
@@ -456,6 +514,7 @@ model DocumentChunk {
 
 model ManagerTask {
   id          String    @id @default(cuid())
+  tenantId    String    @default("limart")
   title       String
   description String?
   isUrgent    Boolean   @default(false)
@@ -483,10 +542,12 @@ model ManagerTask {
   @@index([createdById])
   @@index([createdById, status, deadline])
   @@index([parentId])
+  @@index([tenantId, assigneeId, status])
 }
 
 model StaffTask {
   id           String    @id @default(cuid())
+  tenantId     String    @default("limart")
   title        String
   description  String?
   status       String    @default("TODO") // TODO, DOING, DONE, APPROVED, REJECTED
@@ -515,10 +576,12 @@ model StaffTask {
   @@index([status])
   @@index([status, createdAt])
   @@index([createdAt])
+  @@index([tenantId, assigneeId, status])
 }
 
 model ManagerChecklistTask {
   id          String   @id @default(cuid())
+  tenantId    String   @default("limart")
   title       String
   description String?
   assigneeId  String
@@ -536,6 +599,7 @@ model ManagerChecklistTask {
   @@index([assigneeId, order, createdAt])
   @@index([assigneeId, targetDate, order])
   @@index([targetDate])
+  @@index([tenantId, assigneeId, active])
 }
 
 model ManagerChecklistCompletion {
@@ -557,6 +621,7 @@ model ManagerChecklistCompletion {
 
 model ManagerWeeklyTask {
   id            String    @id @default(cuid())
+  tenantId      String    @default("limart")
   title         String
   description   String?
   assigneeId    String
@@ -579,10 +644,12 @@ model ManagerWeeklyTask {
   @@index([assigneeId, weekStart, weekEnd])
   @@index([assigneeId, weekStart, createdAt])
   @@index([createdAt])
+  @@index([tenantId, assigneeId, weekStart])
 }
 
 model ShiftDuty {
   id          String     @id @default(cuid())
+  tenantId    String     @default("limart")
   shiftId     Int?
   userId      String
   createdById String
@@ -610,10 +677,13 @@ model ShiftDuty {
   @@index([shiftId, createdAt])
   @@index([shiftId, userId, createdAt])
   @@index([date, isCompleted])
+  @@index([tenantId, date])
+  @@index([tenantId, shiftId])
 }
 
 model SessionAuditLog {
   id        String   @id @default(cuid())
+  tenantId  String   @default("limart")
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
   action    String   // LOGIN, LOGOUT, CHECKIN, CHECKOUT, FAILED_LOGIN
@@ -631,5 +701,5 @@ model SessionAuditLog {
   @@index([status, createdAt])
   @@index([action, status, createdAt])
   @@index([createdAt])
+  @@index([tenantId, createdAt])
 }
-

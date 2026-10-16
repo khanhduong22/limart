@@ -153,7 +153,7 @@ deploy_dual_run() {
             ${ENV_ARG} \
             -e PORT=4000 \
             -e NODE_ENV=production \
-            -e DATABASE_URL="${DATABASE_URL:-postgresql://kido:KidoVPS2026!@limart-db:5432/checkin_db?sslmode=disable&connection_limit=10&pool_timeout=15}" \
+            -e DATABASE_URL="${DATABASE_URL:-postgresql://kido:KidoVPS2026!@limart-db:5432/checkin_db?sslmode=disable&connection_limit=25&pool_timeout=20}" \
             -e REDIS_URL="${REDIS_URL:-redis://limart-valkey:6379}" \
             -e MEILISEARCH_HOST="${MEILISEARCH_HOST:-http://meilisearch:7700}" \
             -e MEILISEARCH_KEY="${MEILISEARCH_KEY:-kt_meilisearch_master_key_2026_safe}" \
@@ -167,10 +167,10 @@ deploy_dual_run() {
 
         # Step 6: Database schema migration sync in candidate container
         log_info "Syncing database schema via Prisma in candidate container..."
-        docker exec "${CANDIDATE_API_CONTAINER}" node -e "
+        docker exec "${CANDIDATE_API_CONTAINER}" bun -e "
           const { execSync } = require('child_process');
           try {
-            console.log(execSync('npx prisma db push --skip-generate --schema=packages/db/prisma/schema.prisma').toString());
+            console.log(execSync('bunx prisma db push --skip-generate --schema=packages/db/prisma/schema.prisma').toString());
           } catch (e) {
             console.log('Database push completed or logged:', e.message);
           }
@@ -241,6 +241,19 @@ deploy_dual_run() {
     docker exec limart-db sh -c "pg_dump -U kido --schema-only --no-owner --no-privileges checkin_db | psql -U kido -d checkin_demo_db >/dev/null 2>&1 || true"
     for DB_TARGET in checkin_db checkin_demo_db; do
         docker exec limart-db psql -U kido -d "$DB_TARGET" -c '
+          CREATE TABLE IF NOT EXISTS "Tenant" (
+            "id" TEXT NOT NULL PRIMARY KEY,
+            "name" TEXT NOT NULL,
+            "slug" TEXT NOT NULL UNIQUE,
+            "domain" TEXT UNIQUE,
+            "isActive" BOOLEAN NOT NULL DEFAULT true,
+            "settings" JSONB,
+            "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+          );
+          INSERT INTO "Tenant" ("id", "name", "slug", "domain", "isActive")
+          VALUES ('\''limart'\'', '\''LimArt Store'\'', '\''limart'\'', '\''limart.khanhdp.com'\'', true)
+          ON CONFLICT ("id") DO NOTHING;
           CREATE TABLE IF NOT EXISTS "Document" (
             "id" TEXT NOT NULL PRIMARY KEY,
             "path" TEXT NOT NULL UNIQUE,
@@ -264,6 +277,22 @@ deploy_dual_run() {
           ALTER TABLE "SessionAuditLog" ADD COLUMN IF NOT EXISTS "device" TEXT;
           ALTER TABLE "SessionAuditLog" ADD COLUMN IF NOT EXISTS "city" TEXT;
           ALTER TABLE "SessionAuditLog" ADD COLUMN IF NOT EXISTS "details" JSONB;
+          DO $$
+          DECLARE
+            t TEXT;
+          BEGIN
+            FOREACH t IN ARRAY ARRAY[
+              '\''User'\'', '\''WorkShift'\'', '\''ShiftAuditLog'\'', '\''Request'\'', '\''Announcement'\'',
+              '\''StickyNote'\'', '\''PayrollAdjustment'\'', '\''LuckyWheelPrize'\'', '\''LuckyWheelHistory'\'',
+              '\''CheckIn'\'', '\''AllowedIP'\'', '\''Holiday'\'', '\''TaskDefinition'\'', '\''TaskItem'\'',
+              '\''UserTask'\'', '\''PayrollPeriod'\'', '\''Payslip'\'', '\''Document'\'', '\''ManagerTask'\'',
+              '\''StaffTask'\'', '\''ManagerChecklistTask'\'', '\''ManagerWeeklyTask'\'', '\''ShiftDuty'\'',
+              '\''SessionAuditLog'\''
+            ]
+            LOOP
+              EXECUTE format('\''ALTER TABLE %I ADD COLUMN IF NOT EXISTS "tenantId" TEXT NOT NULL DEFAULT %L'\'', t, '\''limart'\'');
+            END LOOP;
+          END $$;
         ' >/dev/null 2>&1 || true
     done
 

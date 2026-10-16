@@ -5,6 +5,7 @@ import { getVietnamMonthRange } from "../lib/date-utils";
 import { isShiftLocked } from "../lib/schedule-lock";
 import { assertPeriodOpen } from "../lib/payroll-period";
 import { invalidateShiftDutyCache, invalidatePayrollCache, invalidateCachePattern, getOrSetCache } from "../lib/cache";
+import { rescheduleShiftNotifications } from "../lib/shift-notifications";
 
 export const scheduleRoute = new Hono<AppEnv>();
 
@@ -213,6 +214,8 @@ const handleCreateOrRegisterShift = async (c: any) => {
       invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
 
+    void rescheduleShiftNotifications();
+
     return c.json({ success: true, data: newShift }, 201);
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to create shift" }, 500);
@@ -282,6 +285,8 @@ scheduleRoute.post("/:id/swap", authMiddleware, async (c) => {
       invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
 
+    void rescheduleShiftNotifications();
+
     return c.json({
       success: true,
       message: newSwapStatus
@@ -350,6 +355,8 @@ scheduleRoute.post("/:id/take", authMiddleware, async (c) => {
       invalidateCachePattern("admin:dashboard*"),
       invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
+
+    void rescheduleShiftNotifications();
 
     return c.json({
       success: true,
@@ -439,6 +446,8 @@ scheduleRoute.delete("/:id", authMiddleware, async (c) => {
       invalidateCachePattern("admin:dashboard*"),
       invalidateCachePattern("staff:schedule:*"),
     ]).catch(() => {});
+
+    void rescheduleShiftNotifications();
 
     return c.json({ success: true, message: "Đã xóa ca trực" });
   } catch (err: any) {

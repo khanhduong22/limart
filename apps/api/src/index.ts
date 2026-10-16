@@ -14,7 +14,8 @@ export { notificationsRoute } from "./routes/notifications.route";
 import { isDemoSandboxEnabled, seedAndSanitizeDemoDatabase } from "./lib/demo-sandbox";
 import {
   ensureDefaultNotificationRules,
-  runShiftReminderCheck,
+  shiftNotificationWorker,
+  syncShiftNotificationSchedule,
 } from "./lib/shift-notifications";
 
 const port = Number(process.env.PORT) || 4000;
@@ -36,15 +37,18 @@ if (typeof (globalThis as any).Bun === "undefined" && process.env.NODE_ENV !== "
 // - When DEMO_SANDBOX_MODE === "true", seed & sanitize the isolated demo database on startup
 // - When DEMO_SANDBOX_MODE !== "true", ensure phuckhanh22 has PARTNER role, staffTasksAllowed enabled, and clear old work shifts
 if (process.env.NODE_ENV !== "test") {
-  ensureDefaultNotificationRules().catch((err) => {
-    console.error("[Checkin API] Failed to ensure default notification rules:", err);
-  });
+  ensureDefaultNotificationRules()
+    .then(() => syncShiftNotificationSchedule())
+    .catch((err) => {
+      console.error("[Checkin API] Failed to initialize shift notification scheduler:", err);
+    });
 
-  const shiftReminderTimer = setInterval(() => {
-    runShiftReminderCheck().catch(() => {});
-  }, 60_000);
-  if (typeof (shiftReminderTimer as any)?.unref === "function") {
-    (shiftReminderTimer as any).unref();
+  // Lightweight 6-hour safety re-sync fallback (while HybridNotificationScheduler handles exact-second wakeups via 1 setTimeout)
+  const shiftScheduleSafetySync = setInterval(() => {
+    syncShiftNotificationSchedule().catch(() => {});
+  }, 6 * 60 * 60 * 1000);
+  if (typeof (shiftScheduleSafetySync as any)?.unref === "function") {
+    (shiftScheduleSafetySync as any).unref();
   }
 
   if (isDemoSandboxEnabled()) {
@@ -108,6 +112,8 @@ export const shutdownController = setupGracefulShutdown({
   server: () => server,
   timeoutMs: 10000,
   onShutdown: async () => {
+    shiftNotificationWorker.clear();
+
     // 1. Disconnect Prisma
     try {
       await prisma.$disconnect();

@@ -61,11 +61,14 @@ import {
   DEFAULT_SHIFT_NOTIFICATION_RULES,
   ensureDefaultNotificationRules,
   formatShiftTimeRange,
+  getShiftSchedulerTelemetry,
   getVapidPublicKey,
   renderNotificationTemplate,
   resetShiftNotificationMemoryState,
   runShiftReminderCheck,
   sendNotificationToUser,
+  shiftNotificationWorker,
+  syncShiftNotificationSchedule,
 } from "../src/lib/shift-notifications";
 
 function generateValidSubscriberKeys() {
@@ -377,6 +380,10 @@ describe("Shift Notification Engine & /api/notifications Endpoints", () => {
       expect(data.stats.totalSubscribers).toBe(1);
       expect(data.stats.todayShiftsCount).toBe(1);
       expect(data.stats.rulesActiveCount).toBe(4);
+      expect(data.scheduler).toBeDefined();
+      expect(typeof data.scheduler.mode).toBe("string");
+      expect(data.scheduler.activeTimers).toBe(1);
+      expect(data.scheduler.nextWakeupAt).toBeTruthy();
     });
 
     it("GET /api/notifications/my, DELETE /api/notifications/unsubscribe, and Admin Rule CRUD + dispatch-today + /api/cron/shift-reminders work end-to-end", async () => {
@@ -530,4 +537,70 @@ describe("Shift Notification Engine & /api/notifications Endpoints", () => {
       expect(mockPushSubscriptionDelete).toHaveBeenCalled();
     });
   });
+
+  describe("4. Hybrid Timing Wheel + Single Next-Wakeup setTimeout Worker", () => {
+    it("syncShiftNotificationSchedule populates Timing Wheel buckets, arms 1 setTimeout at 07:30:00 ICT, and chains to 07:45:00 ICT on wakeup", async () => {
+      // Shift: 2026-10-16 08:00 - 12:00 ICT (01:00 - 05:00 UTC)
+      const shiftStart = new Date("2026-10-16T01:00:00.000Z");
+      const shiftEnd = new Date("2026-10-16T05:00:00.000Z");
+
+      mockWorkShiftFindMany.mockResolvedValue([
+        {
+          id: 501,
+          userId: "user-1",
+          start: shiftStart,
+          end: shiftEnd,
+          status: "APPROVED",
+          user: {
+            id: "user-1",
+            name: "Lê Minh C",
+            email: "lmc@limart.vn",
+            isActive: true,
+          },
+        },
+      ]);
+
+      // Sync at 07:00 ICT (00:00 UTC) -> all 4 rules (-30m/-15m start & end) are in the future
+      const now0700 = new Date("2026-10-16T00:00:00.000Z");
+      const syncRes = await syncShiftNotificationSchedule({ now: now0700 });
+
+      expect(syncRes.checkedShifts).toBe(1);
+      expect(syncRes.scheduledJobsCount).toBe(4);
+      expect(syncRes.totalPendingJobs).toBe(4);
+      expect(syncRes.totalBuckets).toBe(4);
+      expect(syncRes.activeTimers).toBe(1);
+      // Earliest wakeup is 07:30:00 ICT (00:30:00 UTC)
+      expect(syncRes.nextWakeupAt).toBe("2026-10-16T00:30:00.000Z");
+
+      // Simulate single timer firing at 07:30:00 ICT (00:30:00 UTC)
+      const flush0730 = await shiftNotificationWorker.flushDue(
+        new Date("2026-10-16T00:30:00.000Z").getTime()
+      );
+      expect(flush0730.dispatched).toHaveLength(1);
+      expect(flush0730.dispatched[0].payload.ruleCode).toBe("SHIFT_START_30M");
+      expect(mockNotificationLogCreate).toHaveBeenCalledTimes(1);
+
+      // Immediately after 07:30:00 fires, the single timer is re-armed for 07:45:00 ICT (00:45:00 UTC)!
+      const after0730 = getShiftSchedulerTelemetry();
+      expect(after0730.activeTimers).toBe(1);
+      expect(after0730.totalPendingJobs).toBe(3);
+      expect(after0730.nextWakeupAt).toBe("2026-10-16T00:45:00.000Z");
+      expect(after0730.firedCount).toBe(1);
+    });
+
+    it("arms a single rollover wakeup at 00:00:05 GMT+7 tomorrow when no upcoming reminders exist today", async () => {
+      mockWorkShiftFindMany.mockResolvedValue([]);
+
+      // 2026-10-16 22:00:00 ICT (15:00:00 UTC)
+      const lateNight = new Date("2026-10-16T15:00:00.000Z");
+      const syncRes = await syncShiftNotificationSchedule({ now: lateNight });
+
+      expect(syncRes.scheduledJobsCount).toBe(0);
+      expect(syncRes.totalPendingJobs).toBe(0);
+      expect(syncRes.activeTimers).toBe(1);
+      // 2026-10-17T00:00:05.000+07:00 === 2026-10-16T17:00:05.000Z
+      expect(syncRes.nextWakeupAt).toBe("2026-10-16T17:00:05.000Z");
+    });
+  });
 });
+

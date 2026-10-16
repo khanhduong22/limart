@@ -5,13 +5,16 @@ import {
   ensureDefaultNotificationRules,
   formatShiftTimeRange,
   getInMemoryRules,
+  getShiftSchedulerTelemetry,
   getVapidPublicKey,
   getVietnamTodayRange,
   normalizeNotificationRule,
   renderNotificationTemplate,
+  rescheduleShiftNotifications,
   runShiftReminderCheck,
   sendNotificationToUser,
   setInMemoryRules,
+  syncShiftNotificationSchedule,
 } from "../lib/shift-notifications";
 
 export const notificationsRoute = new Hono<AppEnv>();
@@ -352,6 +355,10 @@ notificationsRoute.get("/admin/overview", authMiddleware, adminMiddleware, async
     }
 
     const rulesActiveCount = rules.filter((r) => r.active).length;
+    if (getShiftSchedulerTelemetry().nextWakeupMs === null) {
+      await syncShiftNotificationSchedule().catch(() => {});
+    }
+    const scheduler = getShiftSchedulerTelemetry();
 
     return c.json({
       success: true,
@@ -363,6 +370,7 @@ notificationsRoute.get("/admin/overview", authMiddleware, adminMiddleware, async
         rulesActiveCount,
         activeRules: rulesActiveCount,
       },
+      scheduler,
       recentLogs,
     });
   } catch (err: any) {
@@ -426,6 +434,8 @@ notificationsRoute.post("/admin/rules", authMiddleware, adminMiddleware, async (
     const normalized = normalizeNotificationRule(created);
     const current = getInMemoryRules();
     setInMemoryRules([...current.filter((r) => r.code !== normalized.code), normalized]);
+
+    void rescheduleShiftNotifications();
 
     return c.json({
       success: true,
@@ -503,6 +513,8 @@ notificationsRoute.put("/admin/rules/:id", authMiddleware, adminMiddleware, asyn
       setInMemoryRules(next);
     }
 
+    void rescheduleShiftNotifications();
+
     return c.json({
       success: true,
       rule: normalized,
@@ -576,6 +588,8 @@ notificationsRoute.patch("/admin/rules/:id/toggle", authMiddleware, adminMiddlew
       mem.map((r) => (r.id === id || r.code === id ? normalized : r))
     );
 
+    void rescheduleShiftNotifications();
+
     return c.json({
       success: true,
       rule: normalized,
@@ -608,6 +622,8 @@ notificationsRoute.delete("/admin/rules/:id", authMiddleware, adminMiddleware, a
 
     const mem = getInMemoryRules();
     setInMemoryRules(mem.filter((r) => r.id !== id && r.code !== id));
+
+    void rescheduleShiftNotifications();
 
     return c.json({ success: true });
   } catch (err: any) {

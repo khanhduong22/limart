@@ -8,6 +8,13 @@ import {
   randomBytes,
 } from "node:crypto";
 import { prisma } from "@checkin/db";
+import { getRedisClient } from "./cache";
+import {
+  HybridNotificationScheduler,
+  type ScheduledNotificationJob,
+  type SchedulerTelemetry,
+  type ZSetStoreAdapter,
+} from "../../../../packages/notify/src/scheduler";
 
 export type ShiftTriggerType = "BEFORE_SHIFT_START" | "BEFORE_SHIFT_END";
 
@@ -149,6 +156,7 @@ const dispatchedShiftRuleKeys = new Set<string>();
 export function resetShiftNotificationMemoryState(): void {
   inMemoryRules = DEFAULT_SHIFT_NOTIFICATION_RULES.map((r) => ({ ...r }));
   dispatchedShiftRuleKeys.clear();
+  shiftNotificationWorker.clear();
 }
 
 export function getInMemoryRules(): ShiftNotificationRule[] {
@@ -704,3 +712,238 @@ export async function runShiftReminderCheck(options?: {
     notifications: sentList,
   };
 }
+
+export const SHIFT_NOTIFICATION_ZSET_KEY = "limart:shift:notif:zset";
+
+export interface ShiftReminderJobPayload {
+  idempotencyKey: string;
+  dayKey: string;
+  shiftId: number;
+  userId: string;
+  userName: string;
+  ruleCode: string;
+  title: string;
+  body: string;
+  targetUrl: string;
+  shiftTime: string;
+}
+
+function createValkeyZSetAdapter(): ZSetStoreAdapter | null {
+  try {
+    const client = getRedisClient();
+    if (!client || client.status === "end") return null;
+    return {
+      async zadd(key: string, score: number, member: string) {
+        const c = getRedisClient();
+        if (!c || typeof (c as any).zadd !== "function") return 0;
+        return await (c as any).zadd(key, score, member);
+      },
+      async zrangebyscore(
+        key: string,
+        minScore: number | string,
+        maxScore: number | string
+      ) {
+        const c = getRedisClient();
+        if (!c || typeof (c as any).zrangebyscore !== "function") return [];
+        return await (c as any).zrangebyscore(key, minScore, maxScore);
+      },
+      async zrem(key: string, member: string) {
+        const c = getRedisClient();
+        if (!c || typeof (c as any).zrem !== "function") return 1;
+        return await (c as any).zrem(key, member);
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
+export const shiftNotificationWorker = new HybridNotificationScheduler<ShiftReminderJobPayload>({
+  zsetKey: SHIFT_NOTIFICATION_ZSET_KEY,
+  bucketResolutionMs: 1000,
+  zsetAdapter: () => createValkeyZSetAdapter(),
+  onDispatch: async (job: ScheduledNotificationJob<ShiftReminderJobPayload>) => {
+    const {
+      idempotencyKey,
+      shiftId,
+      userId,
+      ruleCode,
+      title,
+      body,
+      targetUrl,
+    } = job.payload;
+
+    if (dispatchedShiftRuleKeys.has(idempotencyKey)) {
+      return;
+    }
+
+    const logModel = (prisma as any)?.notificationLog;
+    if (logModel && typeof logModel.findFirst === "function") {
+      try {
+        const existingLog = await logModel.findFirst({
+          where: {
+            shiftId,
+            ruleCode,
+          },
+        });
+        if (existingLog) {
+          dispatchedShiftRuleKeys.add(idempotencyKey);
+          return;
+        }
+      } catch {
+        // Ignore if notificationLog.findFirst is not mocked
+      }
+    }
+
+    dispatchedShiftRuleKeys.add(idempotencyKey);
+
+    await sendNotificationToUser(userId, {
+      title,
+      body,
+      url: targetUrl || "/",
+      shiftId,
+      ruleCode,
+      channel: "WEB_PUSH",
+    });
+  },
+  onEmptyIdleWakeup: async (nowMs: number) => {
+    await syncShiftNotificationSchedule({ now: new Date(nowMs) }).catch(() => {});
+  },
+});
+
+/**
+ * Synchronizes today's (and upcoming 24h) `APPROVED` shifts and active `NotificationRule`s
+ * into the `shiftNotificationWorker` (O(1) Timing Wheel buckets + Valkey `ZSET`),
+ * and arms ONLY ONE single `setTimeout` pointing to the exact millisecond of the next reminder
+ * (or 00:00:05 GMT+7 midnight rollover when no more reminders remain today).
+ */
+export async function syncShiftNotificationSchedule(options?: {
+  now?: Date;
+}): Promise<SchedulerTelemetry & { scheduledJobsCount: number; checkedShifts: number }> {
+  const now = options?.now ? new Date(options.now) : new Date();
+  const nowMs = now.getTime();
+  const { startOfDay, endOfDay } = getVietnamTodayRange(now);
+
+  // Midnight rollover wakeup at 00:00:05.000 GMT+7 of the next Vietnam day
+  const nextMidnightRolloverMs = endOfDay.getTime() + 1 + 5_000;
+  const horizonEnd = new Date(Math.max(endOfDay.getTime(), nowMs + 24 * 60 * 60 * 1000));
+
+  let shifts: any[] = [];
+  if (prisma?.workShift?.findMany) {
+    try {
+      const found = await prisma.workShift.findMany({
+        where: {
+          status: "APPROVED",
+          start: { lte: horizonEnd },
+          end: { gte: startOfDay },
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              isActive: true,
+            },
+          },
+        },
+        orderBy: { start: "asc" },
+      });
+      if (Array.isArray(found)) {
+        shifts = found;
+      }
+    } catch {
+      shifts = [];
+    }
+  }
+
+  const allRules = await ensureDefaultNotificationRules();
+  const activeRules = allRules.filter((r) => r.active);
+
+  const jobsToSchedule: ScheduledNotificationJob<ShiftReminderJobPayload>[] = [];
+
+  for (const shift of shifts) {
+    if (!shift || shift.user?.isActive === false) continue;
+
+    const userId = String(shift.userId || shift.user?.id || "");
+    if (!userId) continue;
+
+    const userName = String(shift.user?.name || shift.user?.email || "Bạn");
+    const shiftStart = new Date(shift.start);
+    const shiftEnd = new Date(shift.end);
+    const shiftTime = formatShiftTimeRange(shiftStart, shiftEnd);
+    const shiftDayKey = getVietnamTodayRange(shiftStart).dayKey;
+
+    for (const rule of activeRules) {
+      const targetMoment =
+        rule.triggerType === "BEFORE_SHIFT_END" ? shiftEnd : shiftStart;
+      const fireAtMs = targetMoment.getTime() - rule.offsetMinutes * 60_000;
+      const idempotencyKey = `${shiftDayKey}:${shift.id}:${rule.code}`;
+
+      if (dispatchedShiftRuleKeys.has(idempotencyKey)) {
+        continue;
+      }
+
+      // Skip reminders that are already more than 2 minutes in the past
+      if (fireAtMs < nowMs - 2 * 60_000) {
+        continue;
+      }
+
+      const title = renderNotificationTemplate(rule.titleTemplate, {
+        name: userName,
+        shiftTime,
+        offsetMinutes: rule.offsetMinutes,
+      });
+      const body = renderNotificationTemplate(rule.bodyTemplate, {
+        name: userName,
+        shiftTime,
+        offsetMinutes: rule.offsetMinutes,
+      });
+
+      jobsToSchedule.push({
+        id: idempotencyKey,
+        fireAtMs,
+        payload: {
+          idempotencyKey,
+          dayKey: shiftDayKey,
+          shiftId: shift.id,
+          userId,
+          userName,
+          ruleCode: rule.code,
+          title,
+          body,
+          targetUrl: rule.targetUrl || "/",
+          shiftTime,
+        },
+      });
+    }
+  }
+
+  const telemetry = await shiftNotificationWorker.replaceSchedule(jobsToSchedule, {
+    idleWakeupMs: nextMidnightRolloverMs,
+    nowMs,
+  });
+
+  return {
+    ...telemetry,
+    scheduledJobsCount: jobsToSchedule.length,
+    checkedShifts: shifts.length,
+  };
+}
+
+/**
+ * Safe, non-throwing event-driven reschedule trigger invoked whenever shifts or notification rules change.
+ */
+export function rescheduleShiftNotifications(options?: {
+  now?: Date;
+}): Promise<(SchedulerTelemetry & { scheduledJobsCount: number; checkedShifts: number }) | null> {
+  return syncShiftNotificationSchedule(options).catch(() => null);
+}
+
+/**
+ * Returns live telemetry from the singleton `shiftNotificationWorker`.
+ */
+export function getShiftSchedulerTelemetry(): SchedulerTelemetry {
+  return shiftNotificationWorker.getTelemetry();
+}
+

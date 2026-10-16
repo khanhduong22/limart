@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { createECDH, randomBytes } from 'node:crypto';
 import {
+  createNotificationScheduler,
   createWebPushNotifier,
   escapeHtml,
   escapeMarkdownV2,
@@ -10,9 +11,11 @@ import {
   formatStayBookingTelegramHtml,
   formatSystemAlertHtml,
   generateVAPIDKeys,
+  HybridNotificationScheduler,
   sendTelegramMessage,
   sendWebPush,
   urlBase64ToUint8Array,
+  type ZSetStoreAdapter,
 } from '../src';
 
 function createTestSubscriptionKeys() {
@@ -218,3 +221,197 @@ describe('@checkin/notify — Formatters & Telegram Validation', () => {
     expect(noChat.success).toBe(false);
   });
 });
+
+describe('@checkin/notify — HybridNotificationScheduler (Timing Wheel + Valkey ZSET + Single Timer)', () => {
+  it('groups jobs into O(1) quantized Timing Wheel buckets and maintains strictly ONE active timer', async () => {
+    const baseNow = new Date('2026-10-16T00:00:00.000Z').getTime();
+    let currentNow = baseNow;
+    const dispatchedIds: string[] = [];
+
+    const scheduler = createNotificationScheduler<{ label: string }>({
+      bucketResolutionMs: 1000,
+      nowFn: () => currentNow,
+      onDispatch: (job) => {
+        dispatchedIds.push(job.id);
+      },
+    });
+
+    try {
+      // Schedule 3 jobs: two at +30m (within same 1s bucket) and one at +15m
+      const t15m = baseNow + 15 * 60_000;
+      const t30m = baseNow + 30 * 60_000;
+
+      scheduler.schedule({
+        id: 'shift-1:30m',
+        fireAtMs: t30m + 120,
+        payload: { label: 'Shift 1 -30m' },
+      });
+      scheduler.schedule({
+        id: 'shift-2:30m',
+        fireAtMs: t30m + 850,
+        payload: { label: 'Shift 2 -30m' },
+      });
+
+      let telemetry = scheduler.getTelemetry();
+      expect(telemetry.mode).toBe('in-memory-wheel');
+      expect(telemetry.activeTimers).toBe(1);
+      expect(telemetry.totalPendingJobs).toBe(2);
+      expect(telemetry.totalBuckets).toBe(1);
+      expect(telemetry.nextWakeupMs).toBe(t30m);
+
+      // Now schedule an earlier job at +15m -> single timer immediately re-arms to t15m
+      scheduler.schedule({
+        id: 'shift-1:15m',
+        fireAtMs: t15m + 400,
+        payload: { label: 'Shift 1 -15m' },
+      });
+
+      telemetry = scheduler.getTelemetry();
+      expect(telemetry.activeTimers).toBe(1);
+      expect(telemetry.totalPendingJobs).toBe(3);
+      expect(telemetry.totalBuckets).toBe(2);
+      expect(telemetry.nextWakeupMs).toBe(t15m);
+
+      // Advance clock to t15m and flush due bucket
+      currentNow = t15m;
+      const flush1 = await scheduler.flushDue(currentNow);
+      expect(flush1.dispatched.map((j) => j.id)).toEqual(['shift-1:15m']);
+
+      // Single timer automatically re-armed to t30m!
+      telemetry = scheduler.getTelemetry();
+      expect(telemetry.activeTimers).toBe(1);
+      expect(telemetry.totalPendingJobs).toBe(2);
+      expect(telemetry.totalBuckets).toBe(1);
+      expect(telemetry.nextWakeupMs).toBe(t30m);
+      expect(telemetry.firedCount).toBe(1);
+
+      // Advance clock to t30m and flush remaining bucket
+      currentNow = t30m;
+      const flush2 = await scheduler.flushDue(currentNow);
+      expect(flush2.dispatched.map((j) => j.id)).toEqual(['shift-1:30m', 'shift-2:30m']);
+
+      telemetry = scheduler.getTelemetry();
+      expect(telemetry.activeTimers).toBe(0);
+      expect(telemetry.totalPendingJobs).toBe(0);
+      expect(telemetry.totalBuckets).toBe(0);
+      expect(telemetry.nextWakeupMs).toBeNull();
+      expect(telemetry.firedCount).toBe(3);
+      expect(dispatchedIds).toEqual(['shift-1:15m', 'shift-1:30m', 'shift-2:30m']);
+    } finally {
+      scheduler.clear();
+    }
+  });
+
+  it('supports O(1) job cancellation and re-arms the single timer to the next earliest bucket', () => {
+    const baseNow = new Date('2026-10-16T00:00:00.000Z').getTime();
+    const scheduler = new HybridNotificationScheduler({
+      nowFn: () => baseNow,
+      onDispatch: () => {},
+    });
+
+    try {
+      const t10m = baseNow + 10 * 60_000;
+      const t25m = baseNow + 25 * 60_000;
+
+      scheduler.schedule({ id: 'job-early', fireAtMs: t10m, payload: {} });
+      scheduler.schedule({ id: 'job-late', fireAtMs: t25m, payload: {} });
+      expect(scheduler.getTelemetry().nextWakeupMs).toBe(t10m);
+
+      // Cancel the earliest job -> timer must re-arm to t25m
+      const removed = scheduler.cancel('job-early');
+      expect(removed).toBe(true);
+      expect(scheduler.cancel('non-existent')).toBe(false);
+
+      const telemetry = scheduler.getTelemetry();
+      expect(telemetry.totalPendingJobs).toBe(1);
+      expect(telemetry.nextWakeupMs).toBe(t25m);
+      expect(telemetry.activeTimers).toBe(1);
+    } finally {
+      scheduler.clear();
+    }
+  });
+
+  it('deduplicates notifications across multiple workers using Valkey ZSET atomic ZREM claiming', async () => {
+    const baseNow = new Date('2026-10-16T01:00:00.000Z').getTime();
+    const fireAt = baseNow + 15 * 60_000;
+
+    // Shared in-memory ZSET store simulating Valkey sorted set across 2 API replicas
+    const zsetStore = new Map<string, Map<string, number>>();
+    const sharedZSetAdapter: ZSetStoreAdapter = {
+      async zadd(key, score, member) {
+        let set = zsetStore.get(key);
+        if (!set) {
+          set = new Map();
+          zsetStore.set(key, set);
+        }
+        set.set(member, score);
+        return 1;
+      },
+      async zrangebyscore(key, _min, max) {
+        const set = zsetStore.get(key);
+        if (!set) return [];
+        const maxNum = Number(max);
+        const res: string[] = [];
+        for (const [member, score] of set.entries()) {
+          if (score <= maxNum) res.push(member);
+        }
+        return res;
+      },
+      async zrem(key, member) {
+        const set = zsetStore.get(key);
+        if (!set || !set.has(member)) return 0;
+        set.delete(member);
+        return 1;
+      },
+    };
+
+    const workerADispatched: string[] = [];
+    const workerBDispatched: string[] = [];
+
+    const workerA = createNotificationScheduler({
+      zsetAdapter: sharedZSetAdapter,
+      zsetKey: 'limart:shift:notif:zset',
+      nowFn: () => baseNow,
+      onDispatch: (job) => {
+        workerADispatched.push(job.id);
+      },
+    });
+
+    const workerB = createNotificationScheduler({
+      zsetAdapter: sharedZSetAdapter,
+      zsetKey: 'limart:shift:notif:zset',
+      nowFn: () => baseNow,
+      onDispatch: (job) => {
+        workerBDispatched.push(job.id);
+      },
+    });
+
+    try {
+      await workerA.scheduleBatch([
+        { id: '2026-10-16:101:SHIFT_START_15M', fireAtMs: fireAt, payload: { shiftId: 101 } },
+      ]);
+      await workerB.scheduleBatch([
+        { id: '2026-10-16:101:SHIFT_START_15M', fireAtMs: fireAt, payload: { shiftId: 101 } },
+      ]);
+
+      expect(workerA.getTelemetry().mode).toBe('hybrid-zset-wheel');
+
+      // Both workers wake up at fireAt simultaneously (e.g. Blue-Green deployment overlap)
+      const [resA, resB] = await Promise.all([
+        workerA.flushDue(fireAt),
+        workerB.flushDue(fireAt),
+      ]);
+
+      // Exactly ONE worker claims & dispatches; the other records a deduplicatedSkip
+      expect(workerADispatched.length + workerBDispatched.length).toBe(1);
+      expect(resA.skippedByZSet + resB.skippedByZSet).toBe(1);
+      expect(
+        workerA.getTelemetry().deduplicatedSkips + workerB.getTelemetry().deduplicatedSkips
+      ).toBe(1);
+    } finally {
+      workerA.clear();
+      workerB.clear();
+    }
+  });
+});
+

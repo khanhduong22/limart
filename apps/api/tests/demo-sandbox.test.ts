@@ -13,6 +13,8 @@ const {
   mockPayslipCreate,
   mockWorkShiftCreate,
   mockCheckInCreate,
+  mockDocumentCreate,
+  mockSessionAuditLogCreate,
 } = vi.hoisted(() => ({
   mockUserCount: vi.fn(),
   mockUserFindUnique: vi.fn(),
@@ -26,6 +28,8 @@ const {
   mockPayslipCreate: vi.fn(),
   mockWorkShiftCreate: vi.fn(),
   mockCheckInCreate: vi.fn(),
+  mockDocumentCreate: vi.fn(),
+  mockSessionAuditLogCreate: vi.fn(),
 }));
 
 vi.mock("@checkin/db", () => ({
@@ -75,7 +79,10 @@ vi.mock("@checkin/db", () => ({
     announcement: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
     announcementRead: { deleteMany: vi.fn().mockResolvedValue({}) },
     stickyNote: { deleteMany: vi.fn().mockResolvedValue({}) },
-    document: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
+    document: {
+      create: mockDocumentCreate,
+      deleteMany: vi.fn().mockResolvedValue({}),
+    },
     documentChunk: { deleteMany: vi.fn().mockResolvedValue({}) },
     request: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
     payrollPeriod: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
@@ -84,7 +91,13 @@ vi.mock("@checkin/db", () => ({
       create: mockPayslipCreate,
       deleteMany: vi.fn().mockResolvedValue({}),
     },
-    sessionAuditLog: { deleteMany: vi.fn().mockResolvedValue({}) },
+    sessionAuditLog: {
+      create: mockSessionAuditLogCreate,
+      findFirst: vi.fn().mockResolvedValue(null),
+      count: vi.fn().mockResolvedValue(0),
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({}),
+    },
     session: { deleteMany: vi.fn().mockResolvedValue({}) },
     account: { deleteMany: vi.fn().mockResolvedValue({}) },
     $queryRaw: vi.fn().mockResolvedValue([]),
@@ -96,6 +109,7 @@ import {
   _resetDemoModulesMemory,
   buildCorporateAvatarSvg,
   DEMO_STAFF_NAMES,
+  ENTERPRISE_DEMO_DOCUMENTS,
   FULL_TIME_SALARIES,
   getDemoPersonas,
   PART_TIME_RATES,
@@ -122,6 +136,8 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
     mockPayslipCreate.mockImplementation(async ({ data }) => ({ id: "ps-1", ...data }));
     mockUserCreate.mockImplementation(async ({ data }) => data);
     mockAllowedIPCreate.mockImplementation(async ({ data }) => ({ id: 1, ...data }));
+    mockDocumentCreate.mockImplementation(async ({ data }) => data);
+    mockSessionAuditLogCreate.mockImplementation(async ({ data }) => data);
   });
 
   afterEach(() => {
@@ -402,6 +418,46 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
       expect(JSON.stringify(savedPayslip.content)).not.toContain("5432100");
       expect(savedPayslip.content.name).toBe(ptStaff?.name);
       expect(savedPayslip.content.hourlyRate).toBe(ptStaff?.hourlyRate);
+
+      // Verify >= 6 Enterprise SOP Documents seeded across all HelpPage categories
+      expect(ENTERPRISE_DEMO_DOCUMENTS.length).toBeGreaterThanOrEqual(6);
+      expect(res.documentsSeeded).toBeGreaterThanOrEqual(6);
+      expect(mockDocumentCreate.mock.calls.length).toBeGreaterThanOrEqual(6);
+      const seededDocPaths = mockDocumentCreate.mock.calls.map((c) => c[0].data.path);
+      expect(seededDocPaths).toEqual(
+        expect.arrayContaining([
+          "quy-che/01-noi-quy-cham-cong-va-ca-lam-viec.md",
+          "luong/02-chinh-sach-luong-thuong-va-kpi.md",
+          "quy-tac/03-quy-trinh-dong-goi-va-kiem-ke-kho.md",
+          "admin/04-huong-dan-quan-tri-danh-cho-chu-shop.md",
+          "manual/05-so-tay-hoi-nhap-nhan-vien-moi.md",
+          "quy-tac/06-quy-dinh-bao-mat-va-ban-giao-quy.md",
+        ])
+      );
+
+      // Verify >= 20 SessionAuditLog entries seeded with SHA-256 hash chain & realistic metadata
+      expect(res.auditLogsSeeded).toBeGreaterThanOrEqual(20);
+      expect(mockSessionAuditLogCreate.mock.calls.length).toBeGreaterThanOrEqual(20);
+      const seededAuditLogs = mockSessionAuditLogCreate.mock.calls.map((c) => c[0].data);
+      const seededActions = new Set(seededAuditLogs.map((l) => l.action));
+      expect(Array.from(seededActions)).toEqual(
+        expect.arrayContaining([
+          "LOGIN",
+          "CHECKIN",
+          "CHECKOUT",
+          "LOGOUT",
+          "MANUAL_CHECKIN",
+          "FAILED_LOGIN",
+        ])
+      );
+      expect(seededAuditLogs.filter((l) => l.status === "SUCCESS").length).toBeGreaterThanOrEqual(20);
+      expect(seededAuditLogs.filter((l) => l.status === "FAILED").length).toBeGreaterThanOrEqual(3);
+      for (const log of seededAuditLogs) {
+        expect(log.details?.hash).toMatch(/^[0-9a-f]{64}$/);
+        expect(log.details?.previousHash).toMatch(/^[0-9a-f]{64}$/);
+        expect(log.details?.requestId).toBeTruthy();
+        expect(log.details?.note).toBeTruthy();
+      }
     });
   });
 

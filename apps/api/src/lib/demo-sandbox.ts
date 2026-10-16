@@ -228,7 +228,7 @@ export function sanitizeText(
       .sort((a, b) => b[0].length - a[0].length);
 
     for (const [origName, demoName] of entries) {
-      const pattern = new RegExp(escapeRegExp(origName.trim()), "gi");
+      const pattern = new RegExp(`(?<!\\p{L})${escapeRegExp(origName.trim())}(?!\\p{L})`, "giu");
       output = output.replace(pattern, demoName);
     }
   }
@@ -1574,29 +1574,31 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     );
   }
 
-  // 9. Documents (SOP Knowledge Base)
-  const docsToSeed =
-    sourceData.documents.length > 0
-      ? sourceData.documents
-      : [
-          {
-            id: "demo-doc-sop-1",
-            path: "noi-quy-cham-cong-demomart.md",
-            title: "Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise — Nội quy Chấm công & Ca làm việc",
-            content:
-              "Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise. Nhân viên thực hiện Check-in trên ứng dụng khi kết nối WiFi cửa hàng DemoMart hoặc bật định vị GPS trong bán kính 150m. Đi trễ quá 5 phút sẽ ghi nhận nhắc nhở tự động.",
-          },
-          {
-            id: "demo-doc-sop-2",
-            path: "quy-trinh-dong-goi-khoan.md",
-            title: "Quy trình Đóng gói Đơn hàng & Tính thưởng Khoán DemoMart Enterprise",
-            content:
-              "Mỗi đơn hàng đóng gói đạt chuẩn có quay video/chụp ảnh đối chiếu tại bàn đóng gói DemoMart Enterprise được cộng tự động vào bảng lương khoán cuối tháng.",
-          },
-        ];
+  // 9. Documents (SOP Knowledge Base — always seed 6 comprehensive Enterprise SOP documents + non-colliding source docs)
+  let documentsSeededCount = 0;
+  const seededDocPaths = new Set<string>();
 
-  for (const doc of docsToSeed) {
-    await safeExec(() =>
+  for (const doc of ENTERPRISE_DEMO_DOCUMENTS) {
+    seededDocPaths.add(doc.path);
+    const createdDoc = await safeExec(() =>
+      targetPrisma.document?.create?.({
+        data: {
+          id: doc.id,
+          path: doc.path,
+          title: doc.title,
+          content: doc.content,
+        },
+      })
+    );
+    if (createdDoc !== undefined) {
+      documentsSeededCount++;
+    }
+  }
+
+  for (const doc of sourceData.documents) {
+    if (!doc?.path || seededDocPaths.has(doc.path)) continue;
+    seededDocPaths.add(doc.path);
+    const createdDoc = await safeExec(() =>
       targetPrisma.document?.create?.({
         data: {
           id: doc.id,
@@ -1606,6 +1608,9 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
         },
       })
     );
+    if (createdDoc !== undefined) {
+      documentsSeededCount++;
+    }
   }
 
   // 10. Requests (generic reasons)
@@ -1742,7 +1747,112 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     }
   }
 
+  // 12. SessionAuditLog (25 realistic entries spanning the last 7 days with SHA-256 hash chain)
+  let auditLogsSeededCount = 0;
+  const auditUserPool = [
+    adminUser,
+    partnerUser,
+    ...activeStaffUsers.slice(0, 5),
+  ].filter(Boolean);
+
+  const trustedIps = ["103.199.18.88", "118.69.72.14", "14.161.22.105", "27.72.88.19"];
+  const cities = ["TP. Hồ Chí Minh", "Hà Nội", "Đà Nẵng"];
+  const desktopUA =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/129.0.0.0";
+  const mobileUA =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148";
+  const tabletUA =
+    "Mozilla/5.0 (iPad; CPU OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1";
+
+  const auditScenarioTemplates: Array<{
+    action: string;
+    status: "SUCCESS" | "FAILED";
+    device: "Desktop" | "Mobile" | "Tablet";
+    ipOverride?: string;
+    note: string;
+    reason?: string;
+  }> = [
+    { action: "LOGIN", status: "SUCCESS", device: "Desktop", note: "Đăng nhập hệ thống quản trị ca sáng" },
+    { action: "CHECKIN", status: "SUCCESS", device: "Mobile", note: "Chấm công vào ca sáng qua WiFi cửa hàng DemoMart" },
+    { action: "CHECKIN", status: "SUCCESS", device: "Mobile", note: "Chấm công vào ca sáng đúng giờ (+1 lượt quay thưởng)" },
+    { action: "FAILED_LOGIN", status: "FAILED", device: "Mobile", ipOverride: "45.122.201.99", note: "Cảnh báo đăng nhập từ IP lạ", reason: "Thiết bị ngoài danh sách tin cậy" },
+    { action: "MANUAL_CHECKIN", status: "SUCCESS", device: "Desktop", note: "Quản lý ca xác nhận bổ sung giờ công cho nhân viên kho" },
+    { action: "CHECKOUT", status: "SUCCESS", device: "Mobile", note: "Chấm công tan ca sáng, hoàn thành bàn giao quầy" },
+    { action: "LOGIN", status: "SUCCESS", device: "Tablet", note: "Đăng nhập máy POS quầy thu ngân tầng 1" },
+    { action: "CHECKIN", status: "SUCCESS", device: "Mobile", note: "Chấm công vào ca chiều tại cửa hàng DemoMart" },
+    { action: "LOGOUT", status: "SUCCESS", device: "Desktop", note: "Đăng xuất phiên làm việc sau khi duyệt bảng công" },
+    { action: "FAILED_LOGIN", status: "FAILED", device: "Desktop", ipOverride: "45.122.201.99", note: "Từ chối phiên truy cập ngoài vùng mạng", reason: "Thiết bị ngoài danh sách tin cậy" },
+    { action: "CHECKOUT", status: "SUCCESS", device: "Mobile", note: "Chấm công kết thúc ca chiều (đủ 4.5 giờ công)" },
+    { action: "LOGIN", status: "SUCCESS", device: "Desktop", note: "Chủ cửa hàng truy cập bảng điều khiển doanh thu & KPI" },
+    { action: "CHECKIN", status: "SUCCESS", device: "Mobile", note: "Chấm công ca tối hỗ trợ đóng gói đơn hàng TMĐT" },
+    { action: "MANUAL_CHECKIN", status: "SUCCESS", device: "Desktop", note: "Điều chỉnh công ca kiểm kê kho định kỳ" },
+    { action: "CHECKOUT", status: "SUCCESS", device: "Mobile", note: "Chấm công đóng ca tối & khóa sổ quỹ tiền mặt" },
+    { action: "LOGOUT", status: "SUCCESS", device: "Mobile", note: "Nhân viên đăng xuất ứng dụng PWA sau ca làm việc" },
+    { action: "LOGIN", status: "SUCCESS", device: "Desktop", note: "Quản lý ca đăng nhập kiểm tra tiến độ checklist mở ca" },
+    { action: "CHECKIN", status: "SUCCESS", device: "Mobile", note: "Chấm công ca sáng qua xác thực WiFi nội bộ" },
+    { action: "FAILED_LOGIN", status: "FAILED", device: "Mobile", ipOverride: "45.122.201.99", note: "Chặn yêu cầu xác thực OAuth không hợp lệ", reason: "Thiết bị ngoài danh sách tin cậy" },
+    { action: "CHECKOUT", status: "SUCCESS", device: "Mobile", note: "Chấm công ra ca và gửi báo cáo sản lượng đóng gói" },
+    { action: "LOGIN", status: "SUCCESS", device: "Tablet", note: "Truy cập tra cứu SOP Nội quy trên thiết bị quầy" },
+    { action: "MANUAL_CHECKIN", status: "SUCCESS", device: "Desktop", note: "Duyệt đơn bù công cho nhân viên đi giao hàng ngoại tuyến" },
+    { action: "CHECKIN", status: "SUCCESS", device: "Mobile", note: "Chấm công nhận ca trực cửa hàng DemoMart" },
+    { action: "LOGOUT", status: "SUCCESS", device: "Tablet", note: "Đóng phiên làm việc trên thiết bị dùng chung" },
+    { action: "LOGIN", status: "SUCCESS", device: "Desktop", note: "Khởi tạo phiên trải nghiệm DemoMart Enterprise" },
+  ];
+
+  let prevAuditHash = "0".repeat(64);
+  for (let i = 0; i < auditScenarioTemplates.length; i++) {
+    const tpl = auditScenarioTemplates[i];
+    const actorUser = auditUserPool[i % auditUserPool.length] || adminUser;
+    const offsetMs = Math.round(
+      ((auditScenarioTemplates.length - 1 - i) / auditScenarioTemplates.length) *
+        7 *
+        24 *
+        60 *
+        60 *
+        1000
+    );
+    const createdAt = new Date(now.getTime() - offsetMs);
+    const currentHash = buildDeterministicHexHash(`demo-audit-${i + 1}-${prevAuditHash}-${tpl.action}-${createdAt.getTime()}`);
+    const requestId = `req-demo-${String(i + 1).padStart(3, "0")}-${currentHash.slice(0, 8)}`;
+    const ipAddress = tpl.ipOverride || trustedIps[i % trustedIps.length];
+    const city = cities[i % cities.length];
+    const userAgent =
+      tpl.device === "Mobile" ? mobileUA : tpl.device === "Tablet" ? tabletUA : desktopUA;
+
+    const details: Record<string, any> = {
+      hash: currentHash,
+      previousHash: prevAuditHash,
+      requestId,
+      timestamp: createdAt.getTime(),
+      note: tpl.note,
+      ...(tpl.reason ? { reason: tpl.reason } : {}),
+    };
+    prevAuditHash = currentHash;
+
+    const createdAudit = await safeExec(() =>
+      targetPrisma.sessionAuditLog?.create?.({
+        data: {
+          id: `demo-audit-log-${String(i + 1).padStart(2, "0")}`,
+          userId: actorUser.id,
+          action: tpl.action,
+          status: tpl.status,
+          ipAddress,
+          userAgent,
+          device: tpl.device,
+          city,
+          details,
+          createdAt,
+        },
+      })
+    );
+    if (createdAudit !== undefined) {
+      auditLogsSeededCount++;
+    }
+  }
+
   // Clear Redis caches after demo seed
+  await safeExec(() => invalidateCachePattern("meta:documents:*"));
+  await safeExec(() => invalidateCachePattern("auth:audit-logs:*"));
   await safeExec(() => invalidateCachePattern("*"));
 
   return {
@@ -1751,5 +1861,177 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     shiftsSeeded: shiftsSeededCount,
     checkinsSeeded: checkinsSeededCount,
     payslipsSeeded: payslipsSeededCount,
+    documentsSeeded: documentsSeededCount,
+    auditLogsSeeded: auditLogsSeededCount,
   };
 }
+
+function buildDeterministicHexHash(seed: string): string {
+  let h1 = 0xdeadbeef ^ seed.length;
+  let h2 = 0x41c6ce57 ^ seed.length;
+  for (let i = 0; i < seed.length; i++) {
+    const ch = seed.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  let hex = "";
+  for (let round = 0; round < 8; round++) {
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    hex += (h1 >>> 0).toString(16).padStart(8, "0");
+  }
+  return hex.slice(0, 64).padEnd(64, "0");
+}
+
+export const ENTERPRISE_DEMO_DOCUMENTS = [
+  {
+    id: "demo-doc-sop-1",
+    path: "quy-che/01-noi-quy-cham-cong-va-ca-lam-viec.md",
+    title: "Quy chế Chấm công, Định vị GPS & Quản lý Ca làm việc",
+    content: `# Quy chế Chấm công, Định vị GPS & Quản lý Ca làm việc
+
+Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise. Tài liệu này quy định tiêu chuẩn chấm công, đăng ký lịch làm việc và kỷ luật thời gian áp dụng cho toàn bộ nhân sự cửa hàng và kho vận.
+
+## 1. Khung giờ Ca làm việc Tiêu chuẩn
+
+| Mã Ca | Tên Ca Làm Việc | Khung Giờ | Đối Tượng Áp Dụng | Hệ Số Công |
+| :--- | :--- | :--- | :--- | :--- |
+| **SHIFT-M** | Ca Sáng Tiêu Chuẩn | 08:00 – 12:00 | Part-time / Full-time | 1.0x |
+| **SHIFT-A** | Ca Chiều Tiêu Chuẩn | 13:00 – 17:30 | Part-time / Full-time | 1.0x |
+| **SHIFT-E** | Ca Tối Cao Điểm TMĐT | 17:30 – 21:30 | Part-time / Kho vận | 1.15x |
+| **SHIFT-F** | Ca Hành Chính Cửa Hàng | 08:00 – 17:30 | Quản lý ca / Full-time | 1.0x |
+
+## 2. Quy định Xác thực Check-in / Check-out
+
+- **Xác thực mạng WiFi / IP tĩnh cửa hàng**: Nhân viên bắt buộc kết nối đúng mạng WiFi nội bộ tại quầy hoặc kho vận DemoMart trước khi bấm nút **Chấm công Vào ca**.
+- **Định vị GPS dự phòng**: Trong trường hợp bảo trì đường truyền cố định, hệ thống đối chiếu tọa độ GPS trong bán kính **150m** quanh cửa hàng.
+- **Thời gian mở cổng Check-in**: Hệ thống cho phép chấm công sớm tối đa **15 phút** trước giờ bắt đầu ca và ghi nhận đúng giờ nếu thao tác trong vòng **05 phút** đầu ca.
+
+## 3. Chế tài Đi trễ & Quy trình Đổi ca
+
+- Đi trễ từ **06 – 15 phút**: Ghi nhận nhắc nhở tự động trên bảng công và khấu trừ **0.5 giờ công** tính lương.
+- Đi trễ trên **15 phút** không có đơn xin phép hợp lệ: Hệ thống đánh dấu vi phạm kỷ luật ca và tạm khóa lượt quay thưởng chuyên cần trong ngày.
+- Nhân viên có nhu cầu **Đổi ca / Nhượng ca** phải mở trạng thái *Cần người nhận ca* trên ứng dụng trước giờ vào ca tối thiểu **06 tiếng** để Quản lý ca phê duyệt.`,
+  },
+  {
+    id: "demo-doc-sop-2",
+    path: "luong/02-chinh-sach-luong-thuong-va-kpi.md",
+    title: "Chính sách Tính lương Tự động, Thưởng Chuyên cần & KPI Sản lượng",
+    content: `# Chính sách Tính lương Tự động, Thưởng Chuyên cần & KPI Sản lượng
+
+Hệ thống DemoMart Enterprise tự động tổng hợp dữ liệu chấm công, sản lượng đóng gói khoán và thưởng KPI theo thời gian thực để đảm bảo minh bạch 100% cho mọi nhân viên.
+
+## 1. Công thức Tính lương theo Hình thức Hợp đồng
+
+- **Nhân sự Full-time (Toàn thời gian)**:
+  - Lương ngày tiêu chuẩn = \`Lương cơ bản tháng / 26 ngày công chuẩn\`.
+  - Lương giờ quy đổi = \`Lương ngày tiêu chuẩn / 8 giờ\`.
+  - Phụ cấp ca trưởng (Senior Shift): Cộng thêm **+2.000đ / giờ** đối với các ca được phân công phụ trách khóa sổ quầy.
+- **Nhân sự Part-time (Bán thời gian)**:
+  - Lương thực nhận = \`Tổng số giờ công hợp lệ × Đơn giá giờ (23.000đ – 35.000đ/giờ) × Hệ số ngày lễ\`.
+
+## 2. Đơn giá Khoán Sản lượng & Hệ số Ngày Lễ
+
+| Hạng Mục Công Việc / Ngày Lễ | Đơn Giá / Hệ Số | Điều Kiện Ghi Nhận |
+| :--- | :--- | :--- |
+| Đóng gói đơn Shopee / TikTok chuẩn | **1.500đ / đơn** | Có ảnh/video bàn đóng hàng, không hoàn trả lỗi gói |
+| Bốc vác & xếp kiện nhập kho tầng 2 | **5.000đ / kiện** | Kiểm đếm đủ mã vạch và xếp đúng phân khu kệ |
+| Trực CSKH & chốt đơn WFH ca tối | **35.000đ / ca** | Thời gian phản hồi trung bình dưới 5 phút |
+| Ngày Lễ / Tết theo quy định | **Hệ số 1.5x – 3.0x** | Tự động nhân hệ số trên bảng công chi tiết |
+
+## 3. Lịch Chốt Công & Thanh toán Lương qua VietQR
+
+- **Ngày 01 – 02 hàng tháng**: Bộ phận Quản trị nhân sự kiểm tra bảng tổng hợp công và giải quyết khiếu nại trực tuyến.
+- **Ngày 03 hàng tháng**: Hệ thống khóa kỳ lương (\`LOCKED\`), xuất Phiếu lương điện tử tới từng tài khoản nhân viên và thực hiện giải ngân hàng loạt qua mã **VietQR** ngân hàng.`,
+  },
+  {
+    id: "demo-doc-sop-3",
+    path: "quy-tac/03-quy-trinh-dong-goi-va-kiem-ke-kho.md",
+    title: "SOP Quy trình Đóng gói Đơn hàng TMĐT & Bốc vác Kho vận",
+    content: `# SOP Quy trình Đóng gói Đơn hàng TMĐT & Bốc vác Kho vận
+
+Quy trình chuẩn (Standard Operating Procedure) này bắt buộc áp dụng tại khu vực kho vận và bàn đóng gói của DemoMart Enterprise nhằm triệt tiêu rủi ro thất thoát hoặc giao sai sản phẩm.
+
+## 1. Quy trình 5 Bước Đóng gói Đơn hàng Có Camera Đối chiếu
+
+1. **Quét mã vận đơn (Barcode/QR)**: Đặt phiếu giao hàng dưới vùng camera bàn đóng gói để ghi nhận thời điểm bắt đầu xử lý đơn.
+2. **Kiểm tra ngoại quan & Hạn sử dụng**: Đối chiếu đúng phân loại màu sắc, kích cỡ và số lượng từng SKU trên phiếu xuất kho.
+3. **Gia cố chống sốc 2 lớp**: Quấn màng xốp hơi tối thiểu 2 vòng đối với hàng dễ vỡ, chèn giấy chèn khe hở trong hộp carton tiêu chuẩn.
+4. **Dán tem niêm phong & Mã vận đơn**: Dán tem vỡ niêm phong DemoMart tại mép hộp và dán nhiệt phiếu vận chuyển phẳng phiu, không gấp nếp mã vạch.
+5. **Báo cáo sản lượng trên ứng dụng**: Nhập số lượng đơn hoàn thành vào mục **Khoán Đóng Gói** kèm đường dẫn bằng chứng để Quản lý ca nghiệm thu.
+
+## 2. Tiêu chuẩn An toàn Bốc vác & Kiểm kê Kho cuối tuần
+
+- Phân loại kiện hàng theo nguyên tắc **FIFO (Nhập trước – Xuất trước)** và tuyệt đối không xếp chồng quá chiều cao giới hạn **1.8m** tại kệ tầng 2.
+- Cuối mỗi ca chiều Thứ Bảy, nhân sự kho phối hợp cùng Quản lý ca thực hiện kiểm kê chéo 20 mã hàng bán chạy nhất với phần mềm POS.`,
+  },
+  {
+    id: "demo-doc-sop-4",
+    path: "admin/04-huong-dan-quan-tri-danh-cho-chu-shop.md",
+    title: "Hướng dẫn Vận hành Hệ thống Dành cho Chủ Cửa hàng & Quản lý Ca",
+    content: `# Hướng dẫn Vận hành Hệ thống Dành cho Chủ Cửa hàng & Quản lý Ca
+
+Tài liệu dành riêng cho cấp Quản trị viên (\`ADMIN\`) và Quản lý ca (\`PARTNER\`) khi điều hành hoạt động hàng ngày trên nền tảng DemoMart Enterprise.
+
+## 1. Quy trình Phê duyệt Đơn từ & Điều phối Lịch ca
+
+- Truy cập phân hệ **Duyệt Đơn & Lịch Ca** lúc **09:00** và **16:00** hàng ngày để xử lý các yêu cầu *Xin nghỉ phép*, *Đổi ca* hoặc *Đăng ký làm việc từ xa (WFH)*.
+- Khi phê duyệt đơn nghỉ phép của nhân sự chủ chốt, Quản lý ca cần kiểm tra mật độ nhân sự trên lịch tuần nhằm đảm bảo mỗi ca luôn có tối thiểu **02 nhân viên bán hàng** và **01 phụ trách ca**.
+
+## 2. Giao việc theo Ma trận Eisenhower & Checklist Mở/Đóng Ca
+
+| Nhóm Công Việc | Mức Độ Ưu Tiên | Cơ Chế Giám Sát Trên Hệ Thống |
+| :--- | :--- | :--- |
+| **Khẩn cấp & Quan trọng** | Xử lý ngay trong ca | Giao trực tiếp tại bảng *Manager Tasks* có hạn chót theo giờ |
+| **Quan trọng, Không khẩn cấp** | Kế hoạch tuần | Theo dõi tại bảng *Weekly Tasks* và đánh giá vào chiều Thứ Sáu |
+| **Checklist Mở / Đóng ca** | Định kỳ hàng ngày | Bắt buộc tích hoàn thành 100% trước khi bàn giao chìa khóa quầy |
+
+## 3. Kiểm toán Bảo mật & Khóa sổ Bảng lương
+
+- Định kỳ kiểm tra màn hình **Nhật ký Bảo mật (Session Audit Log)** để phát hiện sớm các lần đăng nhập thất bại (\`FAILED_LOGIN\`) hoặc chấm công từ địa chỉ IP lạ.
+- Trước khi khóa bảng lương tháng, Chủ cửa hàng rà soát các khoản thưởng/phạt điều chỉnh (\`Payroll Adjustment\`) và tỷ lệ thưởng doanh số toàn cửa hàng.`,
+  },
+  {
+    id: "demo-doc-sop-5",
+    path: "manual/05-so-tay-hoi-nhap-nhan-vien-moi.md",
+    title: "Sổ tay Hội nhập Nhân sự Mới (Onboarding Handbook) — DemoMart Enterprise",
+    content: `# Sổ tay Hội nhập Nhân sự Mới (Onboarding Handbook) — DemoMart Enterprise
+
+Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise! Sổ tay này giúp nhân viên mới nhanh chóng làm quen với văn hóa dịch vụ, tác phong làm việc và các tiện ích số hóa trong 7 ngày đầu tiên.
+
+## 1. Tác phong Diện mạo & Tiêu chuẩn Phục vụ Khách hàng 5S
+
+- **Đồng phục & Thẻ tên**: Mặc áo polo đồng phục DemoMart gọn gàng, đeo bảng tên ở ngực trái trong suốt thời gian làm việc tại cửa hàng.
+- **Quy tắc chào đón 3-5-10**: Mỉm cười khi khách ở khoảng cách 10 bước, gật đầu chào ở khoảng cách 5 bước và chủ động hỏi thăm hỗ trợ khi khách đứng cách 3 bước.
+- **Giữ gìn không gian quầy kệ (5S)**: Sàng lọc – Sắp xếp – Sạch sẽ – Săn sóc – Sẵn sàng trong suốt ca trực, đặc biệt tại khu vực trưng bày trung tâm.
+
+## 2. Hướng dẫn Sử dụng Ứng dụng Nhân viên (Staff PWA)
+
+- **Chấm công 1 chạm**: Mở ứng dụng trên điện thoại cá nhân, kiểm tra trạng thái *Mạng hợp lệ* và nhấn nút **Check-in** ngay khi bắt đầu ca.
+- **Nhận việc & Báo cáo kết quả**: Theo dõi danh sách nhiệm vụ trong ca tại tab **Công việc**, chụp ảnh quầy kệ sau khi hoàn tất để Quản lý ca duyệt điểm thưởng.
+- **Tra cứu Trợ lý AI Nội quy**: Khi gặp tình huống vận hành chưa rõ quy định, nhân viên có thể đặt câu hỏi trực tiếp cho **Trợ lý AI Nội quy** để nhận câu trả lời trích dẫn chính xác từ kho tài liệu SOP.`,
+  },
+  {
+    id: "demo-doc-sop-6",
+    path: "quy-tac/06-quy-dinh-bao-mat-va-ban-giao-quy.md",
+    title: "Quy định Bảo mật Phiên đăng nhập & Biên bản Bàn giao Quỹ cuối ca",
+    content: `# Quy định Bảo mật Phiên đăng nhập & Biên bản Bàn giao Quỹ cuối ca
+
+Nhằm bảo vệ an toàn dữ liệu tài chính và thông tin nhân sự tại DemoMart Enterprise, toàn bộ nhân viên và quản lý ca phải tuân thủ nghiêm ngặt quy định bảo mật phiên làm việc và đối soát quỹ tiền mặt.
+
+## 1. Chính sách Bảo mật Tài khoản & Nhật ký Chuỗi Băm SHA-256
+
+- **Tuyệt đối không dùng chung tài khoản**: Mỗi nhân sự đăng nhập bằng tài khoản định danh riêng; nghiêm cấm chấm công hộ hoặc chia sẻ thiết bị đã lưu phiên đăng nhập.
+- **Giám sát Chuỗi Băm Bất Biến (Cryptographic Audit Trail)**: Mọi thao tác \`LOGIN\`, \`CHECKIN\`, \`CHECKOUT\`, \`MANUAL_CHECKIN\` và \`LOGOUT\` đều được hệ thống neo mã băm liên hoàn **SHA-256** kèm địa chỉ IP và thông tin thiết bị để phục vụ hậu kiểm.
+- **Đăng xuất trên thiết bị dùng chung**: Sau khi hoàn tất thao tác trên máy tính bảng hoặc máy POS tại quầy, nhân viên bắt buộc nhấn **Đăng xuất** ngay lập tức.
+
+## 2. Quy trình Đối soát & Bàn giao Quỹ Tiền mặt Cuối ca
+
+| Bước Thực Hiện | Nội Dung Kiểm Tra | Người Chịu Trách Nhiệm |
+| :--- | :--- | :--- |
+| **Bước 1: Đếm tiền mặt** | Kiểm đếm tiền mặt thực tế theo từng mệnh giá trong ngăn kéo thu ngân | Thu ngân ca giao & Ca nhận |
+| **Bước 2: Đối chiếu POS** | Khớp tổng doanh thu tiền mặt + chuyển khoản VietQR với báo cáo ca | Quản lý ca trực tiếp |
+| **Bước 3: Niêm phong két** | Cất doanh thu vượt định mức vào két sắt an toàn và ký biên bản điện tử | Quản lý ca & Chủ cửa hàng |`,
+  },
+];
+

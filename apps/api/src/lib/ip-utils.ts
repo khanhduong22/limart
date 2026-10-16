@@ -20,30 +20,78 @@ export function getClientIP(c: Context): string {
 }
 
 export async function getAllowedIPs() {
-  return await getOrSetCache("config:allowed-ips", 600, async () => {
+  const list = await getOrSetCache("config:allowed-ips", 600, async () => {
     return await prisma.allowedIP.findMany();
   });
+
+  const safeList = Array.isArray(list) ? list : [];
+  const isDemo = process.env.DEMO_SANDBOX_MODE === "true";
+  const hasWildcard = safeList.some(
+    (r: { prefix: string }) => r.prefix === "0.0.0.0/0" || r.prefix === "*"
+  );
+
+  if (isDemo || hasWildcard) {
+    const result = [...safeList];
+    if (!result.some((r: { prefix: string }) => r.prefix === "0.0.0.0/0")) {
+      result.push({
+        id: 999991,
+        prefix: "0.0.0.0/0",
+        label: "Demo Public Mode (Mọi mạng WiFi/4G)",
+        createdAt: new Date(),
+      });
+    }
+    if (!result.some((r: { prefix: string }) => r.prefix === "::/0")) {
+      result.push({
+        id: 999992,
+        prefix: "::/0",
+        label: "Demo Public Mode (Mọi mạng WiFi/4G)",
+        createdAt: new Date(),
+      });
+    }
+    return result;
+  }
+
+  return safeList;
 }
 
 export async function getIPStatus(c: Context): Promise<{
   ip: string;
   isAllowed: boolean;
+  allowed: boolean;
   locationName: string;
 }> {
   const clientIP = getClientIP(c);
   const allowedIps = await getAllowedIPs();
   const prefixes = allowedIps.map((r: { prefix: string }) => r.prefix);
 
+  const isDemo = process.env.DEMO_SANDBOX_MODE === "true";
+  const hasWildcard = prefixes.some(
+    (p: string) => p === "0.0.0.0/0" || p === "*" || p === "::/0"
+  );
   const isDev = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
-  const isAllowed = isDev && prefixes.length === 0 ? true : isIPMatch(clientIP, prefixes);
+  const isAllowed =
+    isDemo || hasWildcard || (isDev && prefixes.length === 0)
+      ? true
+      : isIPMatch(clientIP, prefixes);
 
   const matched = isAllowed
-    ? allowedIps.find((ip: { prefix: string }) => isIPMatch(clientIP, [ip.prefix]))
+    ? allowedIps.find((ip: { prefix: string }) =>
+        ip.prefix !== "0.0.0.0/0" &&
+        ip.prefix !== "::/0" &&
+        ip.prefix !== "*" &&
+        isIPMatch(clientIP, [ip.prefix])
+      ) ||
+      allowedIps.find(
+        (ip: { prefix: string }) => ip.prefix === "0.0.0.0/0" || ip.prefix === "*"
+      )
     : null;
 
   return {
     ip: clientIP,
     isAllowed,
-    locationName: isAllowed ? (matched?.label || "Văn phòng") : "Ngoài vùng phủ sóng",
+    allowed: isAllowed,
+    locationName: isAllowed
+      ? matched?.label || (isDemo ? "Demo Public Mode (Mọi mạng WiFi/4G)" : "Văn phòng")
+      : "Ngoài vùng phủ sóng",
   };
 }

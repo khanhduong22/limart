@@ -2,6 +2,15 @@ import React from "react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { useDemoModules, type DemoModulesConfig } from "@/lib/demo-mode";
+
+interface AdminNavLinkItem {
+  href: string;
+  label: string;
+  icon: string;
+  badge?: number;
+  module: keyof DemoModulesConfig;
+}
 
 export default function AdminNavLinks({
   pendingRequestsCount = 0,
@@ -12,39 +21,45 @@ export default function AdminNavLinks({
   pendingTasksCount?: number;
   onItemClick?: () => void;
 }) {
-  const links = [
-    { href: "/", label: "Dashboard", icon: "/admin/icons/capy_dashboard.webp" },
-    { href: "/employees", label: "Nhân sự", icon: "/admin/icons/capy_hr.webp" },
-    { href: "/schedule", label: "Lịch làm việc", icon: "/admin/icons/capy_calendar.webp" },
-    { href: "/reports", label: "Bảng thành tích", icon: "/admin/icons/capy_badge.webp" },
+  const demoModules = useDemoModules();
+
+  const links: AdminNavLinkItem[] = [
+    { href: "/", label: "Dashboard", icon: "/admin/icons/capy_dashboard.webp", module: "attendance" },
+    { href: "/employees", label: "Nhân sự", icon: "/admin/icons/capy_hr.webp", module: "attendance" },
+    { href: "/schedule", label: "Lịch làm việc", icon: "/admin/icons/capy_calendar.webp", module: "attendance" },
+    { href: "/reports", label: "Bảng thành tích", icon: "/admin/icons/capy_badge.webp", module: "gamification" },
     {
       href: "/requests",
       label: "Duyệt yêu cầu",
       badge: pendingRequestsCount,
       icon: "/admin/icons/capy_request.webp",
+      module: "attendance",
     },
-    { href: "/announcements", label: "Thông báo", icon: "/admin/icons/capy_announce.webp" },
-    { href: "/payroll", label: "Bảng Lương", icon: "/admin/icons/capy_payroll.webp" },
-    { href: "/lucky-wheel", label: "Vòng quay", icon: "/admin/icons/capy_wheel.webp" },
+    { href: "/announcements", label: "Thông báo", icon: "/admin/icons/capy_announce.webp", module: "attendance" },
+    { href: "/payroll", label: "Bảng Lương", icon: "/admin/icons/capy_payroll.webp", module: "payroll" },
+    { href: "/lucky-wheel", label: "Vòng quay", icon: "/admin/icons/capy_wheel.webp", module: "gamification" },
     {
       href: "/tasks",
       label: "Duyệt WFH & Đóng gói",
       badge: pendingTasksCount,
       icon: "/admin/icons/capy_wfh.webp",
+      module: "piecework",
     },
-    { href: "/manager-tasks", label: "Manager Tasks", icon: "/admin/icons/capy_manager.webp" },
-    { href: "/staff-tasks", label: "Công việc và KPI", icon: "/admin/icons/capy_kpi.webp" },
-    { href: "/settings", label: "Cấu hình (IP)", icon: "/admin/icons/capy_settings.webp" },
-    { href: "/audit-logs", label: "Session Audit Log", icon: "/admin/icons/capy_badge.webp" },
-    { href: "/help", label: "Trợ lí Capy", icon: "/admin/icons/capy_ai.webp" },
+    { href: "/manager-tasks", label: "Manager Tasks", icon: "/admin/icons/capy_manager.webp", module: "operations" },
+    { href: "/staff-tasks", label: "Công việc và KPI", icon: "/admin/icons/capy_kpi.webp", module: "operations" },
+    { href: "/settings", label: "Cấu hình (IP)", icon: "/admin/icons/capy_settings.webp", module: "attendance" },
+    { href: "/audit-logs", label: "Session Audit Log", icon: "/admin/icons/capy_badge.webp", module: "attendance" },
+    { href: "/help", label: "Trợ lí Capy", icon: "/admin/icons/capy_ai.webp", module: "ai_sop" },
   ];
+
+  const visibleLinks = links.filter((link) => demoModules[link.module] !== false);
 
   return (
     <nav
       id="admin-nav-links"
       className="grid items-start px-4 text-sm font-medium gap-1.5 mt-2"
     >
-      {links.map((link) => (
+      {visibleLinks.map((link) => (
         <NavLink
           key={link.href}
           to={link.href}

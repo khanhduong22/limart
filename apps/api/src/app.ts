@@ -23,6 +23,7 @@ import { managerTasksRoute } from "./routes/manager-tasks.route";
 import { tasksRoute } from "./routes/tasks.route";
 import { specialDaysRoute } from "./routes/special-days.route";
 import { cronRoute } from "./routes/cron.route";
+import { demoRoute } from "./routes/demo.route";
 import { authMiddleware, AppEnv } from "./middleware/auth.middleware";
 import { serverTiming } from "./middleware/server-timing.middleware";
 import { prisma } from "@checkin/db";
@@ -205,6 +206,9 @@ export function createApp() {
 
   // Scheduled Background & Cron Routes
   app.route("/api/cron", cronRoute);
+
+  // Interactive Demo Sandbox Routes
+  app.route("/api/demo", demoRoute);
 
   // Text-To-Speech endpoint for Capy AI
   app.post("/api/tts", async (c) => {

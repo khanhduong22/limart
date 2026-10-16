@@ -12,7 +12,8 @@
 ### Active Environment & Domain Inventory
 | Environment | Domain / URL | Branch / Compose | Active Containers | Architecture |
 | :--- | :--- | :--- | :--- | :--- |
-| 🚀 **Production** | `https://limart.khanhdp.com`<br>`https://limart2.khanhdp.com` (Canary) | `main` (`/opt/limart`) | `limart-api` (:4000, Bun `oven/bun:1-alpine`)<br>`limart-admin` (:3001)<br>`limart-staff` (:3002) | Monorepo 3-Tier (Bun 1.3 + Hono REST API + Vite Admin SPA + Vite Staff PWA) |
+| 🚀 **Production** | `https://limart.khanhdp.com` | `main` (`/opt/limart`) | `limart-api` (:4000, Bun `oven/bun:1-alpine`)<br>`limart-admin` (:3001)<br>`limart-staff` (:3002) | Monorepo 3-Tier (Bun 1.3 + Hono REST API + Vite Admin SPA + Vite Staff PWA) |
+| 🧪 **Public Demo Sandbox** | `https://limart2.khanhdp.com` | `main` (`/opt/limart`) | `limart-demo-api` (:4010, isolated `checkin_demo_db` + Valkey `/2`)<br>`limart-admin` (:3001)<br>`limart-staff` (:3002) | 100% Anonymized Demo Sandbox (hourly reset, 1-click role switcher, Super App Studio) |
 | 🔄 **Backup Domain** | `https://limart3.khanhdp.com` | Caddy Redirect | None | Permanent HTTP 301 redirect ➔ `https://limart.khanhdp.com/` |
 | 📦 **Legacy V1 Archive Branch** | N/A | `backup/legacy-v1-main` | None | Remote archive of original Next.js 16 monolith standalone |
 | 🛑 **Legacy Monolith Directory** | N/A | `/opt/checkin-app -> /opt/limart` | None | **Decommissioned & Symlinked** (~280 MiB RAM saved) |

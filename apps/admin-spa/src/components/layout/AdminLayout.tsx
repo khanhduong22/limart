@@ -10,6 +10,8 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { AdminGuard } from "./AdminGuard";
 
+const DemoSandboxWidget = React.lazy(() => import("./DemoSandboxWidget"));
+
 export function AdminLayout() {
   const location = useLocation();
   const [changelogOpen, setChangelogOpen] = useState(false);
@@ -185,6 +187,11 @@ export function AdminLayout() {
           latestVersion={LATEST_VERSION}
           changelog={CHANGELOGS[0]}
         />
+
+        {/* Super App Demo Studio Widget (0ms TBT lazy loaded) */}
+        <React.Suspense fallback={null}>
+          <DemoSandboxWidget />
+        </React.Suspense>
       </div>
     </AdminGuard>
   );

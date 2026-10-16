@@ -9,6 +9,8 @@ export { managerTasksRoute } from "./routes/manager-tasks.route";
 export { tasksRoute } from "./routes/tasks.route";
 export { specialDaysRoute } from "./routes/special-days.route";
 export { cronRoute } from "./routes/cron.route";
+export { demoRoute } from "./routes/demo.route";
+import { isDemoSandboxEnabled, seedAndSanitizeDemoDatabase } from "./lib/demo-sandbox";
 
 const port = Number(process.env.PORT) || 4000;
 let server: ServerType | null = null;
@@ -25,47 +27,65 @@ if (typeof (globalThis as any).Bun === "undefined" && process.env.NODE_ENV !== "
   console.log(`[Checkin API] Running on Bun at port ${port}`);
 }
 
-// Bootstrap hook: ensure phuckhanh22 has PARTNER role, staffTasksAllowed enabled, and clear old work shifts
-if (process.env.NODE_ENV !== "test" && prisma?.user?.findMany) {
-  prisma.user
-    .findMany({
-      where: {
-        OR: [
-          { email: { contains: "phuckhanh22", mode: "insensitive" } },
-          { name: { contains: "phuckhanh22", mode: "insensitive" } },
-          { name: { contains: "Phúc Khánh", mode: "insensitive" } },
-          { name: { contains: "Phuc Khanh", mode: "insensitive" } },
-        ],
-      },
-      select: { id: true, name: true, email: true },
-    })
-    .then(async (users) => {
-      if (!users || users.length === 0) return;
-
-      const userIds = users.map((u) => u.id);
-      const updateRes = await prisma.user.updateMany({
-        where: { id: { in: userIds } },
-        data: { role: "PARTNER", staffTasksAllowed: true },
+// Bootstrap hook:
+// - When DEMO_SANDBOX_MODE === "true", seed & sanitize the isolated demo database on startup
+// - When DEMO_SANDBOX_MODE !== "true", ensure phuckhanh22 has PARTNER role, staffTasksAllowed enabled, and clear old work shifts
+if (process.env.NODE_ENV !== "test") {
+  if (isDemoSandboxEnabled()) {
+    seedAndSanitizeDemoDatabase({ force: false })
+      .then((res) => {
+        console.log(
+          `[Demo Sandbox] Startup check completed (skipped=${res.skipped}, users=${res.usersSeeded})`
+        );
+      })
+      .catch((err) => {
+        console.error("[Demo Sandbox] Error initializing demo database:", err);
       });
-      if (updateRes && updateRes.count > 0) {
-        console.log(`[Checkin API] Synced PARTNER role for phuckhanh22 (${updateRes.count} account(s) updated)`);
-      }
+  } else if (prisma?.user?.findMany) {
+    prisma.user
+      .findMany({
+        where: {
+          OR: [
+            { email: { contains: "phuckhanh22", mode: "insensitive" } },
+            { name: { contains: "phuckhanh22", mode: "insensitive" } },
+            { name: { contains: "Phúc Khánh", mode: "insensitive" } },
+            { name: { contains: "Phuc Khanh", mode: "insensitive" } },
+          ],
+        },
+        select: { id: true, name: true, email: true },
+      })
+      .then(async (users) => {
+        if (!users || users.length === 0) return;
 
-      for (const u of users) {
-        if (prisma.shiftDuty?.deleteMany) {
-          await prisma.shiftDuty.deleteMany({ where: { userId: u.id } }).catch(() => {});
+        const userIds = users.map((u) => u.id);
+        const updateRes = await prisma.user.updateMany({
+          where: { id: { in: userIds } },
+          data: { role: "PARTNER", staffTasksAllowed: true },
+        });
+        if (updateRes && updateRes.count > 0) {
+          console.log(
+            `[Checkin API] Synced PARTNER role for phuckhanh22 (${updateRes.count} account(s) updated)`
+          );
         }
-        if (prisma.workShift?.deleteMany) {
-          const res = await prisma.workShift.deleteMany({ where: { userId: u.id } });
-          if (res && res.count > 0) {
-            console.log(`[Checkin API] Cleared all work shifts for Phuc Khanh (${res.count} shifts removed)`);
+
+        for (const u of users) {
+          if (prisma.shiftDuty?.deleteMany) {
+            await prisma.shiftDuty.deleteMany({ where: { userId: u.id } }).catch(() => {});
+          }
+          if (prisma.workShift?.deleteMany) {
+            const res = await prisma.workShift.deleteMany({ where: { userId: u.id } });
+            if (res && res.count > 0) {
+              console.log(
+                `[Checkin API] Cleared all work shifts for Phuc Khanh (${res.count} shifts removed)`
+              );
+            }
           }
         }
-      }
-    })
-    .catch((err) => {
-      console.error("[Checkin API] Error syncing phuckhanh22 partner role / clearing shifts:", err);
-    });
+      })
+      .catch((err) => {
+        console.error("[Checkin API] Error syncing phuckhanh22 partner role / clearing shifts:", err);
+      });
+  }
 }
 
 export const shutdownController = setupGracefulShutdown({

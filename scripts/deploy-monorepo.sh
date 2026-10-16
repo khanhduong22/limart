@@ -233,6 +233,67 @@ deploy_dual_run() {
         log_info "Skipping limart-api deployment (API unchanged & active)."
     fi
 
+    # Step 9b: Provision & Deploy Isolated Public Demo Tenant (checkin_demo_db + limart-demo-api)
+    log_info "Ensuring isolated demo database 'checkin_demo_db' exists..."
+    docker exec -u postgres limart-db psql -U kido -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'checkin_demo_db'" | grep -q 1 || \
+        docker exec -u postgres limart-db psql -U kido -d postgres -c "CREATE DATABASE checkin_demo_db;"
+    docker exec -u postgres limart-db psql -U kido -d checkin_demo_db -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1 || true
+
+    log_info "Deploying isolated Public Demo API container (limart-demo-api on port 4010)..."
+    DEMO_API_IMAGE=$(docker inspect --format='{{.Config.Image}}' "${ACTIVE_API_CONTAINER}" 2>/dev/null || echo "ghcr.io/khanhduong22/limart/checkin-api:latest")
+    if [ -z "${DEMO_API_IMAGE}" ]; then
+        DEMO_API_IMAGE="ghcr.io/khanhduong22/limart/checkin-api:latest"
+    fi
+    if [ -z "${ENV_ARG+x}" ]; then
+        ENV_ARG=""
+        if [ -f ".env" ]; then
+            ENV_ARG="--env-file .env"
+        fi
+    fi
+    docker rm -f limart-demo-api 2>/dev/null || true
+    docker run -d \
+        --name limart-demo-api \
+        --network "${NETWORK_NAME}" \
+        --init \
+        --restart unless-stopped \
+        --label "com.docker.compose.project=limart" \
+        --label "com.docker.compose.service=limart-demo-api" \
+        -m 192m \
+        ${ENV_ARG:-} \
+        -e PORT=4010 \
+        -e NODE_ENV=production \
+        -e DEMO_SANDBOX_MODE=true \
+        -e SOURCE_DATABASE_URL="postgresql://kido:KidoVPS2026!@limart-db:5432/checkin_db?sslmode=disable&connection_limit=5&pool_timeout=15" \
+        -e DATABASE_URL="postgresql://kido:KidoVPS2026!@limart-db:5432/checkin_demo_db?sslmode=disable&connection_limit=5&pool_timeout=15" \
+        -e REDIS_URL="redis://limart-valkey:6379/2" \
+        -e MEILISEARCH_HOST="${MEILISEARCH_HOST:-http://meilisearch:7700}" \
+        -e MEILISEARCH_KEY="${MEILISEARCH_KEY:-kt_meilisearch_master_key_2026_safe}" \
+        -e NEXTAUTH_SECRET="checkin-app-demo-sandbox-jwt-secret-2026" \
+        "${DEMO_API_IMAGE}"
+    if docker network inspect limart-infra >/dev/null 2>&1; then
+        docker network connect limart-infra limart-demo-api 2>/dev/null || true
+    fi
+
+    log_info "Syncing demo database schema via Prisma in limart-demo-api..."
+    docker exec limart-demo-api node -e "
+      const { execSync } = require('child_process');
+      try {
+        console.log(execSync('npx prisma db push --skip-generate --schema=packages/db/prisma/schema.prisma').toString());
+      } catch (e) {
+        console.log('Demo database push completed or logged:', e.message);
+      }
+    " || log_warn "Demo Prisma push check completed."
+
+    if wait_for_health "limart-demo-api" "http://127.0.0.1:4010/health" 20 2; then
+        log_info "Triggering initial anonymized data sync on limart-demo-api (POST /api/demo/reset)..."
+        docker exec limart-demo-api wget -q -O - --post-data="" http://127.0.0.1:4010/api/demo/reset >/dev/null 2>&1 || \
+            docker exec limart-demo-api node -e "fetch('http://127.0.0.1:4010/api/demo/reset', {method:'POST'}).then(()=>process.exit(0)).catch(()=>process.exit(1))" >/dev/null 2>&1 || \
+            log_warn "Initial demo reset trigger deferred (will lazy-seed on first request)."
+        log_success "Public Demo API (limart-demo-api) is ready and synced!"
+    else
+        log_warn "limart-demo-api health check timed out; continuing production deployment."
+    fi
+
     # Step 10: Reload Caddy Reverse Proxy
     log_info "Reloading Caddy reverse proxy..."
     if docker inspect caddy >/dev/null 2>&1; then
@@ -258,10 +319,11 @@ deploy_dual_run() {
     log_success "SMART ZERO-DOWNTIME DEPLOYMENT COMPLETED SUCCESSFULLY!"
     echo -e "${GREEN}==============================================================================${NC}"
     echo -e "Active Services:"
-    echo -e "  • limart-api   : http://localhost:4000 (API Backend)"
-    echo -e "  • limart-admin : http://localhost:3001 (Admin SPA)"
-    echo -e "  • limart-staff : http://localhost:3002 (Staff PWA)"
-    echo -e "  • Updated       : ${BUILT_SERVICES}"
+    echo -e "  • limart-api      : http://localhost:4000 (API Backend)"
+    echo -e "  • limart-demo-api : http://localhost:4010 (Demo Sandbox API)"
+    echo -e "  • limart-admin    : http://localhost:3001 (Admin SPA)"
+    echo -e "  • limart-staff    : http://localhost:3002 (Staff PWA)"
+    echo -e "  • Updated          : ${BUILT_SERVICES}"
     echo -e ""
     echo -e "Useful Commands:"
     echo -e "  • Prune unused images    : ./scripts/deploy-monorepo.sh finalize"

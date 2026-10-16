@@ -1,20 +1,96 @@
-import React from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAdminQuery } from "@/hooks/useAdminQuery";
 import { AdminPageLoadingSkeleton } from "@/components/ui/AdminPageLoadingSkeleton";
 import { ShieldAlert, ArrowLeft } from "lucide-react";
+import {
+  fetchDemoStatus,
+  isLikelyDemoHost,
+  switchDemoRole,
+} from "@/lib/demo-mode";
 
 interface AdminGuardProps {
   children: React.ReactNode;
 }
 
 export function AdminGuard({ children }: AdminGuardProps) {
-  const { data, error, isLoading } = useAdminQuery<any>("/api/me", {
-    revalidateOnFocus: true,
-    shouldRetryOnError: false,
-  });
+  const { data, error, isLoading, mutate, refetch } = useAdminQuery<any>(
+    "/api/me",
+    {
+      revalidateOnFocus: true,
+      shouldRetryOnError: false,
+    }
+  );
+
+  const [demoEnabled, setDemoEnabled] = useState<boolean>(() =>
+    isLikelyDemoHost()
+  );
+  const [isSwitchingDemo, setIsSwitchingDemo] = useState<boolean>(false);
+  const attemptedAutoSwitchRef = useRef<boolean>(false);
+
+  const currentUser = data?.user;
+  const isAdmin = currentUser?.role === "ADMIN";
+
+  const handleEnterDemoAdmin = useCallback(
+    async (forceFallbackUser = false) => {
+      setIsSwitchingDemo(true);
+      try {
+        const result = await switchDemoRole("ADMIN");
+        if (result.ok) {
+          if (result.user) {
+            await mutate({ user: result.user }, true);
+          } else if (forceFallbackUser) {
+            await mutate(
+              {
+                user: {
+                  id: "demo-admin",
+                  name: "Nguyễn Minh Khôi (Chủ Shop Demo)",
+                  role: "ADMIN",
+                },
+              },
+              true
+            );
+          } else {
+            await mutate(undefined, true);
+            await refetch();
+          }
+        }
+      } finally {
+        setIsSwitchingDemo(false);
+      }
+    },
+    [mutate, refetch]
+  );
+
+  useEffect(() => {
+    if (isLoading || isAdmin || attemptedAutoSwitchRef.current) {
+      return;
+    }
+    attemptedAutoSwitchRef.current = true;
+
+    let cancelled = false;
+    (async () => {
+      const likelyDemo = isLikelyDemoHost();
+      if (likelyDemo) {
+        setDemoEnabled(true);
+        await handleEnterDemoAdmin(false);
+        return;
+      }
+
+      const status = await fetchDemoStatus();
+      if (cancelled) return;
+      if (status.enabled) {
+        setDemoEnabled(true);
+        await handleEnterDemoAdmin(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoading, isAdmin, handleEnterDemoAdmin]);
 
   // If currently loading profile for the first time
-  if (isLoading && !data && !error) {
+  if ((isLoading && !data && !error) || isSwitchingDemo) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4 sm:p-6 flex items-center justify-center">
         <div className="w-full max-w-4xl">
@@ -23,9 +99,6 @@ export function AdminGuard({ children }: AdminGuardProps) {
       </div>
     );
   }
-
-  const currentUser = data?.user;
-  const isAdmin = currentUser?.role === "ADMIN";
 
   // If user is authenticated and has ADMIN role, grant access
   if (isAdmin) {
@@ -64,8 +137,18 @@ export function AdminGuard({ children }: AdminGuardProps) {
           </div>
         )}
 
-        {/* Google Login Button */}
-        <div className="mt-6 pt-4 border-t border-orange-100 dark:border-gray-800">
+        {/* Google Login & Demo 1-Click Section */}
+        <div className="mt-6 pt-4 border-t border-orange-100 dark:border-gray-800 space-y-3">
+          {demoEnabled && (
+            <button
+              type="button"
+              onClick={() => handleEnterDemoAdmin(true)}
+              className="relative flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 px-4 py-3 text-xs sm:text-sm font-bold text-white shadow-md transition-all hover:shadow-lg cursor-pointer active:scale-98"
+            >
+              <span>🚀 Vào thẳng chế độ Chủ Shop Demo (1-Click)</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleGoogleLogin}
@@ -109,3 +192,4 @@ export function AdminGuard({ children }: AdminGuardProps) {
 }
 
 export default AdminGuard;
+

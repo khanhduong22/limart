@@ -50,6 +50,51 @@ services:
         max-file: "3"
 
   # ----------------------------------------------------------------------------
+  # 1b. Limart Demo Sandbox API Service (Isolated Tenant on checkin_demo_db)
+  # ----------------------------------------------------------------------------
+  limart-demo-api:
+    image: ghcr.io/khanhduong22/limart/checkin-api:latest
+    container_name: limart-demo-api
+    init: true
+    restart: unless-stopped
+    expose:
+      - "4010"
+    environment:
+      - PORT=4010
+      - NODE_ENV=production
+      - DEMO_SANDBOX_MODE=true
+      - SOURCE_DATABASE_URL=${DATABASE_URL:-postgresql://kido:KidoVPS2026!@limart-db:5432/checkin_db?sslmode=disable&connection_limit=5&pool_timeout=15}
+      - DATABASE_URL=${DEMO_DATABASE_URL:-postgresql://kido:KidoVPS2026!@limart-db:5432/checkin_demo_db?sslmode=disable&connection_limit=5&pool_timeout=15}
+      - REDIS_URL=${DEMO_REDIS_URL:-redis://limart-valkey:6379/2}
+      - MEILISEARCH_HOST=${MEILISEARCH_HOST:-http://meilisearch:7700}
+      - MEILISEARCH_KEY=${MEILISEARCH_KEY:-kt_meilisearch_master_key_2026_safe}
+      - NEXTAUTH_SECRET=${DEMO_JWT_SECRET:-checkin-app-demo-sandbox-jwt-secret-2026}
+    env_file:
+      - .env
+    depends_on:
+      - limart-db
+      - limart-valkey
+    networks:
+      limart-infra:
+        aliases:
+          - limart-demo-api
+      ops_bridge:
+        aliases:
+          - limart-demo-api
+    mem_limit: 192m
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:4010/health | grep -q '\"status\":\"' || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ----------------------------------------------------------------------------
   # 2. Limart Admin SPA (Vite React + Nginx Alpine static server)
   # ----------------------------------------------------------------------------
   limart-admin:

@@ -34,6 +34,7 @@ import { initPWARegistration } from "./lib/pwa-register";
 import { RouterProvider, usePathname, useRouter } from "./lib/router";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 const PwaInstallModal = lazy(() => import("./components/pwa").then((m) => ({ default: m.PwaInstallModal })));
+const DemoSandboxWidget = lazy(() => import("./components/DemoSandboxWidget"));
 import { useAppVersionGuard, VersionGuardBanner } from "@checkin/spa-version-guard";
 import { DeferredTelemetryProvider } from "@checkin/deferred-telemetry";
 
@@ -63,6 +64,53 @@ function AppContent() {
     const token = getAuthToken();
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
+    const tryAutoDemoLogin = async (): Promise<boolean> => {
+      try {
+        const statusRes = await fetch("/api/demo/status", { credentials: "include" });
+        if (!statusRes.ok) return false;
+        const statusJson = await statusRes.json();
+        const isDemoEnabled = Boolean(statusJson?.enabled || statusJson?.data?.enabled);
+        if (!isDemoEnabled) return false;
+
+        const targetRole = window.location.pathname.startsWith("/staff-tasks")
+          ? "PARTNER"
+          : "USER";
+        const switchRes = await fetch("/api/demo/switch-role", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: targetRole }),
+        });
+        if (!switchRes.ok) return false;
+        const switchJson = await switchRes.json();
+        const payload =
+          switchJson?.data && typeof switchJson.data === "object"
+            ? { ...switchJson, ...switchJson.data }
+            : switchJson;
+
+        if (payload?.token) {
+          setAuthToken(payload.token);
+        }
+        if (payload?.user) {
+          saveCachedProfile({
+            id: payload.user.id || "demo_staff",
+            name: payload.user.name || "Nhân viên LimArt",
+            email: payload.user.email || "",
+            role: payload.user.role || targetRole,
+            avatarUrl: payload.user.image || "/capybara_mascot.webp",
+            employmentType: payload.user.employmentType || "PART_TIME",
+            hourlyRate: payload.user.hourlyRate || 25000,
+            streakDays: 0,
+            gachaTickets: 1,
+            achievements: payload.user.achievements || [],
+          });
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
     fetch("/api/me", { credentials: "include", headers })
       .then((res) => {
         if (res.ok) return res.json();
@@ -72,7 +120,7 @@ function AppContent() {
         }
         throw new Error(`HTTP ${res.status}`);
       })
-      .then((data) => {
+      .then(async (data) => {
         if (data.success && data.user) {
           if (data.token) {
             setAuthToken(data.token);
@@ -100,18 +148,20 @@ function AppContent() {
             }
           }
         } else {
-          if (pathname !== "/login") {
+          const demoAuthed = await tryAutoDemoLogin();
+          if (!demoAuthed && pathname !== "/login") {
             router.push("/login");
           }
         }
       })
-      .catch((err) => {
+      .catch(async (err) => {
         // If it's a network glitch/offline, DO NOT log out if cached profile exists!
         const cached = getCachedProfile();
         if (cached && cached.id && cached.id !== "staff_default") {
           console.warn("[App] Offline/network error, continuing with cached session for:", cached.name);
         } else if (err.message === "Unauthenticated") {
-          if (pathname !== "/login") {
+          const demoAuthed = await tryAutoDemoLogin();
+          if (!demoAuthed && pathname !== "/login") {
             router.push("/login");
           }
         }
@@ -237,6 +287,9 @@ function AppContent() {
         <Suspense fallback={null}>
           <PwaInstallModal />
         </Suspense>
+        <Suspense fallback={null}>
+          <DemoSandboxWidget />
+        </Suspense>
       </div>
     );
   }
@@ -301,6 +354,11 @@ function AppContent() {
       {/* PWA Installation Guide Modal */}
       <Suspense fallback={null}>
         <PwaInstallModal />
+      </Suspense>
+
+      {/* Demo Sandbox Studio Widget (Rendered only when /api/demo/status is enabled) */}
+      <Suspense fallback={null}>
+        <DemoSandboxWidget />
       </Suspense>
     </div>
   );

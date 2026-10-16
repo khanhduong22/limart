@@ -2,9 +2,15 @@ import React, { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { AlertTriangle, Info } from "lucide-react";
 import { getAuthToken } from "../lib/api-client";
+import { fetchDemoStatus, switchDemoRole } from "../lib/demo-mode";
+import { useRouter } from "../lib/router";
 
 export const LoginView: React.FC = () => {
-  // Check if already authenticated on mount
+  const router = useRouter();
+  const [demoEnabled, setDemoEnabled] = useState<boolean>(false);
+  const [switchingRole, setSwitchingRole] = useState<string | null>(null);
+
+  // Check if already authenticated or if Demo Mode is active on mount
   useEffect(() => {
     const token = getAuthToken();
     const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
@@ -16,7 +22,33 @@ export const LoginView: React.FC = () => {
         }
       })
       .catch(() => {});
+
+    fetchDemoStatus().then((status) => {
+      if (status.enabled) {
+        setDemoEnabled(true);
+      }
+    });
   }, []);
+
+  const handleDemoQuickLogin = async (role: "ADMIN" | "PARTNER" | "USER") => {
+    setSwitchingRole(role);
+    try {
+      const res = await switchDemoRole(role);
+      if (!res.success) {
+        toast.error(res.error || "Không thể khởi tạo phiên Demo");
+        return;
+      }
+      if (role === "ADMIN") {
+        window.location.href = "/admin";
+      } else if (role === "PARTNER") {
+        router.push("/staff-tasks");
+      } else {
+        router.push("/");
+      }
+    } finally {
+      setSwitchingRole(null);
+    }
+  };
 
   // URL Error handling
   const [urlNotice, setUrlNotice] = useState<{
@@ -143,6 +175,44 @@ export const LoginView: React.FC = () => {
             <div>
               <p className="font-bold text-[11px] leading-tight mb-0.5">{urlNotice.title}</p>
               <p className="text-[11px] leading-relaxed opacity-90">{urlNotice.message}</p>
+            </div>
+          </div>
+        )}
+
+        {/* 1-Click Demo Experience Card */}
+        {demoEnabled && (
+          <div
+            data-testid="demo-login-card"
+            className="mb-4 rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 via-orange-50/80 to-rose-50/60 p-3.5 text-left shadow-sm"
+          >
+            <p className="text-xs font-extrabold text-orange-950 mb-2 text-center">
+              🚀 Chế độ Trải Nghiệm Demo (1-Click)
+            </p>
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={switchingRole !== null}
+                onClick={() => handleDemoQuickLogin("ADMIN")}
+                className="w-full rounded-xl border border-amber-300 bg-white hover:bg-amber-50 px-3 py-2 text-xs font-bold text-amber-950 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+              >
+                👑 Xem Giao Diện Chủ Shop (Admin)
+              </button>
+              <button
+                type="button"
+                disabled={switchingRole !== null}
+                onClick={() => handleDemoQuickLogin("PARTNER")}
+                className="w-full rounded-xl border border-indigo-200 bg-white hover:bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-950 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+              >
+                📋 Xem Giao Diện Quản Lý (Partner)
+              </button>
+              <button
+                type="button"
+                disabled={switchingRole !== null}
+                onClick={() => handleDemoQuickLogin("USER")}
+                className="w-full rounded-xl border border-emerald-200 bg-white hover:bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-950 shadow-2xs transition-all cursor-pointer disabled:opacity-60"
+              >
+                👷 Xem Giao Diện Nhân Viên (Staff)
+              </button>
             </div>
           </div>
         )}

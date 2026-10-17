@@ -47,13 +47,14 @@ export async function generateWithGeminiFallback(
   systemInstruction: string,
   prompt: string
 ): Promise<string> {
-  const candidateModels = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
+  const candidateModels = ["gemini-flash-lite-latest", "gemini-flash-latest"];
   let lastError: any = null;
   for (const modelName of candidateModels) {
     try {
       const model = genAI.getGenerativeModel({
         model: modelName,
         systemInstruction,
+        generationConfig: { temperature: 1 },
       });
       const result = await model.generateContent(prompt);
       const text = result.response.text();
@@ -160,134 +161,192 @@ export function scoreDocuments(
   return scored;
 }
 
+export const STRICT_NOT_FOUND_MESSAGE =
+  "🍊 Hiện tại thông tin về vấn đề này chưa có trong kho tài liệu nội bộ trên hệ thống. Bạn vui lòng liên hệ trực tiếp Quản lý cửa hàng hoặc nhờ Admin bổ sung văn bản quy định này vào kho tài liệu nhé! 🦫";
+
 export function buildDeterministicFallback(userQuery: string, relevantContext: string): string {
-  const lowerQuery = userQuery.toLowerCase();
-
-  // 1. Store Address / Location
-  if (
-    lowerQuery.includes("địa chỉ") ||
-    lowerQuery.includes("ở đâu") ||
-    lowerQuery.includes("cửa hàng") ||
-    lowerQuery.includes("shop ở") ||
-    (lowerQuery.includes("shop") && (lowerQuery.includes("đâu") || lowerQuery.includes("địa chỉ") || lowerQuery.includes("qua")))
-  ) {
-    return `📍 **Thông tin địa chỉ Cửa hàng Họa cụ LimArt:**
-
-🏠 **Địa chỉ:** Cửa hàng LimArt (Vui lòng chọn đúng chi nhánh bạn đang trực hoặc đính kèm vị trí Google Maps của shop).
-⏰ **Giờ mở cửa:** 8h30 - 21h30 (Tất cả các ngày trong tuần, kể cả Thứ 7 & Chủ Nhật).
-📞 **Hotline hỗ trợ:** Liên hệ Hotline cửa hàng hoặc Fanpage Họa cụ LimArt.
-
-💬 **Mẫu tin nhắn chuẩn gửi khách (Nhân viên copy gửi ngay):**
----
-"Dạ em chào anh/chị ạ! 🎨
-Dạ cửa hàng LimArt mở cửa từ 8h30 đến 21h30 tất cả các ngày trong tuần ạ.
-📍 Địa chỉ shop tại: [Điền địa chỉ cơ sở / Chi nhánh gần khách nhất]
-Anh/chị có thể ghé trực tiếp để xem và trải nghiệm thử các mẫu họa cụ, giấy vẽ, cọ và màu vẽ nhé ạ! Nếu cần chỉ đường chi tiết hơn, anh/chị nhắn em hỗ trợ ngay nha! 🍊"
----`;
+  if (relevantContext && relevantContext.trim()) {
+    return `🍊 **Capy AI - Hướng dẫn nội bộ LimArt:**\n\nVề câu hỏi "${userQuery}", dưới đây là các thông tin và quy định được trích xuất từ tài liệu nội bộ công ty:\n\n${relevantContext.trim()}\n\n💡 *Nếu cần giải quyết trường hợp ngoại lệ hoặc chưa rõ mức xử lý, vui lòng liên hệ trực tiếp Quản lý cửa hàng để được hỗ trợ nhé! 🦫*`;
   }
 
-  // 2. Broken / Damaged Goods & Complaint Handling
-  if (
-    lowerQuery.includes("vỡ") ||
-    lowerQuery.includes("hỏng") ||
-    lowerQuery.includes("bể") ||
-    lowerQuery.includes("móp") ||
-    lowerQuery.includes("rách") ||
-    lowerQuery.includes("lỗi") ||
-    lowerQuery.includes("khiếu nại") ||
-    lowerQuery.includes("đổi trả") ||
-    lowerQuery.includes("đền bù")
-  ) {
-    return `📦 **Quy trình xử lý sự cố hàng bị vỡ / hỏng khi nhận hàng:**
+  return STRICT_NOT_FOUND_MESSAGE;
+}
 
-1️⃣ **Bước 1: Tiếp nhận và xoa dịu khách hàng ngay lập tức**
-- Gửi lời xin lỗi chân thành vì sự cố vận chuyển ngoài ý muốn làm gián đoạn trải nghiệm của khách.
-- Nhờ khách chụp ảnh chi tiết sản phẩm hỏng, mã vận đơn bên ngoài vỏ hộp và **Video mở kiện hàng (unboxing)** để shop làm việc đối soát với đơn vị vận chuyển.
+let isPgVectorChecked = false;
 
-2️⃣ **Bước 2: Đối chiếu hạn mức tự giải quyết khiếu nại**
-- **Hỏng/vỡ nhẹ vẫn dùng được:** Thương lượng hỗ trợ hoàn tiền một phần (20% - 50% tuỳ mức độ) hoặc tặng mã voucher giảm giá cho đơn hàng tiếp theo.
-- **Vỡ nát, hỏng hoàn toàn (màu đổ tràn, chai lọ vỡ, toan rách không dùng được):** Tiến hành gửi bù ngay 01 sản phẩm mới 100% (miễn phí ship hoàn toàn) hoặc hoàn tiền 100% giá trị sản phẩm.
-- *Lưu ý:* Nếu giá trị đơn hàng vượt hạn mức nhân viên được tự duyệt theo quy chế, chụp màn hình gửi nhóm nội bộ để Quản lý duyệt ngay trong vòng 15 phút.
+export async function ensurePgVector(): Promise<boolean> {
+  if (isPgVectorChecked) return true;
+  try {
+    if (typeof prisma.$executeRawUnsafe === "function") {
+      await prisma.$executeRawUnsafe("CREATE EXTENSION IF NOT EXISTS vector;");
+    }
+    isPgVectorChecked = true;
+    return true;
+  } catch (err) {
+    console.warn("[PGVECTOR_EXTENSION_WARN] Could not ensure pgvector extension:", err);
+    return false;
+  }
+}
 
-3️⃣ **Bước 3: Lưu hồ sơ khiếu nại**
-- Ghi nhận thông tin đơn hàng lên hệ thống để bộ phận kho tiến hành khiếu nại bồi thường từ đơn vị vận chuyển.
+export async function syncDocumentChunks(documentId: string, content: string): Promise<number> {
+  await ensurePgVector();
 
-💬 **Mẫu tin nhắn chuẩn gửi khách (Nhân viên copy gửi ngay):**
----
-"Dạ em chào anh/chị ạ! 🎨
-Dạ em thật sự xin lỗi anh/chị vì sự cố đơn hàng bị [vỡ/hỏng] trong quá trình vận chuyển, khiến trải nghiệm của mình chưa được trọn vẹn ạ. Anh/chị cho em xin thêm hình ảnh/video mở gói hàng và ảnh mã vận đơn bên ngoài hộp để shop xử lý đổi mới hoặc hoàn tiền ngay cho mình nhé ạ.
-Shop cam kết bảo vệ 100% quyền lợi của anh/chị, anh/chị yên tâm nha! Em đợi phản hồi của mình ạ. 🍊"
----`;
+  // Delete existing chunks for this document
+  if (prisma.documentChunk?.deleteMany) {
+    await prisma.documentChunk.deleteMany({
+      where: { documentId },
+    });
   }
 
-  // 3. Late check-in rules
-  if (lowerQuery.includes("muộn") || lowerQuery.includes("trễ")) {
-    return `📌 **Quy tắc phạt và xử lý đi muộn:**
-
-1️⃣ **Thời gian ân hạn:**
-- Hệ thống áp dụng thời gian ân hạn **1 phút** so với giờ ca làm việc đã đăng ký.
-
-2️⃣ **Xử lý vi phạm:**
-- Check-in muộn từ phút thứ 2 trở đi sẽ tự động tính vào Bảng vi phạm của tháng.
-- Mức phạt được tính luỹ tiến theo số lần vi phạm trong tháng: trừ điểm chuyên cần nội bộ và quy đổi trừ giờ công theo quy chế.
-
-3️⃣ **Thủ tục giải trình:**
-- Trường hợp có lý do bất khả kháng (hỏng xe, mưa ngập, sự cố kỹ thuật...), nhân viên vào mục **📝 Xin giải trình** trong vòng 24 giờ để gửi Quản lý phê duyệt.`;
+  if (!content || !content.trim()) {
+    return 0;
   }
 
-  // 4. Bonuses & Packing reward
-  if (
-    lowerQuery.includes("thưởng") ||
-    lowerQuery.includes("chuyên cần") ||
-    lowerQuery.includes("200k")
-  ) {
-    return `🏆 **Chính sách thưởng nóng & Vinh danh nhân viên:**
+  const chunks = chunkText(content);
+  const geminiApiKey = getCleanGeminiApiKey();
 
-1️⃣ **Top 1 Chăm chỉ (Số giờ làm cao nhất tháng):**
-- Đạt tối thiểu **130 giờ công** trong tháng sẽ được thưởng nóng **+200.000 ₫** cộng vào bảng lương.
+  if (geminiApiKey) {
+    try {
+      const genAI = new GoogleGenerativeAI(geminiApiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
 
-2️⃣ **Vua Đóng Hàng:**
-- Tích luỹ trên **50 điểm** đóng gói đơn hàng trong tháng sẽ nhận thưởng nóng **+200.000 ₫**.
-
-3️⃣ **Thưởng bưng hàng lên lầu:**
-- Nhân viên tích luỹ từ **≥ 10 điểm** bưng vác hàng lên lầu được cộng thưởng nóng trực tiếp vào kỳ lương.`;
+      for (const chunkContent of chunks) {
+        try {
+          const result = await model.embedContent(chunkContent);
+          const embedding = result.embedding?.values;
+          if (Array.isArray(embedding) && embedding.length > 0) {
+            const vectorString = `[${embedding.join(",")}]`;
+            if (typeof prisma.$executeRawUnsafe === "function") {
+              await prisma.$executeRawUnsafe(
+                `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "embedding", "createdAt") 
+                 VALUES (gen_random_uuid()::text, $1, $2, $3::vector, NOW())`,
+                documentId,
+                chunkContent,
+                vectorString
+              );
+            }
+          } else {
+            if (typeof prisma.$executeRawUnsafe === "function") {
+              await prisma.$executeRawUnsafe(
+                `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "createdAt") 
+                 VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
+                documentId,
+                chunkContent
+              );
+            }
+          }
+        } catch (embedItemErr) {
+          console.warn("[EMBEDDING_CHUNK_WARN] Failed embedding for chunk:", embedItemErr);
+          if (typeof prisma.$executeRawUnsafe === "function") {
+            await prisma.$executeRawUnsafe(
+              `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "createdAt") 
+               VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
+              documentId,
+              chunkContent
+            );
+          }
+        }
+      }
+      return chunks.length;
+    } catch (embErr) {
+      console.warn("[EMBEDDING_INIT_WARN] Gemini embedding failed, falling back to text chunks:", embErr);
+    }
   }
 
-  // 5. Lucky wheel
-  if (lowerQuery.includes("quay") || lowerQuery.includes("vòng quay")) {
-    return `🎰 **Quy chế Vòng Quay May Mắn LimArt:**
+  // Fallback if no gemini key or embedding init failed
+  for (const chunkContent of chunks) {
+    if (typeof prisma.$executeRawUnsafe === "function") {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "createdAt") 
+         VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
+        documentId,
+        chunkContent
+      );
+    }
+  }
+  return chunks.length;
+}
 
-1️⃣ **Điều kiện tham gia:**
-- Nhân viên phải hoàn thành Check-in hợp lệ trong ngày.
-- Chưa thực hiện lượt quay nào trong ngày hôm đó.
+let isAutoBackfilled = false;
 
-2️⃣ **Cấp quyền quay:**
-- Quản lý có thể cấp/mở quyền trong danh mục **Nhân sự** hoặc tab **Vòng quay**.
-- Phần thưởng sẽ được ghi nhận và tổng hợp tự động vào bảng lương cuối tháng.`;
+export async function ensurePgVectorAndSyncChunks(
+  force: boolean = false,
+  docs?: Array<{ id: string; content: string; title?: string; path?: string }>
+): Promise<{
+  success: boolean;
+  totalDocs: number;
+  syncedDocs: number;
+  totalChunks: number;
+}> {
+  await ensurePgVector();
+
+  const allDocs =
+    docs ||
+    (await getOrSetCache("meta:documents:all", 600, () =>
+      prisma.document.findMany({
+        select: { id: true, title: true, path: true, content: true },
+        orderBy: { createdAt: "desc" },
+      })
+    ));
+
+  if (allDocs.length === 0) {
+    return { success: true, totalDocs: 0, syncedDocs: 0, totalChunks: 0 };
   }
 
-  // 6. Generic response with structured document context or helpful guidance
-  if (relevantContext) {
-    return `🍊 **Capy AI - Hướng dẫn nội bộ LimArt:**
+  let docIdsToSync: string[] = [];
 
-Về câu hỏi "${userQuery}", dưới đây là các thông tin và quy định được trích xuất từ tài liệu công ty:
+  if (force) {
+    docIdsToSync = allDocs.map((d) => d.id);
+  } else {
+    try {
+      const chunkStats = await prisma.$queryRaw<
+        Array<{ documentId: string; total: bigint | number; embedded: bigint | number }>
+      >`
+        SELECT 
+          "documentId", 
+          COUNT(*)::int as total, 
+          COUNT("embedding")::int as embedded 
+        FROM "DocumentChunk" 
+        GROUP BY "documentId"
+      `;
 
-${relevantContext.slice(0, 1500)}
+      const statMap = new Map<string, { total: number; embedded: number }>();
+      for (const stat of chunkStats || []) {
+        statMap.set(stat.documentId, {
+          total: Number(stat.total || 0),
+          embedded: Number(stat.embedded || 0),
+        });
+      }
 
-💡 **Hành động đề xuất cho nhân viên:**
-- Đối chiếu đúng trường hợp của bạn với các tiêu chí nêu trên.
-- Nếu cần giải quyết ngoại lệ hoặc chưa rõ mức xử lý, vui lòng liên hệ ngay Quản lý ca trực để được hỗ trợ trực tiếp nhé! 🦫✨`;
+      for (const doc of allDocs) {
+        const s = statMap.get(doc.id);
+        if (!s || s.total === 0 || s.embedded === 0) {
+          docIdsToSync.push(doc.id);
+        }
+      }
+    } catch {
+      docIdsToSync = allDocs.map((d) => d.id);
+    }
   }
 
-  return `🍊 **Capy AI - Hướng dẫn nội bộ LimArt:**
+  let syncedDocs = 0;
+  let totalChunks = 0;
 
-Về câu hỏi: "${userQuery}".
+  for (const doc of allDocs) {
+    if (docIdsToSync.includes(doc.id)) {
+      const count = await syncDocumentChunks(doc.id, doc.content);
+      syncedDocs++;
+      totalChunks += count;
+    }
+  }
 
-Hiện tại cẩm nang nội bộ chưa có kịch bản riêng cho tình huống này.
-Dưới đây là nguyên tắc vận hành bạn cần lưu ý:
-- Giữ thái độ phục vụ tận tâm, lịch sự và lắng nghe khách hàng.
-- Tuyệt đối không tự ý cam kết các vấn đề tài chính hoặc bồi thường vượt hạn mức quy định.
-- Hãy thông báo ngay cho Quản lý cửa hàng qua kênh chat nội bộ để được chỉ đạo cách xử lý chuẩn xác nhất nhé! 🦫✨`;
+  isAutoBackfilled = true;
+  return {
+    success: true,
+    totalDocs: allDocs.length,
+    syncedDocs,
+    totalChunks,
+  };
 }
 
 // ----------------------------------------------------------------------------
@@ -406,14 +465,10 @@ documentsRoute.post("/", authMiddleware, adminMiddleware, async (c) => {
             if (geminiApiKey) {
               try {
                 const genAI = new GoogleGenerativeAI(geminiApiKey);
-                const structureModel = genAI.getGenerativeModel({
-                  model: "gemini-2.5-flash",
-                  systemInstruction:
-                    "Bạn là chuyên gia chuyển đổi tài liệu. Hãy chuyển đổi mã HTML sau đây thành định dạng Markdown chuẩn (GFM - GitHub Flavored Markdown), giữ nguyên các bảng biểu (Markdown tables), danh sách, và định dạng tiêu đề. Chỉ trả về chuỗi Markdown sạch, không có thẻ codeblock ```markdown bao quanh.",
-                });
+                const systemInstruction =
+                  "Bạn là chuyên gia chuyển đổi tài liệu. Hãy chuyển đổi mã HTML sau đây thành định dạng Markdown chuẩn (GFM - GitHub Flavored Markdown), giữ nguyên các bảng biểu (Markdown tables), danh sách, và định dạng tiêu đề. Chỉ trả về chuỗi Markdown sạch, không có thẻ codeblock ```markdown bao quanh.";
                 const prompt = `Chuyển HTML này sang Markdown:\n\n${rawHtml}`;
-                const responseResult = await structureModel.generateContent(prompt);
-                let markdown = responseResult.response.text().trim();
+                let markdown = await generateWithGeminiFallback(genAI, systemInstruction, prompt);
 
                 if (markdown.startsWith("```")) {
                   markdown = markdown.replace(/^```[a-zA-Z]*\n/, "");
@@ -484,63 +539,8 @@ documentsRoute.post("/", authMiddleware, adminMiddleware, async (c) => {
       },
     });
 
-    // Clean up existing chunks
-    await prisma.documentChunk.deleteMany({
-      where: { documentId: document.id },
-    });
-
-    // Chunk text
-    const chunks = chunkText(content);
-    const geminiApiKey = getCleanGeminiApiKey();
-
-    if (geminiApiKey) {
-      try {
-        const genAI = new GoogleGenerativeAI(geminiApiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
-
-        for (const chunkContent of chunks) {
-          try {
-            const result = await model.embedContent(chunkContent);
-            const embedding = result.embedding.values;
-            const vectorString = `[${embedding.join(",")}]`;
-
-            await prisma.$executeRawUnsafe(
-              `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "embedding", "createdAt") 
-               VALUES (gen_random_uuid()::text, $1, $2, $3::vector, NOW())`,
-              document.id,
-              chunkContent,
-              vectorString
-            );
-          } catch {
-            await prisma.$executeRawUnsafe(
-              `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "createdAt") 
-               VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
-              document.id,
-              chunkContent
-            );
-          }
-        }
-      } catch (embErr) {
-        console.error("Lỗi embedding Gemini:", embErr);
-        for (const chunkContent of chunks) {
-          await prisma.$executeRawUnsafe(
-            `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "createdAt") 
-             VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
-            document.id,
-            chunkContent
-          );
-        }
-      }
-    } else {
-      for (const chunkContent of chunks) {
-        await prisma.$executeRawUnsafe(
-          `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "createdAt") 
-           VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
-          document.id,
-          chunkContent
-        );
-      }
-    }
+    // Sync chunks with pgvector embeddings
+    await syncDocumentChunks(document.id, content);
 
     await invalidateCachePattern("meta:documents:*").catch(() => {});
 
@@ -630,6 +630,10 @@ documentsRoute.patch("/:id", authMiddleware, adminMiddleware, async (c) => {
       data,
     });
 
+    if (content !== undefined) {
+      await syncDocumentChunks(id, updated.content);
+    }
+
     await invalidateCachePattern("meta:documents:*").catch(() => {});
 
     return c.json({
@@ -672,6 +676,10 @@ documentsRoute.put("/:id", authMiddleware, adminMiddleware, async (c) => {
       data,
     });
 
+    if (content !== undefined) {
+      await syncDocumentChunks(id, updated.content);
+    }
+
     await invalidateCachePattern("meta:documents:*").catch(() => {});
 
     return c.json({
@@ -713,7 +721,17 @@ export const handleCapyChat = async (c: any) => {
 
     const geminiApiKey = getCleanGeminiApiKey();
 
-    let relevantContext = "";
+    type SimilarChunk = {
+      documentId?: string;
+      content: string;
+      path: string;
+      title: string;
+      distance: number;
+    };
+
+    let closeChunks: SimilarChunk[] = [];
+    const matchedDocIds = new Set<string>();
+
     if (geminiApiKey) {
       try {
         const genAI = new GoogleGenerativeAI(geminiApiKey);
@@ -723,15 +741,9 @@ export const handleCapyChat = async (c: any) => {
         const embeddingResult = await embeddingModel.embedContent(userQuery);
         const queryVector = `[${embeddingResult.embedding.values.join(",")}]`;
 
-        type SimilarChunk = {
-          content: string;
-          path: string;
-          title: string;
-          distance: number;
-        };
-
         const similarChunks = await prisma.$queryRaw<SimilarChunk[]>`
           SELECT
+            c."documentId",
             c.content,
             d.path,
             d.title,
@@ -743,69 +755,88 @@ export const handleCapyChat = async (c: any) => {
           LIMIT 8
         `;
 
-        // Only accept chunks with meaningful semantic proximity (distance <= 0.35)
-        const closeChunks = (similarChunks || []).filter((chunk) => chunk.distance <= 0.35);
-
-        if (closeChunks.length > 0) {
-          relevantContext = closeChunks.reduce((acc, chunk, index) => {
-            return (
-              acc +
-              `--- TÀI LIỆU ${index + 1}: ${chunk.title} (${chunk.path}) ---\n${chunk.content}\n\n`
-            );
-          }, "Thông tin trích xuất từ cẩm nang tài liệu Checkin App / LimArt:\n\n");
+        // Only accept chunks with distance <= 0.65 (avoiding 0.35 drop of valid Vietnamese chunks)
+        closeChunks = (similarChunks || []).filter((chunk) => chunk.distance <= 0.65);
+        for (const chunk of closeChunks) {
+          if (chunk.documentId) matchedDocIds.add(chunk.documentId);
         }
       } catch (ragErr) {
         console.warn("[RAG_SEARCH_FALLBACK]", ragErr);
       }
     }
 
-    // Relevance scoring search across Document if RAG returned nothing
-    if (!relevantContext) {
-      const allDocs = await getOrSetCache("meta:documents:all", 600, () =>
-        prisma.document.findMany({
-          select: { id: true, title: true, path: true, content: true },
-          orderBy: { createdAt: "desc" },
-        })
-      );
+    // Hybrid keyword search across all documents
+    const allDocs = await getOrSetCache("meta:documents:all", 600, () =>
+      prisma.document.findMany({
+        select: { id: true, title: true, path: true, content: true },
+        orderBy: { createdAt: "desc" },
+      })
+    );
 
-      const scoredDocs = scoreDocuments(userQuery, allDocs);
-      const topDocs = scoredDocs.filter((d) => d.score >= MIN_RELEVANCE_SCORE).slice(0, 3);
+    // Auto-trigger background backfill if not yet checked
+    if (!isAutoBackfilled) {
+      isAutoBackfilled = true;
+      ensurePgVectorAndSyncChunks(false, allDocs).catch((err) => {
+        console.warn("[AUTO_BACKFILL_BG_ERR]", err);
+      });
+    }
 
-      if (topDocs.length > 0) {
-        relevantContext = topDocs
-          .map(
-            (doc, idx) =>
-              `--- TÀI LIỆU ${idx + 1}: ${doc.title} (${doc.path}) [Độ tương quan: ${doc.score}đ] ---\n${doc.content.slice(0, 1500)}...\n\n`
-          )
-          .join("\n");
+    const scoredDocs = scoreDocuments(userQuery, allDocs);
+    const topScoredDocs = scoredDocs
+      .filter((d) => d.score >= MIN_RELEVANCE_SCORE)
+      .slice(0, 3);
+
+    const contextParts: string[] = [];
+
+    if (closeChunks.length > 0) {
+      closeChunks.forEach((chunk, index) => {
+        contextParts.push(
+          `--- ĐOẠN TRÍCH ${index + 1}: ${chunk.title} (${chunk.path}) [Khoảng cách vector: ${chunk.distance.toFixed(3)}] ---\n${chunk.content}`
+        );
+      });
+    }
+
+    for (const doc of topScoredDocs) {
+      if (!matchedDocIds.has(doc.id)) {
+        contextParts.push(
+          `--- TÀI LIỆU KHỚP TỪ KHOÁ: ${doc.title} (${doc.path}) [Điểm tương quan: ${doc.score}đ] ---\n${doc.content}`
+        );
+        matchedDocIds.add(doc.id);
       }
+    }
+
+    const relevantContext = contextParts.join("\n\n").trim();
+
+    // 100% STRICT RAG: If no relevant context found from DB, return strict not found message immediately!
+    if (!relevantContext) {
+      return c.json({
+        success: true,
+        reply: STRICT_NOT_FOUND_MESSAGE,
+        content: STRICT_NOT_FOUND_MESSAGE,
+      });
     }
 
     if (geminiApiKey) {
       try {
         const genAI = new GoogleGenerativeAI(geminiApiKey);
-        const systemInstruction = `Bạn là Capy AI - Trợ lý vận hành và chăm sóc khách hàng nội bộ của LimArt (Cửa hàng Họa cụ & Mỹ thuật).
-Nhiệm vụ của bạn là giải đáp chính xác, đầy đủ, chi tiết từng bước cho nhân viên và quản lý về quy trình xử lý đơn hàng, chăm sóc khách hàng, quy chế công ty, chấm công, tính lương thưởng.
+        const systemInstruction = `Bạn là Capy AI - Trợ lý vận hành và hỗ trợ nội bộ của LimArt (Cửa hàng Họa cụ & Mỹ thuật).
+Nhiệm vụ của bạn là giải đáp chính xác, đầy đủ, chi tiết từng bước cho nhân viên và quản lý dựa trên các quy định và tài liệu nội bộ của công ty.
 
-NGUYÊN TẮC BẮT BUỘC:
-1. TRẢ LỜI ĐẦY ĐỦ, CHI TIẾT TỪNG BƯỚC:
-   - Trình bày mạch lạc với các gạch đầu dòng rõ ràng.
-   - Hướng dẫn cụ thể hành động nhân viên cần làm ngay lập tức (Bước 1, Bước 2, Bước 3...).
-   - TUYỆT ĐỐI KHÔNG trả lời hời hợt, không tóm tắt cụt lủn và TUYỆT ĐỐI KHÔNG bảo người dùng tự tìm đọc trong kho tài liệu hay cẩm nang.
-2. XỬ LÝ TÌNH HUỐNG KHÁCH HÀNG (Hàng vỡ/hỏng, hỏi địa chỉ shop, khiếu nại, đổi trả, bảo hành...):
-   - Luôn cung cấp:
-     * Các bước xử lý ngay tại quầy hoặc trên tin nhắn.
-     * Mẫu tin nhắn chuẩn (kèm lời chào, lời xin lỗi nếu có sự cố, câu từ lịch sự, chuyên nghiệp) để nhân viên copy gửi khách ngay.
-     * Hạn mức bồi thường / tự giải quyết (nếu có tài liệu liên quan quy định).
-   - Với câu hỏi về địa chỉ shop: Cung cấp thông tin giờ mở cửa (8h30 - 21h30), nhắc nhân viên gửi đúng chi nhánh và kèm mẫu tin nhắn chỉ đường/chào đón khách.
-3. SỬ DỤNG TÀI LIỆU NỘI BỘ THAM KHẢO:
-   - Nếu tài liệu có thông tin liên quan, hãy áp dụng triệt để các số liệu, hạn mức, quy định trong tài liệu.
-   - Nếu tài liệu ghi "Kho tài liệu nội bộ chưa có văn bản riêng cho nội dung này", hãy chủ động giải đáp bằng kinh nghiệm nghiệp vụ bán lẻ họa cụ / CSKH chuẩn mực, tận tâm và hợp lý, đồng thời nhắc nhân viên báo quản lý nếu vượt thẩm quyền.
-4. PHONG CÁCH: Thân thiện, hỗ trợ nhiệt tình như chú chuột lang nước Capy (sử dụng emoji 🍊, 🦫).
+QUY TẮC BẮT BUỘC (100% STRICT RAG):
+1. NGUỒN THÔNG TIN DUY NHẤT:
+   - Bạn CHỈ ĐƯỢC PHÉP trả lời dựa trên nội dung trong mục "TÀI LIỆU NỘI BỘ THAM KHẢO" bên dưới.
+   - CẤM TUYỆT ĐỐI tự sáng tạo, suy diễn, phỏng đoán, bịa thêm quy định, chính sách, số liệu, địa chỉ hoặc bất kỳ thông tin nào không nằm trong TÀI LIỆU NỘI BỘ THAM KHẢO.
+2. TRẢ LỜI ĐẦY ĐỦ, CHI TIẾT TỪNG BƯỚC:
+   - Khi thông tin CÓ trong tài liệu tham khảo: Trình bày đầy đủ, chi tiết từng bước, giữ nguyên bảng biểu, định mức, quy định, mốc thời gian, số tiền và mẫu câu chuẩn có trong tài liệu.
+   - Tuyệt đối không tóm tắt cụt lủn và TUYỆT ĐỐI KHÔNG ghi câu dạng "xem chi tiết ở tab Kho tài liệu" hay "tra cứu cẩm nang".
+3. KHI KHÔNG CÓ THÔNG TIN TRONG TÀI LIỆU:
+   - Nếu câu hỏi của người dùng hoàn toàn KHÔNG CÓ thông tin hoặc không thể trả lời dựa trên TÀI LIỆU NỘI BỘ THAM KHẢO, bạn BẮT BUỘC trả lời chính xác câu sau:
+     "${STRICT_NOT_FOUND_MESSAGE}"
+4. PHONG CÁCH: Thân thiện, tận tâm như chú chuột lang nước Capy (sử dụng emoji 🍊, 🦫).
 5. Luôn trả lời bằng tiếng Việt.
 
 TÀI LIỆU NỘI BỘ THAM KHẢO:
-${relevantContext || "Kho tài liệu nội bộ chưa có văn bản riêng cho nội dung này."}`;
+${relevantContext}`;
 
         const prompt = `Câu hỏi của người dùng: ${userQuery}`;
         const replyText = await generateWithGeminiFallback(genAI, systemInstruction, prompt);
@@ -838,3 +869,24 @@ ${relevantContext || "Kho tài liệu nội bộ chưa có văn bản riêng cho
 };
 
 documentsRoute.post("/chat", handleCapyChat);
+
+// ----------------------------------------------------------------------------
+// 7. POST /api/documents/reindex - Reindex embeddings for all documents
+// ----------------------------------------------------------------------------
+documentsRoute.post("/reindex", async (c) => {
+  try {
+    const force = c.req.query("force") === "true";
+    const result = await ensurePgVectorAndSyncChunks(force || true);
+    return c.json({
+      success: true,
+      message: `Đã đồng bộ vector embedding cho ${result.syncedDocs}/${result.totalDocs} tài liệu (${result.totalChunks} chunks)`,
+      data: result,
+    });
+  } catch (err: any) {
+    console.error("[REINDEX_ERROR]", err);
+    return c.json(
+      { success: false, error: err?.message || "Lỗi reindex vector" },
+      500
+    );
+  }
+});

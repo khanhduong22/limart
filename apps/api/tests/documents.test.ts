@@ -212,8 +212,8 @@ describe("Documents Routes", () => {
     });
   });
 
-  describe("POST /api/documents/chat", () => {
-    it("returns response from Capy AI query", async () => {
+  describe("POST /api/documents/chat and /api/chat", () => {
+    it("returns response from Capy AI query for late check-in", async () => {
       mockDocFindMany.mockResolvedValue([
         {
           id: "doc-1",
@@ -236,7 +236,96 @@ describe("Documents Routes", () => {
       expect(res.status).toBe(200);
       const json = await res.json();
       expect(json.success).toBe(true);
-      expect(json.reply || json.content).toBeDefined();
+      expect(json.reply || json.content).toContain("Quy tắc phạt và xử lý đi muộn");
+      expect(json.reply || json.content).not.toContain("tab Kho tài liệu");
     }, 15000);
+
+    it("returns comprehensive step-by-step guidance and template for broken goods", async () => {
+      mockDocFindMany.mockResolvedValue([
+        {
+          id: "doc-complaint",
+          title: "Bảng hạn mức tự giải quyết khiếu nại",
+          path: "quy-che/bang-han-muc.docx",
+          content: "Quy định xử lý hàng vỡ, hỏng khi vận chuyển và mức bồi thường.",
+        },
+      ]);
+
+      const res = await app.request("/api/documents/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: "nếu khách báo hàng bị vỡ thì giải quyết như nào",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      const reply = json.reply || json.content;
+      // Must contain step-by-step guidance and message template
+      expect(reply).toContain("Quy trình xử lý sự cố hàng bị vỡ / hỏng");
+      expect(reply).toContain("Mẫu tin nhắn chuẩn gửi khách");
+      expect(reply).not.toContain("Bạn có thể xem chi tiết ở tab 'Kho tài liệu & Quy chế'");
+    });
+
+    it("returns store address information and template for store address query without misattributing complaint document", async () => {
+      mockDocFindMany.mockResolvedValue([
+        {
+          id: "doc-complaint",
+          title: "Bảng hạn mức tự giải quyết khiếu nại",
+          path: "quy-che/bang-han-muc.docx",
+          content: "Quy định xử lý hàng vỡ, hỏng khi vận chuyển và mức bồi thường.",
+        },
+      ]);
+
+      const res = await app.request("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: "khách hỏi địa chỉ shop thì nhắn như nào",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      const reply = json.reply || json.content;
+      // Must contain address info and template, NOT complaint limits
+      expect(reply).toContain("Thông tin địa chỉ Cửa hàng Họa cụ LimArt");
+      expect(reply).toContain("Mẫu tin nhắn chuẩn gửi khách");
+      expect(reply).not.toContain("Bảng hạn mức tự giải quyết khiếu nại");
+      expect(reply).not.toContain("Bạn có thể xem chi tiết ở tab 'Kho tài liệu & Quy chế'");
+    });
+  });
+
+  describe("Relevance Scoring & Stopword Filtering", () => {
+    it("differentiates between broken goods query and store address query", async () => {
+      const { scoreDocuments } = await import("../src/routes/documents.route");
+
+      const docs = [
+        {
+          id: "doc-complaint",
+          title: "Bảng hạn mức tự giải quyết khiếu nại",
+          path: "quy-che/bang-han-muc.docx",
+          content: "Quy định giải quyết khiếu nại hàng bị vỡ, hỏng hóc hoặc thiếu hàng khi vận chuyển.",
+        },
+      ];
+
+      // Query 1: broken goods -> should match high score
+      const scoredBroken = scoreDocuments("nếu khách báo hàng bị vỡ thì giải quyết như nào", docs);
+      expect(scoredBroken.length).toBeGreaterThan(0);
+      expect(scoredBroken[0].score).toBeGreaterThanOrEqual(20);
+
+      // Query 2: address -> stopwords (khách, hỏi, thì, nhắn, như, nào) filtered out,
+      // words left: "địa", "chỉ", "shop" -> does NOT match doc-complaint
+      const scoredAddress = scoreDocuments("khách hỏi địa chỉ shop thì nhắn như nào", docs);
+      // Either 0 matches or score < 20
+      const validMatches = scoredAddress.filter((d) => d.score >= 20);
+      expect(validMatches.length).toBe(0);
+    });
   });
 });

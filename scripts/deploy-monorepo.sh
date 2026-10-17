@@ -140,6 +140,8 @@ deploy_dual_run() {
         ENV_ARG=""
         if [ -f ".env" ]; then
             ENV_ARG="--env-file .env"
+            # Ensure Gemini API keys are exported into environment if present in .env
+            export $(grep -E '^(GEMINI_API_KEY|GOOGLE_GENERATIVE_AI_API_KEY)=' .env | xargs) 2>/dev/null || true
         fi
 
         docker run -d \
@@ -158,6 +160,8 @@ deploy_dual_run() {
             -e MEILISEARCH_HOST="${MEILISEARCH_HOST:-http://meilisearch:7700}" \
             -e MEILISEARCH_KEY="${MEILISEARCH_KEY:-kt_meilisearch_master_key_2026_safe}" \
             -e NEXTAUTH_SECRET="${NEXTAUTH_SECRET:-checkin-app-jwt-secret-monorepo-safe-2026}" \
+            -e GEMINI_API_KEY="${GEMINI_API_KEY:-}" \
+            -e GOOGLE_GENERATIVE_AI_API_KEY="${GOOGLE_GENERATIVE_AI_API_KEY:-}" \
             "${API_IMAGE}"
 
         if docker network inspect limart-infra >/dev/null 2>&1; then

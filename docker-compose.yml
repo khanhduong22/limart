@@ -22,6 +22,8 @@ services:
       - MEILISEARCH_HOST=${MEILISEARCH_HOST:-http://meilisearch:7700}
       - MEILISEARCH_KEY=${MEILISEARCH_KEY:-kt_meilisearch_master_key_2026_safe}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-checkin-app-jwt-secret-monorepo-safe-2026}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_GENERATIVE_AI_API_KEY=${GOOGLE_GENERATIVE_AI_API_KEY:-}
     env_file:
       - .env
     depends_on:

@@ -17,7 +17,7 @@ import { shiftsRoute } from "./routes/shifts.route";
 import { payrollRoute } from "./routes/payroll.route";
 import { requestsRoute } from "./routes/requests.route";
 import { adminRoute } from "./routes/admin.route";
-import { documentsRoute } from "./routes/documents.route";
+import { documentsRoute, handleCapyChat } from "./routes/documents.route";
 import { staffTasksRoute } from "./routes/staff-tasks.route";
 import { managerTasksRoute } from "./routes/manager-tasks.route";
 import { tasksRoute } from "./routes/tasks.route";
@@ -217,6 +217,7 @@ export function createApp() {
   // Documents & Knowledge Base Routes
   app.route("/api/documents", documentsRoute);
   app.route("/documents", documentsRoute);
+  app.post("/api/chat", handleCapyChat);
   app.route("/api/chat", documentsRoute);
 
   // Scheduled Background & Cron Routes

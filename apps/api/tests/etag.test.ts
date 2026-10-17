@@ -22,6 +22,12 @@ vi.mock("../src/lib/meilisearch", () => ({
   checkMeiliHealth: vi.fn().mockResolvedValue("connected"),
 }));
 
+vi.mock("../src/lib/special-days", () => ({
+  getSpecialDays: vi.fn().mockResolvedValue([
+    { date: "2026-10-20", title: "Phụ nữ Việt Nam" }
+  ]),
+}));
+
 import { app } from "../src/app";
 
 describe("ETag Middleware & HTTP Response Optimization", () => {
@@ -30,15 +36,7 @@ describe("ETag Middleware & HTTP Response Optimization", () => {
   });
 
   it("generates an ETag header on GET response", async () => {
-    mockAllowedIPFindMany.mockResolvedValue([
-      { id: 1, prefix: "192.168.1.", label: "LimArt Office" },
-    ]);
-
-    const res = await app.request("/api/ip-status", {
-      headers: {
-        "x-forwarded-for": "192.168.1.50",
-      },
-    });
+    const res = await app.request("/api/special-days");
 
     expect(res.status).toBe(200);
     const etag = res.headers.get("ETag");
@@ -47,25 +45,16 @@ describe("ETag Middleware & HTTP Response Optimization", () => {
   });
 
   it("returns HTTP 304 Not Modified with empty body when If-None-Match matches ETag", async () => {
-    mockAllowedIPFindMany.mockResolvedValue([
-      { id: 1, prefix: "192.168.1.", label: "LimArt Office" },
-    ]);
-
     // 1. Initial request to fetch data and obtain ETag
-    const firstRes = await app.request("/api/ip-status", {
-      headers: {
-        "x-forwarded-for": "192.168.1.50",
-      },
-    });
+    const firstRes = await app.request("/api/special-days");
 
     expect(firstRes.status).toBe(200);
     const etag = firstRes.headers.get("ETag");
     expect(etag).toBeTruthy();
 
     // 2. Subsequent request sending If-None-Match header
-    const cachedRes = await app.request("/api/ip-status", {
+    const cachedRes = await app.request("/api/special-days", {
       headers: {
-        "x-forwarded-for": "192.168.1.50",
         "If-None-Match": etag!,
       },
     });
@@ -77,13 +66,8 @@ describe("ETag Middleware & HTTP Response Optimization", () => {
   });
 
   it("returns HTTP 304 Not Modified when If-None-Match is '*'", async () => {
-    mockAllowedIPFindMany.mockResolvedValue([
-      { id: 1, prefix: "192.168.1.", label: "LimArt Office" },
-    ]);
-
-    const res = await app.request("/api/ip-status", {
+    const res = await app.request("/api/special-days", {
       headers: {
-        "x-forwarded-for": "192.168.1.50",
         "If-None-Match": "*",
       },
     });
@@ -94,13 +78,8 @@ describe("ETag Middleware & HTTP Response Optimization", () => {
   });
 
   it("returns HTTP 200 with full payload when If-None-Match does not match", async () => {
-    mockAllowedIPFindMany.mockResolvedValue([
-      { id: 1, prefix: "192.168.1.", label: "LimArt Office" },
-    ]);
-
-    const res = await app.request("/api/ip-status", {
+    const res = await app.request("/api/special-days", {
       headers: {
-        "x-forwarded-for": "192.168.1.50",
         "If-None-Match": '"outdated-or-different-etag-hash"',
       },
     });
@@ -108,7 +87,6 @@ describe("ETag Middleware & HTTP Response Optimization", () => {
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(data.success).toBe(true);
-    expect(data.isAllowed).toBe(true);
   });
 
   it("preserves GET /health functionality with ETag header", async () => {

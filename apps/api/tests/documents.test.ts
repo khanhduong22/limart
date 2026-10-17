@@ -6,6 +6,7 @@ const {
   mockDocUpsert,
   mockDocUpdate,
   mockDocDelete,
+  mockDocCount,
   mockDocChunkDeleteMany,
   mockExecuteRawUnsafe,
   mockQueryRaw,
@@ -15,6 +16,7 @@ const {
   mockDocUpsert: vi.fn(),
   mockDocUpdate: vi.fn(),
   mockDocDelete: vi.fn(),
+  mockDocCount: vi.fn().mockResolvedValue(2),
   mockDocChunkDeleteMany: vi.fn(),
   mockExecuteRawUnsafe: vi.fn(),
   mockQueryRaw: vi.fn(),
@@ -28,6 +30,7 @@ vi.mock("@checkin/db", () => ({
       upsert: mockDocUpsert,
       update: mockDocUpdate,
       delete: mockDocDelete,
+      count: mockDocCount,
     },
     documentChunk: {
       deleteMany: mockDocChunkDeleteMany,
@@ -419,8 +422,24 @@ describe("Documents Routes", () => {
     });
   });
 
-  describe("POST /api/documents/reindex", () => {
-    it("runs vector reindexing across all documents", async () => {
+  describe("GET & POST /api/documents/reindex", () => {
+    it("returns vector embedding stats via GET", async () => {
+      mockQueryRaw.mockResolvedValue([
+        { total_chunks: 10, embedded_chunks: 10 },
+      ]);
+
+      const res = await app.request("/api/documents/reindex", {
+        method: "GET",
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      expect(json.totalChunks).toBe(10);
+      expect(json.embeddedChunks).toBe(10);
+    });
+
+    it("runs vector reindexing across all documents via POST", async () => {
       mockDocFindMany.mockResolvedValue([
         { id: "doc-1", content: "Nội dung 1" },
         { id: "doc-2", content: "Nội dung 2" },

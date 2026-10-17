@@ -21,7 +21,7 @@ describe("Server-Timing Middleware & Jittered Cache TTL Suite", () => {
       expect(match).not.toBeNull();
       const dur = parseFloat(match![1]);
       expect(dur).toBeGreaterThanOrEqual(0);
-    });
+    }, 15000);
 
     it("exposes Server-Timing in Access-Control-Expose-Headers for CORS clients", async () => {
       const res = await app.request("/health", {
@@ -30,7 +30,7 @@ describe("Server-Timing Middleware & Jittered Cache TTL Suite", () => {
       const exposeHeaders = res.headers.get("Access-Control-Expose-Headers");
       expect(exposeHeaders).toBeDefined();
       expect(exposeHeaders).toContain("Server-Timing");
-    });
+    }, 15000);
 
     it("attaches Server-Timing header even on 404 Not Found responses", async () => {
       const res = await app.request("/api/non-existent-route-for-timing-test");

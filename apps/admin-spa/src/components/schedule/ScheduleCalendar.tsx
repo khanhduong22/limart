@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { isShiftLocked } from '@/lib/schedule-lock';
 import { api } from '@/lib/api';
 import { useScheduleStore } from '@/stores/useScheduleStore';
-import { eventPropGetter, slotPropGetter } from './schedule-utils';
+import { eventPropGetter, slotPropGetter, syncStaffColors } from './schedule-utils';
 import CustomEventComponent from './CustomEventComponent';
 import CalendarToolbar from './CalendarToolbar';
 import type { CalendarEvent, SheetWeekDay } from './types';
@@ -129,6 +129,11 @@ export default function ScheduleCalendar({
     setPrevInitialEvents(initialEvents);
     setEvents(mapEvents(initialEvents));
   }
+
+  // Pre-register and synchronize distinct staff colors deterministically
+  useMemo(() => {
+    syncStaffColors(users, initialEvents);
+  }, [users, initialEvents]);
 
   const displayedEvents = useMemo(() => {
     return events.filter((e) => {

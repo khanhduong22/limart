@@ -19,16 +19,143 @@ const SUGGESTIONS = [
   "Cách xem chi tiết lương?",
 ];
 
-const LOCAL_KNOWLEDGE: Record<string, string> = {
-  "Làm sao để check-in?":
-    "Để check-in, bạn chỉ cần bấm nút lớn **📍 Vào Ca (Check-in)** ở ngay màn hình chính khi đang kết nối Wi-Fi cửa hàng hoặc ở trong bán kính GPS cho phép. Hệ thống hỗ trợ lưu ngoại tuyến nếu mất mạng và tự động đồng bộ khi có kết nối!",
-  "Quy trình xin giải trình?":
-    "Vào mục **📝 Xin giải trình** (hoặc truy cập `/requests`), chọn ngày cần giải trình (đi muộn, về sớm, quên chấm công, hoặc xin nghỉ), điền lý do rõ ràng và nhấn **Gửi yêu cầu**. Admin sẽ xem xét và phê duyệt.",
-  "Cách đăng ký lịch làm việc?":
-    "Bạn vào mục **📅 Đăng ký Lịch** (`/schedule`), chọn các ca trống trong tuần (Ca Sáng: 8h30 - 12h, Ca Chiều: 13h30 - 17h30, hoặc Cả ngày). Bạn cũng có thể sang nhượng ca (Kèo thơm 🎁) cho đồng nghiệp.",
-  "Cách xem chi tiết lương?":
-    "Bấm vào **💰 Chi tiết lương** (`/payroll`) để xem tổng số giờ công, lương tạm tính theo giờ, phụ cấp đóng gói/bưng lầu, thưởng và các khoản điều chỉnh trong tháng.",
-};
+export function cleanAiMarkdown(raw: string): string {
+  if (!raw) return "";
+  let s = raw;
+
+  // In case raw text is a JSON string
+  if (s.trim().startsWith("{") && s.trim().endsWith("}")) {
+    try {
+      const j = JSON.parse(s.trim());
+      if (j.reply || j.content || j.message) {
+        s = j.reply || j.content || j.message;
+      }
+    } catch {}
+  }
+
+  // Convert LaTeX math symbols to natural unicode symbols
+  s = s
+    .replace(/\\ge\b|\\geq\b/g, "≥")
+    .replace(/\\le\b|\\leq\b/g, "≤")
+    .replace(/\\times\b/g, "×")
+    .replace(/\\div\b/g, "÷")
+    .replace(/\\pm\b/g, "±")
+    .replace(/\\approx\b/g, "≈")
+    .replace(/\\neq\b/g, "≠");
+
+  // Remove $ delimiters: $\ge 4$ -> ≥ 4
+  s = s.replace(/\$\$([^$]+)\$\$/g, "$1");
+  s = s.replace(/\$([^$\n]+)\$/g, "$1");
+
+  // Remove leftover backslashes in front of math chars
+  s = s.replace(/\\([><=+\-*\/])/g, "$1");
+
+  return s;
+}
+
+export function renderInlineContent(text: string): React.ReactNode {
+  if (!text) return null;
+  const parts: React.ReactNode[] = [];
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.substring(lastIndex, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith("**") && token.endsWith("**")) {
+      parts.push(
+        <strong key={match.index} className="font-bold text-gray-900">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if (token.startsWith("`") && token.endsWith("`")) {
+      parts.push(
+        <code
+          key={match.index}
+          className="px-1 py-0.5 rounded bg-slate-100 text-slate-800 font-mono text-[11px]"
+        >
+          {token.slice(1, -1)}
+        </code>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.substring(lastIndex));
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
+export function FormattedAiMessage({ content }: { content: string }) {
+  const cleaned = cleanAiMarkdown(content);
+  const lines = cleaned.split("\n");
+
+  return (
+    <div className="space-y-1.5 text-xs text-gray-800 leading-relaxed">
+      {lines.map((line, idx) => {
+        const trimmed = line.trim();
+
+        // Empty line
+        if (!trimmed) {
+          return <div key={idx} className="h-1" />;
+        }
+
+        // Heading: ### Heading or ## Heading or # Heading
+        const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
+        if (headingMatch) {
+          return (
+            <div
+              key={idx}
+              className="font-bold text-gray-900 text-[13px] pt-1.5 pb-0.5 flex items-center gap-1 border-b border-gray-100"
+            >
+              <span>{renderInlineContent(headingMatch[2])}</span>
+            </div>
+          );
+        }
+
+        // Bullet list: - or * or •
+        const bulletMatch = trimmed.match(/^[\-\*•]\s+(.*)$/);
+        if (bulletMatch) {
+          return (
+            <div key={idx} className="flex items-start gap-1.5 pl-1">
+              <span className="text-amber-500 font-bold shrink-0 leading-5">•</span>
+              <span className="flex-1 leading-normal">
+                {renderInlineContent(bulletMatch[1])}
+              </span>
+            </div>
+          );
+        }
+
+        // Numbered item: 1. or 1)
+        const numMatch = trimmed.match(/^(\d+[\.\)])\s+(.*)$/);
+        if (numMatch) {
+          return (
+            <div key={idx} className="flex items-start gap-1.5 pl-1">
+              <span className="font-semibold text-gray-600 shrink-0 leading-5">
+                {numMatch[1]}
+              </span>
+              <span className="flex-1 leading-normal">
+                {renderInlineContent(numMatch[2])}
+              </span>
+            </div>
+          );
+        }
+
+        // Regular paragraph line
+        return (
+          <div key={idx} className="leading-relaxed">
+            {renderInlineContent(trimmed)}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function CapyAssistant({ currentUser }: { currentUser: any }) {
   const isEnterpriseDemo =
@@ -64,23 +191,6 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
     const aiMessageId = (Date.now() + 1).toString();
     setMessages((prev) => [...prev, { id: aiMessageId, role: "assistant", content: "" }]);
 
-    // Check if we have instant local knowledge
-    const matchedKey = Object.keys(LOCAL_KNOWLEDGE).find((k) =>
-      textToSend.toLowerCase().includes(k.toLowerCase())
-    );
-
-    if (matchedKey) {
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === aiMessageId ? { ...m, content: LOCAL_KNOWLEDGE[matchedKey] } : m
-          )
-        );
-        setIsLoading(false);
-      }, 500);
-      return;
-    }
-
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -90,25 +200,52 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
         }),
       });
 
-      if (res.ok) {
-        const reader = res.body?.getReader();
-        const decoder = new TextDecoder();
-        let accumulated = "";
-
-        if (reader) {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            accumulated += decoder.decode(value, { stream: true });
-            setMessages((prev) =>
-              prev.map((m) => (m.id === aiMessageId ? { ...m, content: accumulated } : m))
-            );
-          }
-        }
-      } else {
-        throw new Error("Chat fallback");
+      if (!res.ok) {
+        throw new Error(`Chat error: HTTP ${res.status}`);
       }
-    } catch {
+
+      const text = await res.text();
+      let extractedReply = "";
+
+      try {
+        const json = JSON.parse(text);
+        extractedReply =
+          json.reply ||
+          json.content ||
+          json.message ||
+          (json.success ? "" : json.error) ||
+          "";
+      } catch {
+        // Plain text response
+        extractedReply = text;
+      }
+
+      // Check if extractedReply is itself a nested JSON string
+      if (
+        typeof extractedReply === "string" &&
+        extractedReply.trim().startsWith("{") &&
+        extractedReply.trim().endsWith("}")
+      ) {
+        try {
+          const nested = JSON.parse(extractedReply.trim());
+          if (nested.reply || nested.content || nested.message) {
+            extractedReply = nested.reply || nested.content || nested.message;
+          }
+        } catch {
+          // Ignore
+        }
+      }
+
+      if (!extractedReply || !extractedReply.trim()) {
+        extractedReply =
+          "Capy chưa tìm thấy thông tin phù hợp trong tài liệu nội bộ. Bạn liên hệ Quản lý nhé! 🦫✨";
+      }
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === aiMessageId ? { ...m, content: extractedReply } : m))
+      );
+    } catch (err) {
+      console.error("[CAPY_CHAT_ERROR]", err);
       // Smart Fallback
       setMessages((prev) =>
         prev.map((m) =>
@@ -319,7 +456,11 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
                       : "mr-auto bg-white border border-gray-100 text-gray-800 shadow-2xs rounded-bl-xs"
                   )}
                 >
-                  <p className="whitespace-pre-line">{m.content}</p>
+                  {m.role === "assistant" ? (
+                    <FormattedAiMessage content={m.content} />
+                  ) : (
+                    <p className="whitespace-pre-line">{m.content}</p>
+                  )}
                 </div>
               ))}
               {isLoading && (

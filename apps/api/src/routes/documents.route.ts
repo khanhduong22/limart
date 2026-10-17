@@ -210,42 +210,48 @@ export async function syncDocumentChunks(documentId: string, content: string): P
       const genAI = new GoogleGenerativeAI(geminiApiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-embedding-001" });
 
-      for (const chunkContent of chunks) {
-        try {
-          const result = await model.embedContent(chunkContent);
-          const embedding = result.embedding?.values;
-          if (Array.isArray(embedding) && embedding.length > 0) {
-            const vectorString = `[${embedding.join(",")}]`;
-            if (typeof prisma.$executeRawUnsafe === "function") {
-              await prisma.$executeRawUnsafe(
-                `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "embedding", "createdAt") 
-                 VALUES (gen_random_uuid()::text, $1, $2, $3::vector, NOW())`,
-                documentId,
-                chunkContent,
-                vectorString
-              );
+      const CHUNK_CONCURRENCY = 4;
+      for (let i = 0; i < chunks.length; i += CHUNK_CONCURRENCY) {
+        const chunkBatch = chunks.slice(i, i + CHUNK_CONCURRENCY);
+        await Promise.all(
+          chunkBatch.map(async (chunkContent) => {
+            try {
+              const result = await model.embedContent(chunkContent);
+              const embedding = result.embedding?.values;
+              if (Array.isArray(embedding) && embedding.length > 0) {
+                const vectorString = `[${embedding.join(",")}]`;
+                if (typeof prisma.$executeRawUnsafe === "function") {
+                  await prisma.$executeRawUnsafe(
+                    `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "embedding", "createdAt") 
+                     VALUES (gen_random_uuid()::text, $1, $2, $3::vector, NOW())`,
+                    documentId,
+                    chunkContent,
+                    vectorString
+                  );
+                }
+              } else {
+                if (typeof prisma.$executeRawUnsafe === "function") {
+                  await prisma.$executeRawUnsafe(
+                    `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "createdAt") 
+                     VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
+                    documentId,
+                    chunkContent
+                  );
+                }
+              }
+            } catch (embedItemErr) {
+              console.warn("[EMBEDDING_CHUNK_WARN] Failed embedding for chunk:", embedItemErr);
+              if (typeof prisma.$executeRawUnsafe === "function") {
+                await prisma.$executeRawUnsafe(
+                  `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "createdAt") 
+                   VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
+                  documentId,
+                  chunkContent
+                );
+              }
             }
-          } else {
-            if (typeof prisma.$executeRawUnsafe === "function") {
-              await prisma.$executeRawUnsafe(
-                `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "createdAt") 
-                 VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
-                documentId,
-                chunkContent
-              );
-            }
-          }
-        } catch (embedItemErr) {
-          console.warn("[EMBEDDING_CHUNK_WARN] Failed embedding for chunk:", embedItemErr);
-          if (typeof prisma.$executeRawUnsafe === "function") {
-            await prisma.$executeRawUnsafe(
-              `INSERT INTO "DocumentChunk" ("id", "documentId", "content", "createdAt") 
-               VALUES (gen_random_uuid()::text, $1, $2, NOW())`,
-              documentId,
-              chunkContent
-            );
-          }
-        }
+          })
+        );
       }
       return chunks.length;
     } catch (embErr) {
@@ -332,11 +338,21 @@ export async function ensurePgVectorAndSyncChunks(
   let syncedDocs = 0;
   let totalChunks = 0;
 
-  for (const doc of allDocs) {
-    if (docIdsToSync.includes(doc.id)) {
-      const count = await syncDocumentChunks(doc.id, doc.content);
-      syncedDocs++;
-      totalChunks += count;
+  const DOC_BATCH_SIZE = 3;
+  for (let i = 0; i < allDocs.length; i += DOC_BATCH_SIZE) {
+    const docBatch = allDocs.slice(i, i + DOC_BATCH_SIZE);
+    const results = await Promise.all(
+      docBatch.map(async (doc) => {
+        if (docIdsToSync.includes(doc.id)) {
+          const count = await syncDocumentChunks(doc.id, doc.content);
+          return { synced: 1, chunks: count };
+        }
+        return { synced: 0, chunks: 0 };
+      })
+    );
+    for (const res of results) {
+      syncedDocs += res.synced;
+      totalChunks += res.chunks;
     }
   }
 
@@ -384,7 +400,67 @@ documentsRoute.get("/", async (c) => {
 });
 
 // ----------------------------------------------------------------------------
-// 2. GET /api/documents/:id - Returns single document details
+// 2. GET & POST /api/documents/reindex - Vector stats & Reindex embeddings
+// ----------------------------------------------------------------------------
+documentsRoute.get("/reindex", async (c) => {
+  try {
+    await ensurePgVector();
+    let totalChunks = 0;
+    let embeddedChunks = 0;
+
+    if (typeof prisma.$queryRaw === "function") {
+      const stats = await prisma.$queryRaw<
+        Array<{ total_chunks: bigint | number; embedded_chunks: bigint | number }>
+      >`
+        SELECT 
+          COUNT(*)::int as total_chunks, 
+          COUNT("embedding")::int as embedded_chunks 
+        FROM "DocumentChunk"
+      `.catch(() => []);
+
+      if (stats && stats.length > 0) {
+        totalChunks = Number(stats[0].total_chunks || 0);
+        embeddedChunks = Number(stats[0].embedded_chunks || 0);
+      }
+    }
+
+    const totalDocs = await prisma.document.count().catch(() => 0);
+
+    return c.json({
+      success: true,
+      totalDocuments: totalDocs,
+      totalChunks,
+      embeddedChunks,
+    });
+  } catch (err: any) {
+    console.error("[REINDEX_STATS_ERROR]", err);
+    return c.json(
+      { success: false, error: err?.message || "Lỗi tải thống kê vector" },
+      500
+    );
+  }
+});
+
+documentsRoute.post("/reindex", async (c) => {
+  try {
+    const force = c.req.query("force") === "true";
+    const result = await ensurePgVectorAndSyncChunks(force);
+    return c.json({
+      success: true,
+      message: `Đã đồng bộ vector embedding cho ${result.syncedDocs}/${result.totalDocs} tài liệu (${result.totalChunks} chunks)`,
+      data: result,
+    });
+  } catch (err: any) {
+    console.error("[REINDEX_ERROR]", err);
+    return c.json(
+      { success: false, error: err?.message || "Lỗi reindex vector" },
+      500
+    );
+  }
+});
+
+// ----------------------------------------------------------------------------
+// 3. GET /api/documents/:id - Returns single document details
 // ----------------------------------------------------------------------------
 documentsRoute.get("/:id", async (c) => {
   try {
@@ -699,6 +775,30 @@ documentsRoute.put("/:id", authMiddleware, adminMiddleware, async (c) => {
 // ----------------------------------------------------------------------------
 // 6. POST /api/documents/chat (or /api/chat) - Capy AI grounded chat
 // ----------------------------------------------------------------------------
+export function cleanAiOutputForHumans(text: string): string {
+  if (!text) return "";
+  let cleaned = text;
+
+  // 1. Convert LaTeX math symbols to natural unicode symbols
+  cleaned = cleaned
+    .replace(/\\ge\b|\\geq\b/g, "≥")
+    .replace(/\\le\b|\\leq\b/g, "≤")
+    .replace(/\\times\b/g, "×")
+    .replace(/\\div\b/g, "÷")
+    .replace(/\\pm\b/g, "±")
+    .replace(/\\approx\b/g, "≈")
+    .replace(/\\neq\b/g, "≠");
+
+  // 2. Remove LaTeX math delimiters: $\ge 4$ -> ≥ 4, $$...$$ or $...$
+  cleaned = cleaned.replace(/\$\$([^$]+)\$\$/g, "$1");
+  cleaned = cleaned.replace(/\$([^$\n]+)\$/g, "$1");
+
+  // 3. Remove leftover backslashes before math characters
+  cleaned = cleaned.replace(/\\([><=+\-*\/])/g, "$1");
+
+  return cleaned.trim();
+}
+
 export const handleCapyChat = async (c: any) => {
   try {
     const body = await c.req.json().catch(() => ({}));
@@ -826,8 +926,11 @@ QUY TẮC BẮT BUỘC (100% STRICT RAG):
 1. NGUỒN THÔNG TIN DUY NHẤT:
    - Bạn CHỈ ĐƯỢC PHÉP trả lời dựa trên nội dung trong mục "TÀI LIỆU NỘI BỘ THAM KHẢO" bên dưới.
    - CẤM TUYỆT ĐỐI tự sáng tạo, suy diễn, phỏng đoán, bịa thêm quy định, chính sách, số liệu, địa chỉ hoặc bất kỳ thông tin nào không nằm trong TÀI LIỆU NỘI BỘ THAM KHẢO.
-2. TRẢ LỜI ĐẦY ĐỦ, CHI TIẾT TỪNG BƯỚC:
-   - Khi thông tin CÓ trong tài liệu tham khảo: Trình bày đầy đủ, chi tiết từng bước, giữ nguyên bảng biểu, định mức, quy định, mốc thời gian, số tiền và mẫu câu chuẩn có trong tài liệu.
+2. TRÌNH BÀY RÕ RÀNG, DỄ ĐỌC TRÊN ĐIỆN THOẠI DI ĐỘNG:
+   - Trình bày câu trả lời rõ ràng, thoáng đãng, chia thành các mục ngắn gọn có icon hoặc số thứ tự đầu dòng (ví dụ: 1️⃣, 2️⃣, 📌, 💬, •).
+   - TUYỆT ĐỐI KHÔNG dùng công thức toán học LaTeX ($...$, \\ge, \\times, \\le) — hãy viết bằng tiếng Việt tự nhiên hoặc ký hiệu phổ thông (≥, ≤, ×, ÷).
+   - Tránh dùng bảng Markdown phức tạp (|---|---|) gây tràn màn hình điện thoại, hãy chuyển sang dạng danh sách các gạch đầu dòng phân cấp rõ ràng, dễ nhìn.
+   - Khi thông tin CÓ trong tài liệu tham khảo: Trình bày đầy đủ, chi tiết từng bước, giữ nguyên định mức, quy định, mốc thời gian, số tiền và mẫu câu chuẩn có trong tài liệu.
    - Tuyệt đối không tóm tắt cụt lủn và TUYỆT ĐỐI KHÔNG ghi câu dạng "xem chi tiết ở tab Kho tài liệu" hay "tra cứu cẩm nang".
 3. KHI KHÔNG CÓ THÔNG TIN TRONG TÀI LIỆU:
    - Nếu câu hỏi của người dùng hoàn toàn KHÔNG CÓ thông tin hoặc không thể trả lời dựa trên TÀI LIỆU NỘI BỘ THAM KHẢO, bạn BẮT BUỘC trả lời chính xác câu sau:
@@ -839,7 +942,8 @@ TÀI LIỆU NỘI BỘ THAM KHẢO:
 ${relevantContext}`;
 
         const prompt = `Câu hỏi của người dùng: ${userQuery}`;
-        const replyText = await generateWithGeminiFallback(genAI, systemInstruction, prompt);
+        const rawReply = await generateWithGeminiFallback(genAI, systemInstruction, prompt);
+        const replyText = cleanAiOutputForHumans(rawReply);
 
         return c.json({
           success: true,
@@ -852,7 +956,8 @@ ${relevantContext}`;
     }
 
     // Deterministic fallback answer when Gemini is not configured or all models fail
-    const fallbackAnswer = buildDeterministicFallback(userQuery, relevantContext);
+    const fallbackRaw = buildDeterministicFallback(userQuery, relevantContext);
+    const fallbackAnswer = cleanAiOutputForHumans(fallbackRaw);
 
     return c.json({
       success: true,
@@ -870,23 +975,4 @@ ${relevantContext}`;
 
 documentsRoute.post("/chat", handleCapyChat);
 
-// ----------------------------------------------------------------------------
-// 7. POST /api/documents/reindex - Reindex embeddings for all documents
-// ----------------------------------------------------------------------------
-documentsRoute.post("/reindex", async (c) => {
-  try {
-    const force = c.req.query("force") === "true";
-    const result = await ensurePgVectorAndSyncChunks(force || true);
-    return c.json({
-      success: true,
-      message: `Đã đồng bộ vector embedding cho ${result.syncedDocs}/${result.totalDocs} tài liệu (${result.totalChunks} chunks)`,
-      data: result,
-    });
-  } catch (err: any) {
-    console.error("[REINDEX_ERROR]", err);
-    return c.json(
-      { success: false, error: err?.message || "Lỗi reindex vector" },
-      500
-    );
-  }
-});
+

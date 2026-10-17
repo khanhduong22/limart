@@ -221,6 +221,15 @@ describe("Check-In & Staff Home Data Cache Concurrency & Idempotency", () => {
       expect(cacheControl).toBe("no-store, no-cache, must-revalidate");
       expect(res.headers.get("ETag")).toBeNull();
     });
+
+    it("returns Cache-Control: no-store, no-cache, must-revalidate and no ETag header on GET /api/ip-status", async () => {
+      const res = await app.request("/api/ip-status");
+
+      expect(res.status).toBe(200);
+      const cacheControl = res.headers.get("Cache-Control");
+      expect(cacheControl).toBe("no-store, no-cache, must-revalidate");
+      expect(res.headers.get("ETag")).toBeNull();
+    });
   });
 
   describe("3. Idempotent Double-Tap Protection (15-second window)", () => {

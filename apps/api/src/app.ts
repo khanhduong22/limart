@@ -102,7 +102,8 @@ export function createApp() {
     const path = c.req.path;
     const isRealtimeRoute =
       path.startsWith("/api/staff/") ||
-      path.startsWith("/api/checkins");
+      path.startsWith("/api/checkins") ||
+      path.startsWith("/api/ip-status");
 
     if (isRealtimeRoute) {
       c.header("Cache-Control", "no-store, no-cache, must-revalidate");

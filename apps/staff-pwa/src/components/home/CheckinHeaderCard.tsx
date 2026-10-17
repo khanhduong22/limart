@@ -43,7 +43,14 @@ export const CheckinHeaderCard: React.FC<CheckinHeaderCardProps> = ({
     return () => clearInterval(interval);
   }, []);
 
-  const lastCheckin = todayCheckins.length > 0 ? todayCheckins[todayCheckins.length - 1] : null;
+  const lastCheckin =
+    todayCheckins.length > 0
+      ? todayCheckins.reduce((latest, item) =>
+          new Date(item.timestamp).getTime() >= new Date(latest.timestamp).getTime()
+            ? item
+            : latest
+        )
+      : null;
   const isWorking = lastCheckin?.type === "checkin";
 
   const formatShiftTime = (iso?: string) => {

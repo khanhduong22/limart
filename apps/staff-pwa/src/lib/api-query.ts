@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useQuery, type UseQueryOptions } from "@tanstack/react-query";
 import { fetcher } from "./api-client";
 import { queryClient } from "./queryClient";
@@ -26,14 +27,26 @@ export function useAppQuery<T = any>(
   } = rawOptions;
 
   const isEnabled = Boolean(url) && (optionEnabled !== undefined ? optionEnabled : true);
+  const queryKey = [url];
 
   const query = useQuery<T, any, T>({
-    queryKey: [url],
+    queryKey,
     queryFn: () => fetcher<T>(url!),
     enabled: isEnabled,
     ...(revalidateOnFocus !== undefined ? { refetchOnWindowFocus: revalidateOnFocus } : {}),
     ...restOptions,
   });
+
+  const mutate = useCallback(
+    async (optimisticData?: T | ((current: T | undefined) => T | undefined)) => {
+      if (!url) return;
+      if (optimisticData !== undefined) {
+        queryClient.setQueryData(queryKey, optimisticData as any);
+      }
+      await queryClient.invalidateQueries({ queryKey });
+    },
+    [url, queryKey]
+  );
 
   return {
     data: query.data,
@@ -41,7 +54,7 @@ export function useAppQuery<T = any>(
     isLoading: query.isLoading,
     isFetching: query.isFetching,
     refetch: query.refetch,
-    mutate: () => (url ? queryClient.invalidateQueries({ queryKey: [url] }) : Promise.resolve()),
+    mutate,
   };
 }
 

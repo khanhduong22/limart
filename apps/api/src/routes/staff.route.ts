@@ -37,6 +37,8 @@ export async function ensureAnnouncementReadTable(): Promise<void> {
 
 // GET /api/staff/home-data
 staffRoute.get("/home-data", authMiddleware, async (c) => {
+  c.header("Cache-Control", "no-store, no-cache, must-revalidate");
+  c.header("Pragma", "no-cache");
   try {
     const tokenPayload = c.get("user");
     const callerUserId = tokenPayload.sub;
@@ -44,7 +46,10 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
     const isViewAsMode = Boolean(tokenPayload.role === "ADMIN" && viewAsUserId);
     const userId = isViewAsMode ? viewAsUserId! : callerUserId;
 
-    const { startOfDay, endOfDay, dateStr } = getVietnamDayRange();
+    const now = new Date();
+    const vnDateStr = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ho_Chi_Minh" }).format(now);
+    const { startOfDay, endOfDay } = getVietnamDayRange(now);
+    const dateStr = vnDateStr;
     const cacheKey = `staff:home:${userId}:${dateStr}`;
 
     const cachedData = await getOrSetCache(cacheKey, 60, async () => {
@@ -99,7 +104,7 @@ staffRoute.get("/home-data", authMiddleware, async (c) => {
             userId,
             timestamp: { gte: startOfDay, lte: endOfDay },
           },
-          orderBy: { timestamp: "desc" },
+          orderBy: { timestamp: "asc" },
         }),
         prisma.announcement.findMany({
           where: { active: true },

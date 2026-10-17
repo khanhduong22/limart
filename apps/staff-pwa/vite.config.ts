@@ -100,11 +100,17 @@ export default defineConfig(({ mode }) => ({
             }
           },
           {
-            // NetworkFirst cho API endpoints với timeout fallback (chỉ staff endpoints, không cache /api/admin/*)
+            // NetworkOnly cho live checkin, home-data, và ip-status: tuyệt đối không để SW trả cache cũ
             urlPattern: ({ url }) =>
-              url.pathname.startsWith("/api/staff/") ||
-              url.pathname === "/api/checkins/today" ||
+              url.pathname === "/api/staff/home-data" ||
+              url.pathname.startsWith("/api/checkins") ||
               url.pathname === "/api/ip-status",
+            handler: "NetworkOnly",
+          },
+          {
+            // NetworkFirst cho các API staff còn lại (lịch làm, nhiệm vụ, báo cáo...)
+            urlPattern: ({ url }) =>
+              url.pathname.startsWith("/api/staff/"),
             handler: "NetworkFirst",
             options: {
               cacheName: "limart-v2-api-cache",

@@ -59,8 +59,28 @@ export const HomeCheckinView: React.FC = () => {
     activeUsers,
   } = homeData;
 
-  const handleCheckinSuccess = () => {
-    mutate();
+  const handleCheckinSuccess = (newCheckin?: any) => {
+    if (newCheckin) {
+      mutate((prev: { success: boolean; data: StaffHomeData } | undefined) => {
+        if (!prev || !prev.data) return prev;
+        const existing = Array.isArray(prev.data.todayCheckins)
+          ? prev.data.todayCheckins
+          : [];
+        const updated = existing.some((c: any) => c.id === newCheckin.id)
+          ? existing
+          : [...existing, newCheckin];
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            todayCheckins: updated,
+            hasCheckedInToday: true,
+          },
+        };
+      });
+    } else {
+      mutate();
+    }
   };
 
   return (

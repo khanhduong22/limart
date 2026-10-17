@@ -50,6 +50,11 @@ export function setRedisClient(client: Redis | null) {
 }
 
 export const inFlightPromises = new Map<string, Promise<any>>();
+export let cacheMutationEpoch = 0;
+
+export function resetCacheMutationEpoch(): void {
+  cacheMutationEpoch = 0;
+}
 
 export interface CacheOptions {
   disableJitter?: boolean;
@@ -97,26 +102,34 @@ export async function getOrSetCache<T>(
     return inFlightPromises.get(scopedKey) as Promise<T>;
   }
 
-  // Create deduplicated in-flight fetch promise
-  const fetchPromise = (async () => {
+  // Create deduplicated in-flight fetch promise with Epoch-Guarded SingleFlight
+  let fetchPromise!: Promise<T>;
+  fetchPromise = (async () => {
     try {
+      const startEpoch = cacheMutationEpoch;
       const data = await fetcher();
 
-      if (client && data !== undefined && data !== null) {
-        try {
-          const baseTTL = typeof ttlSeconds === "function" ? ttlSeconds(data) : ttlSeconds;
-          const actualTTL = options?.disableJitter
-            ? baseTTL
-            : getJitteredTTL(baseTTL, options?.jitterRatio ?? 0.15);
-          await client.setex(scopedKey, actualTTL, JSON.stringify(data));
-        } catch {
-          // Ignore cache write error
+      const writeClient = client || getRedisClient();
+      if (writeClient && data !== undefined && data !== null) {
+        // Only write to cache if no invalidation happened during fetch and this promise is still current
+        if (cacheMutationEpoch === startEpoch && inFlightPromises.get(scopedKey) === fetchPromise) {
+          try {
+            const baseTTL = typeof ttlSeconds === "function" ? ttlSeconds(data) : ttlSeconds;
+            const actualTTL = options?.disableJitter
+              ? baseTTL
+              : getJitteredTTL(baseTTL, options?.jitterRatio ?? 0.15);
+            await writeClient.setex(scopedKey, actualTTL, JSON.stringify(data));
+          } catch {
+            // Ignore cache write error
+          }
         }
       }
 
       return data;
     } finally {
-      inFlightPromises.delete(scopedKey);
+      if (inFlightPromises.get(scopedKey) === fetchPromise) {
+        inFlightPromises.delete(scopedKey);
+      }
     }
   })();
 
@@ -129,6 +142,9 @@ export async function getOrSetCache<T>(
  */
 export async function invalidateCache(key: string): Promise<void> {
   const scopedKey = resolveTenantCacheKey(key);
+  cacheMutationEpoch++;
+  inFlightPromises.delete(scopedKey);
+
   try {
     const client = getRedisClient();
     if (client) {
@@ -144,6 +160,27 @@ export async function invalidateCache(key: string): Promise<void> {
  */
 export async function invalidateCachePattern(pattern: string): Promise<void> {
   const scopedPattern = resolveTenantCacheKey(pattern);
+  cacheMutationEpoch++;
+
+  // Synchronously delete all matching keys from inFlightPromises before scanning Redis
+  const scopedEscaped = scopedPattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*")
+    .replace(/\?/g, ".");
+  const scopedRegex = new RegExp(`^${scopedEscaped}$`);
+
+  const rawEscaped = pattern
+    .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*")
+    .replace(/\?/g, ".");
+  const rawRegex = new RegExp(`^${rawEscaped}$`);
+
+  for (const inFlightKey of Array.from(inFlightPromises.keys())) {
+    if (scopedRegex.test(inFlightKey) || rawRegex.test(inFlightKey)) {
+      inFlightPromises.delete(inFlightKey);
+    }
+  }
+
   try {
     const client = getRedisClient();
     if (!client) {
@@ -162,23 +199,16 @@ export async function invalidateCachePattern(pattern: string): Promise<void> {
 
     await new Promise<void>((resolve, reject) => {
       const stream = (client as any).scanStream({ match: scopedPattern, count: 100 });
-      const pipelinePromises: Promise<unknown>[] = [];
+      const pendingDeletes: Promise<any>[] = [];
 
       stream.on("data", (keys: string[]) => {
         if (keys && keys.length > 0) {
-          const pipeline = client.pipeline();
-          pipeline.del(...keys);
-          pipelinePromises.push(pipeline.exec());
+          pendingDeletes.push(client.del(...keys));
         }
       });
 
-      stream.on("end", async () => {
-        try {
-          await Promise.all(pipelinePromises);
-          resolve();
-        } catch (err) {
-          reject(err);
-        }
+      stream.on("end", () => {
+        Promise.all(pendingDeletes).then(() => resolve()).catch(reject);
       });
 
       stream.on("error", (err: any) => {

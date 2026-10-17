@@ -96,7 +96,27 @@ export function createApp() {
   app.use("*", compress());
 
   // 7. ETag & HTTP Response Optimization (RFC 7232 304 Not Modified)
-  app.use("*", etag());
+  // Skip ETag and enforce no-store on real-time attendance routes to prevent stale 304 Not Modified
+  const etagMiddleware = etag();
+  app.use("*", async (c, next) => {
+    const path = c.req.path;
+    const isRealtimeRoute =
+      path.startsWith("/api/staff/") ||
+      path.startsWith("/api/checkins");
+
+    if (isRealtimeRoute) {
+      c.header("Cache-Control", "no-store, no-cache, must-revalidate");
+      c.header("Pragma", "no-cache");
+      await next();
+      if (c.res) {
+        c.res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
+        c.res.headers.set("Pragma", "no-cache");
+      }
+      return;
+    }
+
+    return etagMiddleware(c, next);
+  });
 
   // Global Error Handler
   app.onError((err, c) => {

@@ -7,6 +7,7 @@ import { enqueueCheckin, isNetworkOnline } from "./offline-queue";
 const HOME_CACHE_KEY = "limart_staff_home_data_cache";
 const PROFILE_CACHE_KEY = "limart_staff_profile_cache";
 const LOCAL_CHECKINS_KEY = "limart_staff_today_checkins";
+export const LOCAL_CHECKIN_LEDGER_KEY = "limart_recent_checkins_v1";
 
 const TOKEN_STORAGE_KEY = "limart_staff_jwt_token";
 
@@ -33,6 +34,7 @@ export function removeAuthToken() {
     localStorage.removeItem(PROFILE_CACHE_KEY);
     localStorage.removeItem(HOME_CACHE_KEY);
     localStorage.removeItem(LOCAL_CHECKINS_KEY);
+    localStorage.removeItem(LOCAL_CHECKIN_LEDGER_KEY);
   } catch {}
 }
 
@@ -60,6 +62,7 @@ export async function authFetch(url: string, init?: RequestInit): Promise<Respon
 
   const res = await fetch(url, {
     ...init,
+    cache: init?.cache ?? "no-store",
     headers,
     credentials: "include",
   });
@@ -69,6 +72,116 @@ export async function authFetch(url: string, init?: RequestInit): Promise<Respon
   }
 
   return res;
+}
+
+/**
+ * Record locally confirmed check-in to prevent stale network response from wiping it.
+ */
+export function recordConfirmedCheckin(checkin: any) {
+  try {
+    if (!checkin || typeof checkin !== "object" || !checkin.id) return;
+
+    // 1. Save into LOCAL_CHECKIN_LEDGER_KEY
+    let ledger: any[] = [];
+    try {
+      const raw = localStorage.getItem(LOCAL_CHECKIN_LEDGER_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) ledger = parsed;
+      }
+    } catch {}
+
+    const now = Date.now();
+    ledger = ledger.filter((item) => {
+      if (!item || !item.timestamp) return false;
+      const ts = new Date(item.timestamp).getTime();
+      return !isNaN(ts) && now - ts < 24 * 60 * 60 * 1000;
+    });
+
+    if (!ledger.some((item) => item.id === checkin.id)) {
+      ledger.push(checkin);
+    }
+    localStorage.setItem(LOCAL_CHECKIN_LEDGER_KEY, JSON.stringify(ledger));
+
+    // 2. Immediately update HOME_CACHE_KEY in localStorage
+    try {
+      const homeRaw = localStorage.getItem(HOME_CACHE_KEY);
+      if (homeRaw) {
+        const homeCached = JSON.parse(homeRaw);
+        if (homeCached && typeof homeCached === "object" && homeCached.data) {
+          const existingCheckins = Array.isArray(homeCached.data.todayCheckins)
+            ? homeCached.data.todayCheckins
+            : [];
+          if (!existingCheckins.some((c: any) => c.id === checkin.id)) {
+            homeCached.data.todayCheckins = [...existingCheckins, checkin];
+          }
+          homeCached.data.hasCheckedInToday = true;
+          localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(homeCached));
+        }
+      }
+    } catch {}
+
+    // 3. Purge legacy Service Worker cache
+    if (typeof caches !== "undefined") {
+      caches.delete("limart-v2-api-cache").catch(() => {});
+    }
+  } catch (err) {
+    console.warn("[api-client] Failed to record confirmed checkin:", err);
+  }
+}
+
+/**
+ * Merge confirmed check-ins from local ledger into homeData so stale network response never wipes them.
+ */
+export function mergeConfirmedCheckinsIntoHomeData(homeData: any): any {
+  if (!homeData || typeof homeData !== "object") return homeData;
+  try {
+    const rawLedger = localStorage.getItem(LOCAL_CHECKIN_LEDGER_KEY);
+    if (!rawLedger) return homeData;
+    const ledger = JSON.parse(rawLedger);
+    if (!Array.isArray(ledger) || ledger.length === 0) return homeData;
+
+    const now = Date.now();
+    const currentUserId = homeData.user?.id;
+    const existingCheckins: any[] = Array.isArray(homeData.todayCheckins)
+      ? [...homeData.todayCheckins]
+      : [];
+    let mergedCount = 0;
+
+    for (const record of ledger) {
+      if (!record || !record.id || !record.timestamp) continue;
+      const recordTime = new Date(record.timestamp).getTime();
+      if (isNaN(recordTime) || now - recordTime > 12 * 60 * 60 * 1000) continue;
+
+      if (record.userId && currentUserId && record.userId !== currentUserId) continue;
+
+      if (!existingCheckins.some((c) => c.id === record.id)) {
+        existingCheckins.push(record);
+        mergedCount++;
+      }
+    }
+
+    if (mergedCount > 0) {
+      existingCheckins.sort(
+        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+      homeData.todayCheckins = existingCheckins;
+      homeData.hasCheckedInToday = true;
+    }
+  } catch (err) {
+    console.warn("[api-client] Failed to merge confirmed checkins:", err);
+  }
+  return homeData;
+}
+
+/**
+ * Deterministically resolve the latest checkin by timestamp.
+ */
+export function getLatestCheckin(checkins: any[]): any | null {
+  if (!Array.isArray(checkins) || checkins.length === 0) return null;
+  return checkins.reduce((latest, item) =>
+    new Date(item.timestamp).getTime() >= new Date(latest.timestamp).getTime() ? item : latest
+  );
 }
 
 /**
@@ -85,6 +198,9 @@ export async function fetcher<T = any>(url: string): Promise<T> {
     if (res.ok) {
       const data = await res.json();
       if (url.includes("/api/staff/home-data")) {
+        if (data && typeof data === "object" && data.data) {
+          mergeConfirmedCheckinsIntoHomeData(data.data);
+        }
         try {
           if (data && typeof data === "object") {
             localStorage.setItem(HOME_CACHE_KEY, JSON.stringify(data));
@@ -102,6 +218,7 @@ export async function fetcher<T = any>(url: string): Promise<T> {
         try {
           const parsed = JSON.parse(cached);
           if (parsed && typeof parsed === "object" && parsed.data) {
+            mergeConfirmedCheckinsIntoHomeData(parsed.data);
             return parsed;
           }
           // Clean up corrupted or stale entry
@@ -112,7 +229,9 @@ export async function fetcher<T = any>(url: string): Promise<T> {
           } catch {}
         }
       }
-      return { success: true, data: DEFAULT_HOME_DATA } as any;
+      const fallback = { success: true, data: { ...DEFAULT_HOME_DATA } };
+      mergeConfirmedCheckinsIntoHomeData(fallback.data);
+      return fallback as any;
     }
     // Return empty array fallback for all other endpoints
     return { success: false, data: [] } as any;
@@ -287,6 +406,13 @@ export async function performCheckIn(
   const timestamp = new Date().toISOString();
 
   if (!online) {
+    const offlineRecord = {
+      id: `offline_${Date.now()}`,
+      userId,
+      type,
+      timestamp,
+      note,
+    };
     await enqueueCheckin({
       type,
       latitude: coords?.lat,
@@ -294,15 +420,11 @@ export async function performCheckIn(
       note: note?.trim() || undefined,
       clientTimestamp: timestamp,
     });
+    recordConfirmedCheckin(offlineRecord);
     return {
       success: true,
       message: `⚡ Đã lưu offline! Tự động đồng bộ khi có kết nối mạng.`,
-      data: {
-        id: `offline_${Date.now()}`,
-        type,
-        timestamp,
-        note,
-      },
+      data: offlineRecord,
     };
   }
 
@@ -326,10 +448,14 @@ export async function performCheckIn(
 
     if (res.ok) {
       const data = await res.json();
+      if (data?.success && data?.data) {
+        recordConfirmedCheckin(data.data);
+      }
       return {
         success: true,
         message: data.message || "Ghi nhận thành công!",
         data: data.data,
+        todayDuties: data.todayDuties,
       };
     } else {
       if (res.status === 401) {
@@ -347,6 +473,13 @@ export async function performCheckIn(
     }
   } catch (error) {
     // Network failure -> Save to offline queue
+    const offlineRecord = {
+      id: `offline_${Date.now()}`,
+      userId,
+      type,
+      timestamp,
+      note,
+    };
     await enqueueCheckin({
       type,
       latitude: coords?.lat,
@@ -354,9 +487,11 @@ export async function performCheckIn(
       note: note?.trim() || undefined,
       clientTimestamp: timestamp,
     });
+    recordConfirmedCheckin(offlineRecord);
     return {
       success: true,
       message: `⚡ Đã lưu ngoại tuyến do mạng bận. Sẽ tự động đồng bộ khi kết nối ổn định.`,
+      data: offlineRecord,
     };
   }
 }

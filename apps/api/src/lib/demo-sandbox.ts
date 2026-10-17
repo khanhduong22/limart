@@ -547,11 +547,33 @@ export interface SeedDemoOptions {
   sourcePrismaClient?: any;
 }
 
+let demoSeedMutex: Promise<unknown> = Promise.resolve();
+
+export function _resetDemoSeedMutex(): void {
+  demoSeedMutex = Promise.resolve();
+}
+
 /**
  * Clones from SOURCE_DATABASE_URL (if configured) or seeds rich fallback data,
  * scrubbing all PII and randomizing staff names & salaries.
+ * All calls are strictly serialized via demoSeedMutex to prevent concurrent execution races.
  */
 export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Promise<{
+  skipped: boolean;
+  usersSeeded: number;
+  shiftsSeeded: number;
+  checkinsSeeded: number;
+  payslipsSeeded: number;
+  documentsSeeded: number;
+  auditLogsSeeded: number;
+}> {
+  const run = () => _executeSeedAndSanitizeDemoDatabase(options);
+  const nextPromise = demoSeedMutex.then(run, run);
+  demoSeedMutex = nextPromise.catch(() => {});
+  return nextPromise;
+}
+
+async function _executeSeedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Promise<{
   skipped: boolean;
   usersSeeded: number;
   shiftsSeeded: number;
@@ -997,24 +1019,33 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   await safeExec(() => targetPrisma.user?.deleteMany?.({}));
 
   // 1. Insert Users
+  const seededUserIds = new Set<string>();
   for (const u of sanitizedUsers) {
-    await targetPrisma.user.create({
-      data: {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        image: u.image,
-        role: u.role,
-        isActive: u.isActive,
-        luckyWheelAllowed: u.luckyWheelAllowed,
-        staffTasksAllowed: u.staffTasksAllowed,
-        employmentType: u.employmentType,
-        hourlyRate: u.hourlyRate,
-        monthlySalary: u.monthlySalary,
-        birthday: u.birthday,
-        startDate: u.startDate,
-      },
-    });
+    try {
+      const createdUser = await targetPrisma.user.create({
+        data: {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          image: u.image,
+          role: u.role,
+          isActive: u.isActive,
+          luckyWheelAllowed: u.luckyWheelAllowed,
+          staffTasksAllowed: u.staffTasksAllowed,
+          employmentType: u.employmentType,
+          hourlyRate: u.hourlyRate,
+          monthlySalary: u.monthlySalary,
+          birthday: u.birthday,
+          startDate: u.startDate,
+        },
+      });
+      seededUserIds.add(createdUser?.id || u.id);
+    } catch {
+      const existing = await targetPrisma.user?.findUnique?.({ where: { id: u.id } }).catch(() => null);
+      if (existing?.id) {
+        seededUserIds.add(existing.id);
+      }
+    }
   }
 
   // 2. Insert AllowedIP (Public Demo Mode + Store WiFi)
@@ -1115,7 +1146,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
 
   for (const ti of sourceData.taskItems) {
     if (!taskDefRewardMap.has(ti.taskDefId)) continue;
-    const validAssignee = ti.assigneeId && userMapById.has(ti.assigneeId) ? ti.assigneeId : null;
+    const validAssignee = ti.assigneeId && seededUserIds.has(ti.assigneeId) ? ti.assigneeId : null;
     await safeExec(() =>
       targetPrisma.taskItem?.create?.({
         data: {
@@ -1146,7 +1177,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
         }));
 
   for (const ut of userTasksToSeed) {
-    if (!userMapById.has(ut.userId) || !taskDefRewardMap.has(ut.taskDefId)) continue;
+    if (!seededUserIds.has(ut.userId) || !taskDefRewardMap.has(ut.taskDefId)) continue;
     const unitPrice = taskDefRewardMap.get(ut.taskDefId) || 1500;
     const quantity = Math.max(1, Number(ut.quantity) || 1);
     const bonusPenalty = Number(ut.bonusPenalty) || 0;
@@ -1242,7 +1273,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   }
 
   for (const h of sourceData.wheelHistory) {
-    if (!userMapById.has(h.userId)) continue;
+    if (!seededUserIds.has(h.userId)) continue;
     await safeExec(() =>
       targetPrisma.luckyWheelHistory?.create?.({
         data: {
@@ -1257,7 +1288,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   }
 
   for (const ach of sourceData.achievements) {
-    if (!userMapById.has(ach.userId)) continue;
+    if (!seededUserIds.has(ach.userId)) continue;
     await safeExec(() =>
       targetPrisma.userAchievement?.create?.({
         data: {
@@ -1277,9 +1308,10 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   let shiftsSeededCount = 0;
   let checkinsSeededCount = 0;
   const shiftIdMap = new Map<number, number>();
+  const seededShiftIds = new Set<number>();
 
   for (const s of sourceData.shifts) {
-    if (!userMapById.has(s.userId)) continue;
+    if (!seededUserIds.has(s.userId)) continue;
     try {
       const createdShift = await targetPrisma.workShift.create({
         data: {
@@ -1292,8 +1324,12 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           isSenior: Boolean(s.isSenior),
         },
       });
-      if (s.id && createdShift?.id) {
-        shiftIdMap.set(s.id, createdShift.id);
+      const newShiftId = createdShift?.id ?? (typeof s.id === "number" ? s.id : undefined);
+      if (newShiftId !== undefined) {
+        seededShiftIds.add(newShiftId);
+        if (s.id) {
+          shiftIdMap.set(s.id, newShiftId);
+        }
       }
       shiftsSeededCount++;
     } catch {
@@ -1319,10 +1355,10 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
 
   for (let i = 0; i < todayStaffPool.length; i++) {
     const staffMember = todayStaffPool[i];
-    if (!staffMember) continue;
+    if (!staffMember || !seededUserIds.has(staffMember.id)) continue;
     const isMorning = i % 2 === 0;
     try {
-      await targetPrisma.workShift.create({
+      const createdShift = await targetPrisma.workShift.create({
         data: {
           userId: staffMember.id,
           start: isMorning ? todayMorningStart : todayAfternoonStart,
@@ -1333,6 +1369,9 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           isSenior: i === 0,
         },
       });
+      if (createdShift?.id) {
+        seededShiftIds.add(createdShift.id);
+      }
       shiftsSeededCount++;
     } catch {
       // Ignore
@@ -1341,7 +1380,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
 
   // Copy source CheckIns with scrubbed IP and notes
   for (const ck of sourceData.checkins) {
-    if (!userMapById.has(ck.userId)) continue;
+    if (!seededUserIds.has(ck.userId)) continue;
     try {
       await targetPrisma.checkIn.create({
         data: {
@@ -1361,7 +1400,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   // Ensure TODAY has live check-ins so Admin Dashboard is lively immediately
   for (let i = 0; i < Math.min(3, todayStaffPool.length); i++) {
     const staffMember = todayStaffPool[i];
-    if (!staffMember) continue;
+    if (!staffMember || !seededUserIds.has(staffMember.id)) continue;
     const checkinTime = new Date(todayMorningStart.getTime() - (5 - i * 2) * 60 * 1000);
     try {
       await targetPrisma.checkIn.create({
@@ -1381,14 +1420,28 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
 
   // 7. ShiftDuties, ManagerTasks, StaffTasks, Checklists, WeeklyTasks
   for (const sd of sourceData.shiftDuties) {
-    if (!userMapById.has(sd.userId)) continue;
-    const creatorId = userMapById.has(sd.createdById) ? sd.createdById : adminUser.id;
-    const mappedShiftId = sd.shiftId && shiftIdMap.has(sd.shiftId) ? shiftIdMap.get(sd.shiftId) : null;
+    if (!seededUserIds.has(sd.userId)) continue;
+    const creatorId = seededUserIds.has(sd.createdById)
+      ? sd.createdById
+      : (seededUserIds.has(adminUser.id) ? adminUser.id : sd.userId);
+
+    let mappedShiftId: number | null = null;
+    if (sd.shiftId) {
+      if (shiftIdMap.has(sd.shiftId)) {
+        const candidate = shiftIdMap.get(sd.shiftId)!;
+        if (seededShiftIds.has(candidate)) {
+          mappedShiftId = candidate;
+        }
+      } else if (seededShiftIds.has(sd.shiftId)) {
+        mappedShiftId = sd.shiftId;
+      }
+    }
+
     await safeExec(() =>
       targetPrisma.shiftDuty?.create?.({
         data: {
           id: sd.id,
-          shiftId: mappedShiftId ?? null,
+          shiftId: mappedShiftId,
           userId: sd.userId,
           createdById: creatorId,
           date: new Date(sd.date),
@@ -1428,8 +1481,12 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
         ];
 
   for (const mt of managerTasksToSeed) {
-    const creatorId = userMapById.has(mt.createdById) ? mt.createdById : adminUser.id;
-    const assigneeId = mt.assigneeId && userMapById.has(mt.assigneeId) ? mt.assigneeId : partnerUser.id;
+    const creatorId = seededUserIds.has(mt.createdById)
+      ? mt.createdById
+      : (seededUserIds.has(adminUser.id) ? adminUser.id : partnerUser.id);
+    const assigneeId = mt.assigneeId && seededUserIds.has(mt.assigneeId)
+      ? mt.assigneeId
+      : (seededUserIds.has(partnerUser.id) ? partnerUser.id : creatorId);
     await safeExec(() =>
       targetPrisma.managerTask?.create?.({
         data: {
@@ -1466,8 +1523,12 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
         ];
 
   for (const st of staffTasksToSeed) {
-    const assigneeId = userMapById.has(st.assigneeId) ? st.assigneeId : defaultStaffUser.id;
-    const creatorId = userMapById.has(st.createdById) ? st.createdById : partnerUser.id;
+    const assigneeId = seededUserIds.has(st.assigneeId)
+      ? st.assigneeId
+      : (seededUserIds.has(defaultStaffUser.id) ? defaultStaffUser.id : partnerUser.id);
+    const creatorId = seededUserIds.has(st.createdById)
+      ? st.createdById
+      : (seededUserIds.has(partnerUser.id) ? partnerUser.id : adminUser.id);
     await safeExec(() =>
       targetPrisma.staffTask?.create?.({
         data: {
@@ -1493,7 +1554,9 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
 
   const validChecklistIds = new Set<string>();
   for (const ct of sourceData.checklistTasks) {
-    const assigneeId = userMapById.has(ct.assigneeId) ? ct.assigneeId : partnerUser.id;
+    const assigneeId = ct.assigneeId && seededUserIds.has(ct.assigneeId)
+      ? ct.assigneeId
+      : (seededUserIds.has(partnerUser.id) ? partnerUser.id : adminUser.id);
     validChecklistIds.add(ct.id);
     await safeExec(() =>
       targetPrisma.managerChecklistTask?.create?.({
@@ -1526,7 +1589,9 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   }
 
   for (const wt of sourceData.weeklyTasks) {
-    const assigneeId = userMapById.has(wt.assigneeId) ? wt.assigneeId : partnerUser.id;
+    const assigneeId = wt.assigneeId && seededUserIds.has(wt.assigneeId)
+      ? wt.assigneeId
+      : (seededUserIds.has(partnerUser.id) ? partnerUser.id : adminUser.id);
     await safeExec(() =>
       targetPrisma.managerWeeklyTask?.create?.({
         data: {
@@ -1627,7 +1692,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
 
   for (let i = 0; i < requestsToSeed.length; i++) {
     const reqItem = requestsToSeed[i];
-    if (!userMapById.has(reqItem.userId)) continue;
+    if (!seededUserIds.has(reqItem.userId)) continue;
     await safeExec(() =>
       targetPrisma.request?.create?.({
         data: {
@@ -1669,7 +1734,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
 
   for (let i = 0; i < adjustmentsToSeed.length; i++) {
     const adj = adjustmentsToSeed[i];
-    if (!userMapById.has(adj.userId)) continue;
+    if (!seededUserIds.has(adj.userId)) continue;
     await safeExec(() =>
       targetPrisma.payrollAdjustment?.create?.({
         data: {
@@ -1723,6 +1788,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
         }));
 
   for (const ps of payslipsToSeed) {
+    if (!seededUserIds.has(ps.userId)) continue;
     const demoUser = userMapById.get(ps.userId);
     if (!demoUser) continue;
 
@@ -1753,7 +1819,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     adminUser,
     partnerUser,
     ...activeStaffUsers.slice(0, 5),
-  ].filter(Boolean);
+  ].filter((u) => u && seededUserIds.has(u.id));
 
   const trustedIps = ["103.199.18.88", "118.69.72.14", "14.161.22.105", "27.72.88.19"];
   const cities = ["TP. Hồ Chí Minh", "Hà Nội", "Đà Nẵng"];

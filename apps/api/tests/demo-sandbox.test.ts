@@ -15,6 +15,8 @@ const {
   mockCheckInCreate,
   mockDocumentCreate,
   mockSessionAuditLogCreate,
+  mockShiftDutyCreate,
+  mockPayrollAdjustmentCreate,
 } = vi.hoisted(() => ({
   mockUserCount: vi.fn(),
   mockUserFindUnique: vi.fn(),
@@ -30,6 +32,8 @@ const {
   mockCheckInCreate: vi.fn(),
   mockDocumentCreate: vi.fn(),
   mockSessionAuditLogCreate: vi.fn(),
+  mockShiftDutyCreate: vi.fn(),
+  mockPayrollAdjustmentCreate: vi.fn(),
 }));
 
 vi.mock("@checkin/db", () => ({
@@ -65,7 +69,7 @@ vi.mock("@checkin/db", () => ({
       create: mockCheckInCreate,
       deleteMany: vi.fn().mockResolvedValue({}),
     },
-    shiftDuty: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
+    shiftDuty: { create: mockShiftDutyCreate, deleteMany: vi.fn().mockResolvedValue({}) },
     shiftAuditLog: { deleteMany: vi.fn().mockResolvedValue({}) },
     managerTask: {
       create: vi.fn().mockResolvedValue({}),
@@ -86,7 +90,7 @@ vi.mock("@checkin/db", () => ({
     documentChunk: { deleteMany: vi.fn().mockResolvedValue({}) },
     request: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
     payrollPeriod: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
-    payrollAdjustment: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({}) },
+    payrollAdjustment: { create: mockPayrollAdjustmentCreate, deleteMany: vi.fn().mockResolvedValue({}) },
     payslip: {
       create: mockPayslipCreate,
       deleteMany: vi.fn().mockResolvedValue({}),
@@ -138,6 +142,8 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
     mockAllowedIPCreate.mockImplementation(async ({ data }) => ({ id: 1, ...data }));
     mockDocumentCreate.mockImplementation(async ({ data }) => data);
     mockSessionAuditLogCreate.mockImplementation(async ({ data }) => data);
+    mockShiftDutyCreate.mockImplementation(async ({ data }) => ({ id: "sd-1", ...data }));
+    mockPayrollAdjustmentCreate.mockImplementation(async ({ data }) => ({ id: "padj-1", ...data }));
   });
 
   afterEach(() => {
@@ -458,6 +464,140 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
         expect(log.details?.requestId).toBeTruthy();
         expect(log.details?.note).toBeTruthy();
       }
+    });
+
+    it("serializes concurrent calls via mutex so they execute strictly one after another without races", async () => {
+      process.env.DEMO_SANDBOX_MODE = "true";
+
+      const executionOrder: string[] = [];
+      const originalUserCreate = mockUserCreate.getMockImplementation();
+      mockUserCreate.mockImplementation(async (args) => {
+        await new Promise((r) => setTimeout(r, 5));
+        return originalUserCreate ? originalUserCreate(args) : args.data;
+      });
+
+      const p1 = seedAndSanitizeDemoDatabase({ force: true }).then((res) => {
+        executionOrder.push("call1");
+        return res;
+      });
+      const p2 = seedAndSanitizeDemoDatabase({ force: true }).then((res) => {
+        executionOrder.push("call2");
+        return res;
+      });
+
+      const [res1, res2] = await Promise.all([p1, p2]);
+      expect(res1.skipped).toBe(false);
+      expect(res2.skipped).toBe(false);
+      expect(executionOrder).toEqual(["call1", "call2"]);
+    });
+
+    it("sanitizes ShiftDuty and user-linked records to prevent FK constraint violations when references are unseeded", async () => {
+      process.env.DEMO_SANDBOX_MODE = "true";
+
+      const mockSourcePrisma = {
+        user: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              id: "src-admin",
+              name: "Chủ Shop Thật",
+              email: "realowner@gmail.com",
+              role: "ADMIN",
+              employmentType: "FULL_TIME",
+              hourlyRate: 0,
+              monthlySalary: 30000000,
+              isActive: true,
+            },
+          ]),
+        },
+        workShift: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              id: 101,
+              userId: "src-admin",
+              start: new Date(),
+              end: new Date(Date.now() + 4 * 3600 * 1000),
+              shiftType: "Ca Sáng",
+              status: "APPROVED",
+            },
+          ]),
+        },
+        shiftDuty: {
+          findMany: vi.fn().mockResolvedValue([
+            // Duty 1: References valid shift 101
+            {
+              id: "sd-valid",
+              shiftId: 101,
+              userId: "src-admin",
+              createdById: "src-admin",
+              date: new Date(),
+              title: "Ca sáng hợp lệ",
+              isCompleted: false,
+            },
+            // Duty 2: References non-existent shift 9999
+            {
+              id: "sd-orphan-shift",
+              shiftId: 9999,
+              userId: "src-admin",
+              createdById: "src-admin",
+              date: new Date(),
+              title: "Ca mồ côi shift",
+              isCompleted: false,
+            },
+            // Duty 3: References non-existent user "unknown-user"
+            {
+              id: "sd-orphan-user",
+              shiftId: 101,
+              userId: "unknown-user",
+              createdById: "src-admin",
+              date: new Date(),
+              title: "Ca mồ côi user",
+              isCompleted: false,
+            },
+          ]),
+        },
+        checkIn: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              userId: "unknown-user",
+              type: "checkin",
+              timestamp: new Date(),
+            },
+          ]),
+        },
+        payrollAdjustment: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              id: "padj-orphan",
+              userId: "unknown-user",
+              date: new Date(),
+            },
+          ]),
+        },
+      };
+
+      await seedAndSanitizeDemoDatabase({
+        force: true,
+        sourcePrismaClient: mockSourcePrisma,
+      });
+
+      // Verify ShiftDuty records
+      const dutyCalls = mockShiftDutyCreate.mock.calls.map((c) => c[0].data);
+      expect(dutyCalls.length).toBe(2); // Duty 3 with unknown user must be skipped
+
+      const validDuty = dutyCalls.find((d) => d.id === "sd-valid");
+      expect(validDuty).toBeDefined();
+      expect(typeof validDuty.shiftId).toBe("number");
+
+      const orphanShiftDuty = dutyCalls.find((d) => d.id === "sd-orphan-shift");
+      expect(orphanShiftDuty).toBeDefined();
+      expect(orphanShiftDuty.shiftId).toBeNull(); // Orphan shiftId must be converted to null
+
+      // Verify orphan CheckIn & PayrollAdjustment were skipped
+      const checkinCalls = mockCheckInCreate.mock.calls.map((c) => c[0].data);
+      expect(checkinCalls.some((ck) => ck.userId === "unknown-user")).toBe(false);
+
+      const adjCalls = mockPayrollAdjustmentCreate.mock.calls.map((c) => c[0].data);
+      expect(adjCalls.some((a) => a.userId === "unknown-user")).toBe(false);
     });
   });
 

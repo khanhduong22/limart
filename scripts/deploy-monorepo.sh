@@ -238,7 +238,9 @@ deploy_dual_run() {
     docker exec limart-db psql -U kido -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'checkin_demo_db'" | grep -q 1 || \
         docker exec limart-db psql -U kido -d postgres -c "CREATE DATABASE checkin_demo_db;"
     docker exec limart-db psql -U kido -d checkin_demo_db -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1 || true
-    docker exec limart-db sh -c "pg_dump -U kido --schema-only --no-owner --no-privileges checkin_db | psql -U kido -d checkin_demo_db >/dev/null 2>&1 || true"
+    if ! docker exec limart-db psql -U kido -d checkin_demo_db -tc "SELECT to_regclass('public.\"User\"')" | grep -q "User"; then
+        docker exec limart-db sh -c "pg_dump -U kido --schema-only --no-owner --no-privileges checkin_db | psql -U kido -d checkin_demo_db >/dev/null 2>&1 || true"
+    fi
     for DB_TARGET in checkin_db checkin_demo_db; do
         docker exec limart-db psql -U kido -d "$DB_TARGET" -c '
           CREATE TABLE IF NOT EXISTS "Tenant" (

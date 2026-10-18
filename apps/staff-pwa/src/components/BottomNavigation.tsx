@@ -48,7 +48,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
         className={`w-full mx-auto pointer-events-auto bg-[#faf6f0]/95 backdrop-blur-md border-t border-orange-100/90 shadow-lg transition-all duration-200 ${
           isWide || isPartner
             ? "max-w-4xl lg:max-w-5xl xl:max-w-6xl max-w-full md:border-x md:rounded-t-2xl px-2 md:px-4"
-            : "max-w-md max-w-full"
+            : "w-full max-w-full md:max-w-md"
         }`}
       >
         <div className={`grid ${gridColsClass} h-14 md:h-16 items-center px-1`}>

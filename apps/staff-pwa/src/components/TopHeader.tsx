@@ -21,7 +21,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-slate-800/80 pt-safe px-4 py-3 select-none">
-      <div className="max-w-md mx-auto flex items-center justify-between gap-2">
+      <div className="w-full max-w-full md:max-w-md mx-auto flex items-center justify-between gap-2">
         {/* Left: Mascot + Brand */}
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
           <div className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500/20 to-yellow-400/10 border border-amber-500/30 p-1 flex items-center justify-center overflow-hidden shadow-inner shrink-0">
@@ -101,7 +101,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
       {/* Offline Alert Ribbon when Offline or Items Pending */}
       {(!isOnline || pendingCount > 0) && (
-        <div className="max-w-md mx-auto mt-2">
+        <div className="w-full max-w-full md:max-w-md mx-auto mt-2">
           <div
             className={`px-3 py-1.5 rounded-lg text-xs flex items-center justify-between border ${
               !isOnline

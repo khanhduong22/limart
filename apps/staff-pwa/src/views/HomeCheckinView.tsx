@@ -82,7 +82,7 @@ export const HomeCheckinView: React.FC = () => {
 
   return (
     <div className="flex flex-col items-center justify-center p-2 sm:p-3 w-full max-w-full bg-transparent overflow-x-hidden">
-      <div className="w-full max-w-md max-w-full space-y-3 animate-in fade-in duration-300 pb-32">
+      <div className="w-full max-w-full md:max-w-md mx-auto space-y-3 animate-in fade-in duration-300 pb-32 min-w-0 box-border">
         {/* Admin View Mode Banner */}
         {homeData.isViewAsMode && (
           <div className="bg-purple-700 text-white p-3.5 rounded-xl flex items-center justify-between shadow-md border border-purple-500/30 animate-in fade-in slide-in-from-top-2">

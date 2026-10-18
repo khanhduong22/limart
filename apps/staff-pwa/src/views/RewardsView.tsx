@@ -60,7 +60,7 @@ export const RewardsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-3 pb-32 max-w-md max-w-full mx-auto px-3 sm:px-4 pt-2 select-none overflow-x-hidden">
+    <div className="w-full max-w-full md:max-w-md mx-auto px-3 sm:px-4 pt-2 pb-32 space-y-3 select-none box-border min-w-0 overflow-x-hidden">
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
@@ -84,7 +84,7 @@ export const RewardsView: React.FC = () => {
       </div>
 
       {/* Month Selector */}
-      <div className="flex items-center justify-between bg-white border border-stone-200 p-2 rounded-2xl shadow-xs gap-1 max-w-full">
+      <div className="flex items-center justify-between bg-white border border-stone-200 p-2 rounded-2xl shadow-xs gap-1 w-full max-w-full box-border">
         <Button
           variant="ghost"
           size="sm"
@@ -111,8 +111,8 @@ export const RewardsView: React.FC = () => {
       </div>
 
       {/* Lucky Wheel Quick Banner */}
-      <Link to="/lucky-wheel" className="block max-w-full">
-        <div className="rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-3 sm:p-3.5 text-white shadow-md flex items-center justify-between gap-2 cursor-pointer hover:opacity-95 transition-all">
+      <Link to="/lucky-wheel" className="block w-full max-w-full box-border">
+        <div className="rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-3 sm:p-3.5 text-white shadow-md flex items-center justify-between gap-2 cursor-pointer hover:opacity-95 transition-all w-full box-border">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <span className="text-2xl shrink-0">🎡</span>
             <div className="min-w-0">
@@ -129,22 +129,24 @@ export const RewardsView: React.FC = () => {
       </Link>
 
       {/* Category Tabs */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar -mx-1 px-1 max-w-full">
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setActiveTab(tab.id)}
-            className={`px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
-              activeTab === tab.id
-                ? "bg-amber-500 text-white shadow-xs ring-2 ring-amber-200"
-                : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
-            }`}
-          >
-            <span>{tab.icon}</span>
-            <span>{tab.label}</span>
-          </button>
-        ))}
+      <div className="w-full min-w-0 overflow-hidden">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar -mx-1 px-1">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
+                activeTab === tab.id
+                  ? "bg-amber-500 text-white shadow-xs ring-2 ring-amber-200"
+                  : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"
+              }`}
+            >
+              <span>{tab.icon}</span>
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Leaderboard Content */}

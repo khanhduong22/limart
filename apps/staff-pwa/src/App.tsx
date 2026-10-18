@@ -359,7 +359,7 @@ function AppContent() {
         } flex flex-col relative backdrop-blur-xs transition-all duration-200 max-w-full overflow-x-hidden ${
           isWide
             ? "max-w-4xl lg:max-w-5xl xl:max-w-6xl px-2 sm:px-6 md:px-8"
-            : "max-w-md"
+            : "w-full max-w-full md:max-w-md"
         }`}
       >
         {/* Main Content Area */}

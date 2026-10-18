@@ -170,7 +170,7 @@ export const TasksView: React.FC<TasksViewProps> = ({ userRole }) => {
   };
 
   return (
-    <div className="space-y-3 pb-32 max-w-md max-w-full mx-auto px-3 sm:px-4 pt-2 select-none overflow-x-hidden">
+    <div className="w-full max-w-full md:max-w-md mx-auto px-3 sm:px-4 pt-2 pb-32 space-y-3 select-none box-border min-w-0 overflow-x-hidden">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 min-w-0">
           <Button

@@ -158,7 +158,7 @@ export const renderPodium = (items: FormattedLeaderboardItem[]) => {
   const medals = ["🥇", "🥈", "🥉"];
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 w-full max-w-full box-border">
       {items.map((item, idx) => {
         const rankBg =
           idx === 0
@@ -170,7 +170,7 @@ export const renderPodium = (items: FormattedLeaderboardItem[]) => {
         return (
           <div
             key={idx}
-            className={`flex items-center justify-between p-2 rounded-xl border gap-2 ${rankBg}`}
+            className={`flex items-center justify-between p-2 rounded-xl border gap-2 w-full max-w-full box-border ${rankBg}`}
           >
             <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
               <span className="text-base leading-none shrink-0">{medals[idx]}</span>
@@ -215,7 +215,7 @@ export const renderLeaderboardList = (items: FormattedLeaderboardItem[]) => {
   if (items.length === 0) return null;
 
   return (
-    <div className="pt-3 border-t border-stone-100 space-y-2">
+    <div className="pt-3 border-t border-stone-100 space-y-2 w-full max-w-full box-border">
       <div className="flex items-center justify-between px-1">
         <h3 className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
           Xếp hạng tiếp theo
@@ -224,11 +224,11 @@ export const renderLeaderboardList = (items: FormattedLeaderboardItem[]) => {
           +{items.length} nhân viên
         </span>
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-1.5 w-full max-w-full box-border">
         {items.map((item, idx) => (
           <div
             key={idx}
-            className="flex items-center justify-between p-2 rounded-xl border border-stone-100 bg-stone-50/60 gap-2"
+            className="flex items-center justify-between p-2 rounded-xl border border-stone-100 bg-stone-50/60 gap-2 w-full max-w-full box-border"
           >
             <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
               <span className="w-5 text-center text-xs font-bold font-mono text-stone-400 shrink-0">
@@ -290,8 +290,8 @@ export const RewardLeaderboardContent: React.FC<RewardLeaderboardContentProps> =
   const rankingItems = items.slice(3);
 
   return (
-    <div className="space-y-3 max-w-full overflow-hidden">
-      <div className="rounded-2xl bg-white border border-stone-200 p-3 sm:p-4 shadow-xs space-y-3 max-w-full">
+    <div className="space-y-3 w-full max-w-full box-border overflow-hidden min-w-0">
+      <div className="rounded-2xl bg-white border border-stone-200 p-3 sm:p-4 shadow-xs space-y-3 w-full max-w-full box-border">
         <div className="flex items-center justify-between border-b border-stone-100 pb-2.5 gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="text-xl shrink-0">{config.icon}</span>

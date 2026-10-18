@@ -65,7 +65,7 @@ export const CarryingView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-3 pb-24 max-w-md mx-auto px-3 sm:px-4 pt-2 select-none">
+    <div className="w-full max-w-full md:max-w-md mx-auto px-3 sm:px-4 pt-2 pb-24 space-y-3 select-none box-border min-w-0 overflow-x-hidden">
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

@@ -60,23 +60,23 @@ export const RewardsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-3 pb-24 max-w-md mx-auto px-3 sm:px-4 pt-2 select-none">
+    <div className="space-y-3 pb-32 max-w-md max-w-full mx-auto px-3 sm:px-4 pt-2 select-none overflow-x-hidden">
       {/* Top Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => router.push("/")}
-            className="h-8 w-8 rounded-full hover:bg-yellow-100 text-stone-700 cursor-pointer"
+            className="h-8 w-8 rounded-full hover:bg-yellow-100 text-stone-700 cursor-pointer shrink-0"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-base font-bold text-stone-900 tracking-tight flex items-center gap-1.5">
-              <span>🏆</span> Bảng Vàng & Khen Thưởng
+          <div className="min-w-0">
+            <h1 className="text-base font-bold text-stone-900 tracking-tight flex items-center gap-1.5 truncate">
+              <span className="shrink-0">🏆</span> <span className="truncate">Bảng Vàng &amp; Khen Thưởng</span>
             </h1>
-            <p className="text-[10px] text-stone-500">
+            <p className="text-[10px] text-stone-500 truncate">
               Vinh danh những cá nhân xuất sắc nhất tháng
             </p>
           </div>
@@ -84,16 +84,16 @@ export const RewardsView: React.FC = () => {
       </div>
 
       {/* Month Selector */}
-      <div className="flex items-center justify-between bg-white border border-stone-200 p-2 rounded-2xl shadow-xs">
+      <div className="flex items-center justify-between bg-white border border-stone-200 p-2 rounded-2xl shadow-xs gap-1 max-w-full">
         <Button
           variant="ghost"
           size="sm"
           onClick={handlePrevMonth}
-          className="h-8 px-2 text-stone-600 cursor-pointer"
+          className="h-8 px-2 text-stone-600 cursor-pointer shrink-0 text-xs font-semibold"
         >
           <ChevronLeft className="w-4 h-4 mr-0.5" /> Tháng trước
         </Button>
-        <span className="text-xs font-extrabold text-stone-800 font-mono">
+        <span className="text-xs font-extrabold text-stone-800 font-mono whitespace-nowrap px-1">
           Tháng {selectedMonth} / {selectedYear}
         </span>
         <Button
@@ -104,38 +104,38 @@ export const RewardsView: React.FC = () => {
             selectedYear > now.getFullYear() ||
             (selectedYear === now.getFullYear() && selectedMonth >= now.getMonth() + 1)
           }
-          className="h-8 px-2 text-stone-600 cursor-pointer disabled:opacity-30"
+          className="h-8 px-2 text-stone-600 cursor-pointer disabled:opacity-30 shrink-0 text-xs font-semibold"
         >
           Tháng sau <ChevronRight className="w-4 h-4 ml-0.5" />
         </Button>
       </div>
 
       {/* Lucky Wheel Quick Banner */}
-      <Link to="/lucky-wheel" className="block">
-        <div className="rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-3.5 text-white shadow-md flex items-center justify-between cursor-pointer hover:opacity-95 transition-all">
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl">🎡</span>
-            <div>
-              <p className="text-xs font-black">Vòng Quay May Mắn</p>
-              <p className="text-[10px] text-amber-100 mt-0.5">
-                Chấm công đủ để quay trúng quà tiền mặt & vé gacha!
+      <Link to="/lucky-wheel" className="block max-w-full">
+        <div className="rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 p-3 sm:p-3.5 text-white shadow-md flex items-center justify-between gap-2 cursor-pointer hover:opacity-95 transition-all">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <span className="text-2xl shrink-0">🎡</span>
+            <div className="min-w-0">
+              <p className="text-xs font-black truncate">Vòng Quay May Mắn</p>
+              <p className="text-[10px] text-amber-100 mt-0.5 line-clamp-1">
+                Chấm công đủ để quay trúng quà tiền mặt &amp; vé gacha!
               </p>
             </div>
           </div>
-          <span className="text-xs font-bold bg-white text-orange-700 px-2.5 py-1 rounded-full shadow-xs">
+          <span className="text-xs font-bold bg-white text-orange-700 px-2.5 py-1 rounded-full shadow-xs shrink-0 whitespace-nowrap">
             Quay ngay →
           </span>
         </div>
       </Link>
 
       {/* Category Tabs */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar">
+      <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs no-scrollbar -mx-1 px-1 max-w-full">
         {TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+            className={`px-3 py-1.5 rounded-full whitespace-nowrap text-xs font-bold transition-all cursor-pointer flex items-center gap-1 shrink-0 ${
               activeTab === tab.id
                 ? "bg-amber-500 text-white shadow-xs ring-2 ring-amber-200"
                 : "bg-white text-stone-600 border border-stone-200 hover:bg-stone-50"

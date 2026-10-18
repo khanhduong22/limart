@@ -20,7 +20,7 @@ export const ScheduleView: React.FC = () => {
   const currentUserId = response?.currentUserId;
 
   return (
-    <div className="pb-24 pt-2 px-3 sm:px-4 max-w-md mx-auto w-full select-none">
+    <div className="pb-32 pt-2 px-3 sm:px-4 max-w-md max-w-full mx-auto w-full select-none overflow-x-hidden">
       <React.Suspense
         fallback={
           <div className="h-96 w-full flex items-center justify-center text-xs text-slate-400 animate-pulse bg-slate-50/50 rounded-2xl border border-slate-100">

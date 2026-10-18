@@ -37,7 +37,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile }) => {
   };
 
   return (
-    <div className="space-y-3 pb-24 max-w-md mx-auto px-3 sm:px-4 pt-3 select-none w-full box-border overflow-hidden">
+    <div className="space-y-3 pb-32 max-w-md max-w-full mx-auto px-3 sm:px-4 pt-3 select-none w-full box-border overflow-hidden">
       {/* Staff Profile Header Card */}
       <div className="rounded-2xl bg-white/95 border border-orange-100 p-4 sm:p-5 shadow-xs text-center relative overflow-hidden w-full box-border">
         {/* Avatar */}

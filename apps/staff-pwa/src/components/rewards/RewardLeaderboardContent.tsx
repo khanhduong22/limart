@@ -170,10 +170,10 @@ export const renderPodium = (items: FormattedLeaderboardItem[]) => {
         return (
           <div
             key={idx}
-            className={`flex items-center justify-between p-2 rounded-xl border ${rankBg}`}
+            className={`flex items-center justify-between p-2 rounded-xl border gap-2 ${rankBg}`}
           >
-            <div className="flex items-center gap-2.5">
-              <span className="text-base leading-none">{medals[idx]}</span>
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+              <span className="text-base leading-none shrink-0">{medals[idx]}</span>
               <div className="w-8 h-8 rounded-full overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center shrink-0">
                 {item.image ? (
                   <img
@@ -192,15 +192,15 @@ export const renderPodium = (items: FormattedLeaderboardItem[]) => {
                   </span>
                 )}
               </div>
-              <div>
-                <p className="text-xs font-bold text-stone-900">{item.name}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-stone-900 truncate">{item.name}</p>
                 {item.subStat && (
-                  <p className="text-[10px] text-stone-500">{item.subStat}</p>
+                  <p className="text-[10px] text-stone-500 truncate">{item.subStat}</p>
                 )}
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-xs font-black text-stone-800 font-mono">
+            <div className="text-right shrink-0">
+              <span className="text-xs font-black text-stone-800 font-mono whitespace-nowrap">
                 {item.stat}
               </span>
             </div>
@@ -228,10 +228,10 @@ export const renderLeaderboardList = (items: FormattedLeaderboardItem[]) => {
         {items.map((item, idx) => (
           <div
             key={idx}
-            className="flex items-center justify-between p-2 rounded-xl border border-stone-100 bg-stone-50/60"
+            className="flex items-center justify-between p-2 rounded-xl border border-stone-100 bg-stone-50/60 gap-2"
           >
-            <div className="flex items-center gap-2.5">
-              <span className="w-5 text-center text-xs font-bold font-mono text-stone-400">
+            <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+              <span className="w-5 text-center text-xs font-bold font-mono text-stone-400 shrink-0">
                 #{idx + 4}
               </span>
               <div className="w-7 h-7 rounded-full overflow-hidden bg-stone-100 border border-stone-200 flex items-center justify-center shrink-0">
@@ -252,15 +252,15 @@ export const renderLeaderboardList = (items: FormattedLeaderboardItem[]) => {
                   </span>
                 )}
               </div>
-              <div>
-                <p className="text-xs font-bold text-stone-800">{item.name}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-stone-800 truncate">{item.name}</p>
                 {item.subStat && (
-                  <p className="text-[10px] text-stone-500">{item.subStat}</p>
+                  <p className="text-[10px] text-stone-500 truncate">{item.subStat}</p>
                 )}
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-xs font-black text-stone-700 font-mono">
+            <div className="text-right shrink-0">
+              <span className="text-xs font-black text-stone-700 font-mono whitespace-nowrap">
                 {item.stat}
               </span>
             </div>
@@ -290,17 +290,17 @@ export const RewardLeaderboardContent: React.FC<RewardLeaderboardContentProps> =
   const rankingItems = items.slice(3);
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-2xl bg-white border border-stone-200 p-4 shadow-xs space-y-3">
-        <div className="flex items-center justify-between border-b border-stone-100 pb-2.5">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">{config.icon}</span>
-            <div>
-              <h2 className="text-xs font-bold text-stone-900">{config.title}</h2>
-              <p className="text-[10px] text-stone-500">{config.subtitle}</p>
+    <div className="space-y-3 max-w-full overflow-hidden">
+      <div className="rounded-2xl bg-white border border-stone-200 p-3 sm:p-4 shadow-xs space-y-3 max-w-full">
+        <div className="flex items-center justify-between border-b border-stone-100 pb-2.5 gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xl shrink-0">{config.icon}</span>
+            <div className="min-w-0">
+              <h2 className="text-xs font-bold text-stone-900 truncate">{config.title}</h2>
+              <p className="text-[10px] text-stone-500 truncate">{config.subtitle}</p>
             </div>
           </div>
-          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${config.badgeColor}`}>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${config.badgeColor}`}>
             Top 3
           </span>
         </div>

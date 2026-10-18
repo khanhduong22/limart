@@ -47,8 +47,8 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
       <div
         className={`w-full mx-auto pointer-events-auto bg-[#faf6f0]/95 backdrop-blur-md border-t border-orange-100/90 shadow-lg transition-all duration-200 ${
           isWide || isPartner
-            ? "max-w-4xl lg:max-w-5xl xl:max-w-6xl md:border-x md:rounded-t-2xl px-2 md:px-4"
-            : "max-w-md"
+            ? "max-w-4xl lg:max-w-5xl xl:max-w-6xl max-w-full md:border-x md:rounded-t-2xl px-2 md:px-4"
+            : "max-w-md max-w-full"
         }`}
       >
         <div className={`grid ${gridColsClass} h-14 md:h-16 items-center px-1`}>
@@ -59,7 +59,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               <button
                 key={item.id}
                 onClick={() => onChangeTab(item.id)}
-                className={`relative flex flex-col items-center justify-center h-full py-1 px-1 transition-all duration-150 active:scale-95 cursor-pointer ${
+                className={`relative flex flex-col items-center justify-center h-full py-1 px-1 transition-all duration-150 active:scale-95 cursor-pointer min-w-0 ${
                   isActive
                     ? "text-amber-800 font-bold"
                     : "text-stone-500 hover:text-stone-700 font-medium"
@@ -72,13 +72,13 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
 
                 <div className="relative mt-0.5">
                   <Icon
-                    className={`w-4.5 h-4.5 md:w-5 md:h-5 transition-transform duration-150 ${
+                    className={`w-4.5 h-4.5 md:w-5 md:h-5 transition-transform duration-150 shrink-0 ${
                       isActive ? "scale-105 text-amber-700" : "text-stone-400"
                     }`}
                   />
                 </div>
 
-                <span className="text-[9.5px] sm:text-[10px] md:text-xs tracking-tight mt-0.5 line-clamp-1">
+                <span className="text-[9.5px] sm:text-[10px] md:text-xs tracking-tight mt-0.5 whitespace-nowrap truncate max-w-full">
                   {item.label}
                 </span>
               </button>

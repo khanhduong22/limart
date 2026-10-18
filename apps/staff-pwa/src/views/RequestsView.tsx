@@ -12,7 +12,7 @@ export const RequestsView: React.FC = () => {
   const requests = response?.data || [];
 
   return (
-    <div className="p-3 sm:p-4 pb-24 max-w-md mx-auto w-full select-none">
+    <div className="p-3 sm:p-4 pb-32 max-w-md max-w-full mx-auto w-full select-none overflow-x-hidden">
       <React.Suspense
         fallback={
           <div className="h-64 w-full flex items-center justify-center text-xs text-slate-400 animate-pulse bg-slate-50/50 rounded-2xl border border-slate-100">

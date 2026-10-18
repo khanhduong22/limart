@@ -307,9 +307,10 @@ export default function ScheduleClient({
                 }`}
               >
                 {/* Left: Day info */}
-                <div className="flex items-center gap-3">
+                {/* Left: Date badge + Day name */}
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                   <div
-                    className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black shrink-0 shadow-xs transition-transform active:scale-95 ${
+                    className={`w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center font-black shrink-0 shadow-xs transition-transform active:scale-95 ${
                       dayInfo.color
                     } ${
                       isToday
@@ -317,28 +318,28 @@ export default function ScheduleClient({
                         : ""
                     }`}
                   >
-                    <span className="text-xl sm:text-2xl font-black leading-none tracking-tight">
+                    <span className="text-lg sm:text-2xl font-black leading-none tracking-tight">
                       {d.getDate()}
                     </span>
                   </div>
 
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
+                      <span className="text-xs sm:text-sm font-bold text-stone-900 dark:text-stone-100 whitespace-nowrap">
                         {dayInfo.full}
                       </span>
-                      <span className="text-[11px] font-semibold text-stone-400 dark:text-stone-500">
+                      <span className="text-[11px] font-semibold text-stone-400 dark:text-stone-500 whitespace-nowrap">
                         ({dayInfo.short})
                       </span>
                       {isToday && (
-                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded-full bg-amber-500 text-white leading-tight">
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-500 text-white leading-tight shrink-0 whitespace-nowrap">
                           Hôm nay
                         </span>
                       )}
                     </div>
 
                     {!hasShift && (
-                      <p className="text-[11px] text-stone-400 dark:text-stone-500 italic mt-0.5">
+                      <p className="text-[11px] text-stone-400 dark:text-stone-500 italic mt-0.5 truncate">
                         Chưa đăng ký ca
                       </p>
                     )}
@@ -346,7 +347,7 @@ export default function ScheduleClient({
                 </div>
 
                 {/* Right: Shifts list or Register action */}
-                <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                <div className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
                   {hasShift ? (
                     <div className="flex flex-col items-end gap-1">
                       {myShifts.map((s, sIdx) => {
@@ -362,9 +363,9 @@ export default function ScheduleClient({
                         return (
                           <div
                             key={s.id || sIdx}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold bg-emerald-600 text-white shadow-2xs"
+                            className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-xl text-[11px] sm:text-xs font-bold bg-emerald-600 text-white shadow-2xs whitespace-nowrap"
                           >
-                            <Clock className="w-3 h-3 text-emerald-200" />
+                            <Clock className="w-3 h-3 text-emerald-200 shrink-0" />
                             <span>{shiftText}</span>
                           </div>
                         );
@@ -375,7 +376,7 @@ export default function ScheduleClient({
                       type="button"
                       size="sm"
                       variant="outline"
-                      className="h-8 text-xs font-bold px-3 rounded-xl border-amber-300 dark:border-amber-700/80 text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30 hover:bg-amber-100/60 cursor-pointer shadow-2xs"
+                      className="h-8 text-xs font-bold px-2.5 sm:px-3 rounded-xl border-amber-300 dark:border-amber-700/80 text-amber-700 dark:text-amber-400 bg-amber-50/50 dark:bg-amber-950/30 hover:bg-amber-100/60 cursor-pointer shadow-2xs shrink-0 whitespace-nowrap"
                     >
                       + Đăng ký ca
                     </Button>

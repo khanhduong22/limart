@@ -356,14 +356,14 @@ function AppContent() {
           isEnterpriseDemo
             ? "bg-white/95 shadow-xl border-x border-slate-200/80"
             : "bg-[#faf6f0]/95 shadow-2xl border-x border-orange-100/60"
-        } flex flex-col relative backdrop-blur-xs transition-all duration-200 ${
+        } flex flex-col relative backdrop-blur-xs transition-all duration-200 max-w-full overflow-x-hidden ${
           isWide
             ? "max-w-4xl lg:max-w-5xl xl:max-w-6xl px-2 sm:px-6 md:px-8"
             : "max-w-md"
         }`}
       >
         {/* Main Content Area */}
-        <main className="flex-1 flex flex-col">
+        <main className="flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden">
           <ErrorBoundary>
             <Suspense
               fallback={

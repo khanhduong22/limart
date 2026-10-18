@@ -18,7 +18,7 @@ export const HistoryView: React.FC = () => {
   const history = Array.isArray(response?.data) ? response.data : [];
 
   return (
-    <div className="p-3 sm:p-4 pb-24 max-w-md mx-auto w-full space-y-3 select-none">
+    <div className="p-3 sm:p-4 pb-32 max-w-md max-w-full mx-auto w-full space-y-3 select-none overflow-x-hidden">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

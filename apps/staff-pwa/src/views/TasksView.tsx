@@ -170,22 +170,22 @@ export const TasksView: React.FC<TasksViewProps> = ({ userRole }) => {
   };
 
   return (
-    <div className="space-y-3 pb-24 max-w-md mx-auto px-3 sm:px-4 pt-2 select-none">
+    <div className="space-y-3 pb-32 max-w-md max-w-full mx-auto px-3 sm:px-4 pt-2 select-none overflow-x-hidden">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => router.push("/")}
-            className="h-8 w-8 rounded-full hover:bg-orange-100 text-stone-700 cursor-pointer"
+            className="h-8 w-8 rounded-full hover:bg-orange-100 text-stone-700 cursor-pointer shrink-0"
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <div className="text-left">
-            <h1 className="text-base font-bold text-stone-900 tracking-tight flex items-center gap-1.5">
-              <span>💼</span> Trung Tâm Công Việc &amp; Tác Nghiệp
+          <div className="text-left min-w-0">
+            <h1 className="text-base font-bold text-stone-900 tracking-tight flex items-center gap-1.5 truncate">
+              <span className="shrink-0">💼</span> <span className="truncate">Trung Tâm Công Việc &amp; Tác Nghiệp</span>
             </h1>
-            <p className="text-[10px] text-stone-500">
+            <p className="text-[10px] text-stone-500 truncate">
               Quản lý nhiệm vụ ca làm, công tác kho &amp; sàn việc WFH
             </p>
           </div>

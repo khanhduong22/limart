@@ -1,7 +1,7 @@
 import React from "react";
 import { Clock, Calendar, Briefcase, Wallet, User } from "lucide-react";
 
-export type NavTab = "home" | "schedule" | "tasks" | "payroll" | "profile" | "staff-tasks";
+export type NavTab = "home" | "tasks" | "schedule" | "payroll" | "profile" | "staff-tasks";
 
 interface BottomNavigationProps {
   currentTab: NavTab;
@@ -24,18 +24,19 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
     icon: React.ComponentType<{ className?: string }>;
   }> = isPartner
     ? [
-        { id: "staff-tasks", label: "Công việc & KPI", icon: Briefcase },
+        { id: "tasks", label: "Công việc", icon: Briefcase },
         { id: "payroll", label: "Bảng lương", icon: Wallet },
         { id: "profile", label: "Cá nhân", icon: User },
       ]
     : [
         { id: "home", label: "Chấm công", icon: Clock },
+        { id: "tasks", label: "Công việc", icon: Briefcase },
         { id: "schedule", label: "Lịch trực", icon: Calendar },
         { id: "payroll", label: "Bảng lương", icon: Wallet },
         { id: "profile", label: "Cá nhân", icon: User },
       ];
 
-  const gridColsClass = isPartner ? "grid-cols-3" : "grid-cols-4";
+  const gridColsClass = isPartner ? "grid-cols-3" : "grid-cols-5";
 
   return (
     <nav
@@ -66,7 +67,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
               >
                 {/* Active Pill Indicator */}
                 {isActive && (
-                  <div className="absolute top-0 w-8 md:w-12 h-1 bg-amber-500 rounded-b-full shadow-xs" />
+                  <div className="absolute top-0 w-6 sm:w-8 md:w-12 h-1 bg-amber-500 rounded-b-full shadow-xs" />
                 )}
 
                 <div className="relative mt-0.5">
@@ -77,7 +78,7 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
                   />
                 </div>
 
-                <span className="text-[10px] md:text-xs tracking-tight mt-0.5 line-clamp-1">
+                <span className="text-[9.5px] sm:text-[10px] md:text-xs tracking-tight mt-0.5 line-clamp-1">
                   {item.label}
                 </span>
               </button>

@@ -9,18 +9,15 @@ import PrivacyStats from "@/components/PrivacyStats";
 const HomeAnnouncements = lazy(() => import("@/components/HomeAnnouncements"));
 const AnnouncementBar = lazy(() => import("@/components/AnnouncementBar"));
 const ShiftDutyHomeWidget = lazy(() => import("@/components/shift-duty/ShiftDutyHomeWidget"));
-const NotificationOptInCard = lazy(() => import("@/components/NotificationOptInCard"));
-const GachaButton = lazy(() => import("@/components/GachaButton"));
 const CapyAssistant = lazy(() => import("@/components/CapyAssistant"));
 const SpecialDaysWidget = lazy(() => import("@/components/home/SpecialDaysWidget"));
 import { Button } from "@/components/ui/button";
-import { Link, useRouter } from "@/lib/router";
+import { useRouter } from "@/lib/router";
 import { useHomeCheckinStore } from "@/stores/useHomeCheckinStore";
 import { CheckinHeaderCard } from "@/components/home/CheckinHeaderCard";
 import { CheckinTimerCard } from "@/components/home/CheckinTimerCard";
 import { LateWarningBanner } from "@/components/home/LateWarningBanner";
 import { PartnerWelcomeBanner } from "@/components/home/PartnerWelcomeBanner";
-import { HomeNavGrid } from "@/components/home/HomeNavGrid";
 import { RejectedTasksAlertBanner } from "@/components/home/RejectedTasksAlertBanner";
 
 const RejectedTasksModal = lazy(() =>
@@ -215,13 +212,6 @@ export const HomeCheckinView: React.FC = () => {
               </Suspense>
             </div>
 
-            {/* Automatic Shift Notification Opt-In Card */}
-            <div id="home-shift-notifications" className="pt-2">
-              <Suspense fallback={null}>
-                <NotificationOptInCard userId={user?.id} compact />
-              </Suspense>
-            </div>
-
             {/* Capybara Mascot AI Assistant */}
             <div id="home-sticky" className="pt-2 min-h-[96px]">
               <Suspense
@@ -231,42 +221,6 @@ export const HomeCheckinView: React.FC = () => {
               >
                 <CapyAssistant currentUser={user} />
               </Suspense>
-            </div>
-
-            {/* Functional Menu Buttons */}
-            <HomeNavGrid
-              userRole={user?.role}
-              staffTasksAllowed={user?.staffTasksAllowed}
-              rejectedTasksCount={rejectedTasksCount}
-            />
-
-            {/* Gacha Game & Rewards Section */}
-            <div id="home-gacha" className="pt-4 space-y-3 border-t border-dashed mt-4">
-              <Suspense fallback={null}>
-                <GachaButton
-                  userId={user?.id}
-                  hasCheckedIn={hasCheckedInToday}
-                  isAdmin={user?.role === "ADMIN"}
-                />
-              </Suspense>
-              <Link to="/rewards" className="block w-full">
-                <Button
-                  variant="outline"
-                  className="w-full h-11 text-sm font-bold border-yellow-400 bg-gradient-to-r from-yellow-50 to-orange-50 text-orange-700 hover:from-yellow-100 hover:to-orange-100 shadow-2xs transition-all hover:scale-[1.01] cursor-pointer"
-                >
-                  🏆 Bảng Vàng & Khen Thưởng
-                </Button>
-              </Link>
-              {user?.role === "ADMIN" && (
-                <div className="pt-2 text-center">
-                  <a
-                    href="/admin"
-                    className="text-xs font-bold text-amber-900 hover:text-amber-950 inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-100/80 border border-amber-300 rounded-xl transition-all shadow-2xs"
-                  >
-                    ⚙️ Vào Trang Quản Trị (Admin) →
-                  </a>
-                </div>
-              )}
             </div>
           </div>
         </div>

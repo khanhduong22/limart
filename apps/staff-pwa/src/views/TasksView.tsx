@@ -31,7 +31,12 @@ const WfhTaskSubmitModal = React.lazy(() =>
   import("@/components/tasks/WfhTaskSubmitModal").then((m) => ({ default: m.WfhTaskSubmitModal }))
 );
 
-export const TasksView: React.FC = () => {
+export interface TasksViewProps {
+  userRole?: string;
+}
+
+export const TasksView: React.FC<TasksViewProps> = ({ userRole }) => {
+  const isPartner = userRole === "PARTNER";
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<WfhTabType>(() => {
     if (typeof window !== "undefined") {
@@ -178,12 +183,96 @@ export const TasksView: React.FC = () => {
           </Button>
           <div className="text-left">
             <h1 className="text-base font-bold text-stone-900 tracking-tight flex items-center gap-1.5">
-              <span>💼</span> WFH & Sàn Việc
+              <span>💼</span> Trung Tâm Công Việc &amp; Tác Nghiệp
             </h1>
             <p className="text-[10px] text-stone-500">
-              Nhận việc làm thêm ngoài giờ để tăng thu nhập
+              Quản lý nhiệm vụ ca làm, công tác kho &amp; sàn việc WFH
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Quick Action Navigation Grid (Tác nghiệp kho & KPI) */}
+      {!isPartner ? (
+        <div className="grid grid-cols-3 gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/staff-tasks")}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white/95 border border-amber-200/90 shadow-2xs hover:bg-amber-50/60 active:scale-95 transition-all text-center cursor-pointer group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center text-lg mb-1.5 group-hover:scale-105 transition-transform">
+              🎯
+            </div>
+            <span className="text-xs font-bold text-stone-900 leading-tight">
+              Nhiệm vụ &amp; KPI
+            </span>
+            <span className="text-[9.5px] text-stone-500 mt-0.5 line-clamp-1">
+              Ca trực &amp; tiến độ
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/packing")}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white/95 border border-blue-200/90 shadow-2xs hover:bg-blue-50/60 active:scale-95 transition-all text-center cursor-pointer group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-blue-100 text-blue-800 flex items-center justify-center text-lg mb-1.5 group-hover:scale-105 transition-transform">
+              📦
+            </div>
+            <span className="text-xs font-bold text-stone-900 leading-tight">
+              Đóng gói đơn
+            </span>
+            <span className="text-[9.5px] text-stone-500 mt-0.5 line-clamp-1">
+              Quét mã &amp; điểm
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => router.push("/carrying")}
+            className="flex flex-col items-center justify-center p-2.5 rounded-2xl bg-white/95 border border-emerald-200/90 shadow-2xs hover:bg-emerald-50/60 active:scale-95 transition-all text-center cursor-pointer group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center text-lg mb-1.5 group-hover:scale-105 transition-transform">
+              🛗
+            </div>
+            <span className="text-xs font-bold text-stone-900 leading-tight">
+              Bưng vác hàng
+            </span>
+            <span className="text-[9.5px] text-stone-500 mt-0.5 line-clamp-1">
+              Ghi nhận lên lầu
+            </span>
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => router.push("/staff-tasks")}
+          className="w-full flex items-center justify-between p-3 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 shadow-2xs hover:from-amber-100/70 hover:to-orange-100/70 active:scale-[0.99] transition-all text-left cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center text-xl shadow-xs group-hover:scale-105 transition-transform">
+              🎯
+            </div>
+            <div>
+              <h3 className="text-xs sm:text-sm font-bold text-stone-900">Nhiệm Vụ Được Giao &amp; Chỉ Tiêu KPI</h3>
+              <p className="text-[10px] sm:text-[11px] text-stone-500 mt-0.5">Theo dõi nhiệm vụ WFH, nội dung &amp; hoàn thành chỉ tiêu</p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-amber-700 bg-white/90 px-2.5 py-1 rounded-lg border border-amber-200 shrink-0">
+            Xem việc →
+          </span>
+        </button>
+      )}
+
+      {/* Section Divider & Title for WFH Marketplace */}
+      <div className="pt-2 flex items-center justify-between border-t border-stone-200/60">
+        <div className="text-left">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-stone-700 flex items-center gap-1.5">
+            <span>💼</span> Sàn Việc WFH &amp; Ngoài Giờ
+          </h2>
+          <p className="text-[10px] text-stone-400">
+            Nhận việc làm thêm ngoài giờ để tăng thêm thu nhập
+          </p>
         </div>
       </div>
 

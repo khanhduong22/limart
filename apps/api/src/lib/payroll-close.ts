@@ -44,6 +44,7 @@ export async function closePayrollMonth(
       name: true,
       email: true,
       role: true,
+      isActive: true,
       employmentType: true,
     },
   });
@@ -69,9 +70,11 @@ export async function closePayrollMonth(
       id: u.id,
       name: u.name,
       role: u.role,
+      isActive: u.isActive ?? true,
       employmentType: stats.employmentType,
       stats: {
         ...stats,
+        isActive: u.isActive ?? true,
         bonusPercent: shouldApplyBonus ? numBonusPercent : 0,
         bonusAmount,
         finalNet,

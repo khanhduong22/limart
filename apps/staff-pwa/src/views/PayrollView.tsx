@@ -3,7 +3,7 @@ import { useAppQuery } from "@/lib/api-query";
 const PayrollMonthSelector = lazy(() => import("@/components/PayrollMonthSelector"));
 const PayrollExplanationModal = lazy(() => import("@/components/PayrollExplanationModal"));
 const PayrollDetailView = lazy(() => import("@/components/PayrollDetailView"));
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "@/lib/router";
 
@@ -67,6 +67,29 @@ export const PayrollView: React.FC = () => {
           <PayrollExplanationModal />
         </Suspense>
       </div>
+
+      {/* Rewards Banner */}
+      <Link to="/rewards" className="block w-full">
+        <div className="p-3 sm:p-3.5 rounded-2xl bg-gradient-to-r from-amber-500/10 via-yellow-500/15 to-orange-500/10 border border-amber-300/80 shadow-2xs flex items-center justify-between transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 text-white flex items-center justify-center text-lg sm:text-xl shadow-xs shrink-0">
+              🏆
+            </div>
+            <div className="min-w-0 text-left">
+              <p className="text-xs font-bold text-amber-950 flex items-center gap-1.5 truncate">
+                Bảng Vàng &amp; Khen Thưởng
+                <span className="text-[10px] bg-amber-200/90 text-amber-900 font-extrabold px-1.5 py-0.5 rounded-full shrink-0">
+                  Thưởng 200k
+                </span>
+              </p>
+              <p className="text-[10.5px] sm:text-[11px] text-amber-800/85 truncate">
+                Vinh danh Top 1 chăm chỉ &amp; Vua đóng hàng nhận thưởng!
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-amber-700 shrink-0 ml-1" />
+        </div>
+      </Link>
 
         {/* Period Selector Card */}
         <div className="bg-white p-4 rounded-xl shadow-xs border">

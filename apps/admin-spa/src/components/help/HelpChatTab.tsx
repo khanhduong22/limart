@@ -105,27 +105,64 @@ export function HelpChatTab({
       // Fallback local matching based strictly on loaded docs from DB
       let fallbackText = "";
       const lower = query.toLowerCase();
-
-      // Search matched docs using stopword filtering
-      const stopWords = new Set([
-        "nếu", "thì", "như", "nào", "khách", "hàng", "làm", "sao", "cho", "của",
-        "các", "được", "trong", "khi", "và", "có", "là", "ở", "với", "để", "gì",
-        "báo", "hỏi", "nhắn", "tôi", "em", "bạn"
-      ]);
-      const terms = lower
-        .split(/\s+/)
-        .filter((w: string) => !stopWords.has(w) && w.length >= 2);
-
-      const matched = terms.length > 0 ? docs.find(
-        (d) =>
-          terms.some((t: string) => d.title.toLowerCase().includes(t)) ||
-          (d.content.toLowerCase().includes(lower) && lower.length >= 4)
-      ) : null;
-
-      if (matched) {
-        fallbackText = `💡 Quy định trong tài liệu **"${matched.title}"**:\n\n${matched.content}\n\n*Nếu cần giải quyết trường hợp ngoại lệ hoặc vượt hạn mức tự xử lý, anh/chị trao đổi trực tiếp với Quản lý cửa hàng để được hỗ trợ nhanh nhất nhé! 🍊*`;
+      if (
+        lower.includes("địa chỉ") ||
+        lower.includes("ở đâu") ||
+        lower.includes("cửa hàng") ||
+        lower.includes("shop ở") ||
+        (lower.includes("shop") && (lower.includes("đâu") || lower.includes("địa chỉ") || lower.includes("qua")))
+      ) {
+        fallbackText = `📍 **Thông tin địa chỉ Cửa hàng Họa cụ LimArt:**\n\n🏠 **Địa chỉ:** Cửa hàng LimArt (Vui lòng chọn đúng chi nhánh bạn đang trực hoặc đính kèm vị trí Google Maps của shop).\n⏰ **Giờ mở cửa:** 8h30 - 21h30 (Tất cả các ngày trong tuần, kể cả Thứ 7 & Chủ Nhật).\n📞 **Hotline hỗ trợ:** Liên hệ Hotline cửa hàng hoặc Fanpage Họa cụ LimArt.\n\n💬 **Mẫu tin nhắn chuẩn gửi khách (Nhân viên copy gửi ngay):**\n---\n"Dạ em chào anh/chị ạ! 🎨\nDạ cửa hàng LimArt mở cửa từ 8h30 đến 21h30 tất cả các ngày trong tuần ạ.\n📍 Địa chỉ shop tại: [Điền địa chỉ cơ sở / Chi nhánh gần khách nhất]\nAnh/chị có thể ghé trực tiếp để xem và trải nghiệm thử các mẫu họa cụ, giấy vẽ, cọ và màu vẽ nhé ạ! Nếu cần chỉ đường chi tiết hơn, anh/chị nhắn em hỗ trợ ngay nha! 🍊"\n---`;
+      } else if (
+        lower.includes("vỡ") ||
+        lower.includes("hỏng") ||
+        lower.includes("bể") ||
+        lower.includes("móp") ||
+        lower.includes("rách") ||
+        lower.includes("lỗi") ||
+        lower.includes("khiếu nại") ||
+        lower.includes("đổi trả") ||
+        lower.includes("đền bù")
+      ) {
+        fallbackText = `📦 **Quy trình xử lý sự cố hàng bị vỡ / hỏng khi nhận hàng:**\n\n1️⃣ **Bước 1: Tiếp nhận và xoa dịu khách hàng ngay lập tức**\n- Gửi lời xin lỗi chân thành vì sự cố vận chuyển ngoài ý muốn làm gián đoạn trải nghiệm của khách.\n- Nhờ khách chụp ảnh chi tiết sản phẩm hỏng, mã vận đơn bên ngoài vỏ hộp và **Video mở kiện hàng (unboxing)** để shop làm việc đối soát với đơn vị vận chuyển.\n\n2️⃣ **Bước 2: Đối chiếu hạn mức tự giải quyết khiếu nại**\n- **Hỏng/vỡ nhẹ vẫn dùng được:** Thương lượng hỗ trợ hoàn tiền một phần (20% - 50% tuỳ mức độ) hoặc tặng mã voucher giảm giá cho đơn hàng tiếp theo.\n- **Vỡ nát, hỏng hoàn toàn (màu đổ tràn, chai lọ vỡ, toan rách không dùng được):** Tiến hành gửi bù ngay 01 sản phẩm mới 100% (miễn phí ship hoàn toàn) hoặc hoàn tiền 100% giá trị sản phẩm.\n- *Lưu ý:* Nếu giá trị đơn hàng vượt hạn mức nhân viên được tự duyệt theo quy chế, chụp màn hình gửi nhóm nội bộ để Quản lý duyệt ngay trong vòng 15 phút.\n\n3️⃣ **Bước 3: Lưu hồ sơ khiếu nại**\n- Ghi nhận thông tin đơn hàng lên hệ thống để bộ phận kho tiến hành khiếu nại bồi thường từ đơn vị vận chuyển.\n\n💬 **Mẫu tin nhắn chuẩn gửi khách (Nhân viên copy gửi ngay):**\n---\n"Dạ em chào anh/chị ạ! 🎨\nDạ em thật sự xin lỗi anh/chị vì sự cố đơn hàng bị [vỡ/hỏng] trong quá trình vận chuyển, khiến trải nghiệm của mình chưa được trọn vẹn ạ. Anh/chị cho em xin thêm hình ảnh/video mở gói hàng và ảnh mã vận đơn bên ngoài hộp để shop xử lý đổi mới hoặc hoàn tiền ngay cho mình nhé ạ.\nShop cam kết bảo vệ 100% quyền lợi của anh/chị, anh/chị yên tâm nha! Em đợi phản hồi của mình ạ. 🍊"\n---`;
+      } else if (lower.includes("muộn") || lower.includes("trễ")) {
+        fallbackText =
+          "📌 **Quy chế đi muộn:**\n- Ân hạn **1 phút** so với giờ ca trực.\n- Muộn từ phút thứ 2 được ghi nhận vào Bảng Vi Phạm.\n- Phạt luỹ tiến: trừ điểm chuyên cần và trừ giờ công quy đổi.\n- **Giải trình:** Nếu có lý do bất khả kháng, nhân viên vào mục **📝 Xin giải trình** trong vòng 24 giờ để gửi Quản lý phê duyệt.";
+      } else if (
+        lower.includes("thưởng") ||
+        lower.includes("200k") ||
+        lower.includes("chuyên cần")
+      ) {
+        fallbackText =
+          "🏆 **Chính sách thưởng nóng & Vinh danh nhân viên:**\n- **Top 1 Chăm chỉ (Số giờ làm cao nhất tháng):** Đạt tối thiểu **130 giờ công** trong tháng sẽ được thưởng nóng **+200.000 ₫** cộng vào bảng lương.\n- **Vua Đóng Hàng:** Tích luỹ trên **50 điểm** đóng gói đơn hàng trong tháng sẽ nhận thưởng nóng **+200.000 ₫**.\n- **Thưởng bưng hàng lên lầu:** Nhân viên tích luỹ từ **≥ 10 điểm** bưng vác hàng lên lầu được cộng thưởng nóng trực tiếp vào kỳ lương.";
+      } else if (lower.includes("quay") || lower.includes("vòng quay")) {
+        fallbackText =
+          "🎰 **Quy chế Vòng Quay May Mắn LimArt:**\n- **Điều kiện tham gia:** Nhân viên phải hoàn thành **Check-in** hợp lệ trong ngày và chưa thực hiện **lượt quay** nào trong ngày hôm đó.\n- **Cấp quyền quay:** Quản lý có thể cấp quyền trong tab **Nhân sự** (switch Vòng quay) hoặc tab **Vòng quay** > **Cấp quyền quay**.\n- Phần thưởng sẽ được ghi nhận và tổng hợp tự động vào bảng lương cuối tháng.";
+      } else if (lower.includes("wfh") || lower.includes("đóng gói")) {
+        fallbackText =
+          "💼 **Quy trình duyệt WFH & Đóng gói hàng:**\n- **Làm việc tại nhà (WFH):** Nhân viên gửi yêu cầu WFH trên ứng dụng → Quản lý duyệt. Khi được duyệt, nếu không có check-in thực tế, hệ thống tự động ghi nhận 8 giờ công và hiển thị 'Làm việc từ xa (WFH)' mà không cần Check-in qua IP Wi-Fi.\n- **Đóng gói hàng:** Nhân viên nhận nhiệm vụ tại mục Sàn việc / WFH Tasks, chụp ảnh/báo cáo kết quả đóng đơn để Quản lý duyệt điểm tích luỹ (>50 điểm nhận thưởng Vua Đóng Hàng +200.000 ₫).";
       } else {
-        fallbackText = "🍊 Hiện tại thông tin về vấn đề này chưa có trong kho tài liệu nội bộ trên hệ thống. Bạn vui lòng liên hệ trực tiếp Quản lý cửa hàng hoặc nhờ Admin bổ sung văn bản quy định này vào kho tài liệu nhé! 🦫";
+        // Search matched docs using stopword filtering
+        const stopWords = new Set([
+          "nếu", "thì", "như", "nào", "khách", "hàng", "làm", "sao", "cho", "của",
+          "các", "được", "trong", "khi", "và", "có", "là", "ở", "với", "để", "gì",
+          "báo", "hỏi", "nhắn", "tôi", "em", "bạn"
+        ]);
+        const terms = lower
+          .split(/\s+/)
+          .filter((w: string) => !stopWords.has(w) && w.length >= 2);
+
+        const matched = terms.length > 0 ? docs.find(
+          (d) =>
+            terms.some((t: string) => d.title.toLowerCase().includes(t)) ||
+            (d.content.toLowerCase().includes(lower) && lower.length >= 4)
+        ) : null;
+
+        if (matched) {
+          fallbackText = `💡 Quy định trong tài liệu **"${matched.title}"**:\n\n${matched.content}\n\n*Nếu cần giải quyết trường hợp ngoại lệ hoặc vượt hạn mức tự xử lý, anh/chị trao đổi trực tiếp với Quản lý cửa hàng để được hỗ trợ nhanh nhất nhé! 🍊*`;
+        } else {
+          fallbackText = "🍊 Hiện tại thông tin về vấn đề này chưa có trong kho tài liệu nội bộ trên hệ thống. Bạn vui lòng liên hệ trực tiếp Quản lý cửa hàng hoặc nhờ Admin bổ sung văn bản quy định này vào kho tài liệu nhé! 🦫";
+        }
       }
 
       setMessages((prev) => [

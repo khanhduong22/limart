@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,11 +10,16 @@ import {
 } from "@/lib/payrollExport";
 import { api } from "@/lib/api";
 import { usePayrollAdminStore } from "@/stores/usePayrollAdminStore";
+
 const PayrollAdjustmentDialog = React.lazy(() =>
-  import("./payroll/PayrollAdjustmentDialog").then((m) => ({ default: m.PayrollAdjustmentDialog }))
+  import("./payroll/PayrollAdjustmentDialog").then((m) => ({
+    default: m.PayrollAdjustmentDialog,
+  }))
 );
 const PayrollExportModal = React.lazy(() =>
-  import("./payroll/PayrollExportModal").then((m) => ({ default: m.PayrollExportModal }))
+  import("./payroll/PayrollExportModal").then((m) => ({
+    default: m.PayrollExportModal,
+  }))
 );
 
 export interface PayrollAdminClientProps {
@@ -29,17 +34,221 @@ export interface PayrollAdminClientProps {
   onRefresh?: () => void;
 }
 
+interface PayrollTableRowProps {
+  user: any;
+  year: number;
+  month: number;
+  closedState: boolean;
+  bonusPercent: number;
+  bonusTargets: string[];
+  excludedUsers: string[];
+  toggleExcludeUser: (id: string) => void;
+  openAdjustment: (user: any) => void;
+  handleDownloadSingleXLSX: (user: any) => void;
+  f: (n: number) => string;
+}
+
+const PayrollTableRow = React.memo(function PayrollTableRow({
+  user,
+  year,
+  month,
+  closedState,
+  bonusPercent,
+  bonusTargets,
+  excludedUsers,
+  toggleExcludeUser,
+  openAdjustment,
+  handleDownloadSingleXLSX,
+  f,
+}: PayrollTableRowProps) {
+  const userId = user.id || user.userId;
+  const userName = user.name || user.userName || "Nhân viên";
+  const userEmail = user.email || user.userEmail || "";
+  const stats = user.stats || {
+    totalSalary: user.totalSalary || 0,
+    baseSalary: user.baseSalary || 0,
+    totalHours: user.totalHours || user.actualHours || 0,
+    employmentType:
+      user.employmentType ||
+      (user.department === "Toàn thời gian" ? "FULL_TIME" : "PART_TIME"),
+    totalAdjustments: user.allowance || 0,
+  };
+
+  const isThuKpiSalary =
+    (userEmail === "cuccung123456789@gmail.com" || userName === "Thư") &&
+    (year > 2026 || (year === 2026 && month >= 6));
+
+  const shouldApply =
+    !closedState &&
+    (bonusTargets.includes(stats.employmentType) ||
+      (isThuKpiSalary && bonusTargets.includes("PART_TIME"))) &&
+    !excludedUsers.includes(userId);
+
+  const bonusAmount = closedState
+    ? stats.bonusAmount || 0
+    : shouldApply
+    ? ((stats.baseSalary || 0) * bonusPercent) / 100
+    : 0;
+
+  const finalSalary = closedState
+    ? stats.finalNet ?? stats.totalSalary
+    : (stats.totalSalary || 0) + bonusAmount;
+
+  const isResigned = user.isActive === false || stats.isActive === false;
+
+  return (
+    <tr
+      key={userId}
+      className={`border-b transition-colors hover:bg-muted/50 ${
+        isResigned ? "bg-slate-50/50 opacity-90" : ""
+      }`}
+    >
+      <td className="p-4 align-middle">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-xs uppercase border border-primary/20 shrink-0">
+            {(userName || "?").charAt(0).toUpperCase()}
+          </div>
+          <div className="flex flex-col min-w-0">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <Link
+                to={`/employees/${userId}`}
+                className="hover:underline text-blue-600 font-semibold truncate"
+              >
+                {userName}
+              </Link>
+              {isResigned && (
+                <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded font-medium">
+                  Đã nghỉ
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground truncate">
+              {userEmail}
+            </span>
+          </div>
+        </div>
+      </td>
+      <td className="p-4 align-middle font-mono">
+        {stats.employmentType === "FULL_TIME" ? (
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm">
+                {(Number(stats.totalHours) || 0).toFixed(1)}h
+              </span>
+              <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground font-sans">
+                {stats.daysWorked || 22}/{stats.standardDays || 26} công
+              </span>
+            </div>
+            {stats.leaveCount > 0 && (
+              <span className="text-[10px] text-red-600 font-semibold">
+                Nghỉ: {stats.leaveCount}
+              </span>
+            )}
+          </div>
+        ) : (
+          <span className="font-bold text-sm">
+            {(Number(stats.totalHours) || 0).toFixed(1)}h
+          </span>
+        )}
+      </td>
+      <td className="p-4 align-middle text-right font-medium text-gray-700">
+        {f(stats.baseSalary || 0)}
+      </td>
+      <td className="p-4 align-middle text-center w-8">
+        {!closedState &&
+          (bonusTargets.includes(stats.employmentType) ||
+            (isThuKpiSalary && bonusTargets.includes("PART_TIME"))) && (
+            <input
+              type="checkbox"
+              className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+              checked={!excludedUsers.includes(userId)}
+              onChange={() => toggleExcludeUser(userId)}
+              title="Tích để nhận thưởng, bỏ tích để loại khỏi thưởng"
+            />
+          )}
+      </td>
+      <td className="p-4 align-middle text-right font-medium text-blue-600">
+        {bonusAmount > 0 ? "+" : ""}
+        {f(bonusAmount)}
+      </td>
+      <td className="p-4 align-middle">
+        <div className="flex flex-col gap-1">
+          <span
+            className={`font-medium ${
+              (stats.totalAdjustments || 0) > 0
+                ? "text-emerald-600"
+                : (stats.totalAdjustments || 0) < 0
+                ? "text-red-500"
+                : "text-gray-500"
+            }`}
+          >
+            {(stats.totalAdjustments || 0) > 0 ? "+" : ""}
+            {f(stats.totalAdjustments || 0)}
+          </span>
+          {stats.latePenaltyAmount > 0 && (
+            <span className="text-[10px] text-red-500 font-semibold">
+              Trễ {stats.lateCount} lần → -{f(stats.latePenaltyAmount)}
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="p-4 align-middle text-right">
+        <span className="font-bold text-emerald-700 text-base">
+          {f(finalSalary)}
+        </span>
+      </td>
+      <td className="p-4 align-middle text-right">
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 min-h-[36px] min-w-[36px] px-2.5 font-bold"
+            onClick={() => openAdjustment(user)}
+            title="Thưởng/Phạt"
+            disabled={closedState}
+          >
+            ±
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 min-h-[36px] min-w-[36px] px-2.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+            onClick={() => handleDownloadSingleXLSX(user)}
+            title="Xuất phiếu lương"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+          <Link to={`/employees/${userId}`}>
+            <Button
+              variant="default"
+              size="sm"
+              className="h-9 min-h-[36px] px-3 text-xs font-semibold"
+            >
+              Chi tiết
+            </Button>
+          </Link>
+        </div>
+      </td>
+    </tr>
+  );
+});
+
+const DEFAULT_BONUS_TARGETS = ["PART_TIME"];
+const DEFAULT_EXCLUDED_USERS: string[] = [];
+
 export default function PayrollAdminClient({
   data = [],
   month = new Date().getMonth() + 1,
   year = new Date().getFullYear(),
   isClosed = false,
   initialBonusPercent = 0,
-  initialBonusTargets = ["PART_TIME"],
-  initialExcludedUsers = [],
+  initialBonusTargets = DEFAULT_BONUS_TARGETS,
+  initialExcludedUsers = DEFAULT_EXCLUDED_USERS,
   onMonthChange,
   onRefresh,
 }: PayrollAdminClientProps) {
+  const [showResigned, setShowResigned] = useState(false);
+
   const {
     searchTerm,
     setSearchTerm,
@@ -68,12 +277,21 @@ export default function PayrollAdminClient({
     closeExport,
   } = usePayrollAdminStore();
 
-  // Sync prop changes into store
+  // Sync prop changes into store without triggering render loops
   useEffect(() => {
-    setBonusPercent(initialBonusPercent);
-    setBonusTargets(initialBonusTargets);
-    setExcludedUsers(initialExcludedUsers || []);
-    setClosedState(isClosed);
+    const store = usePayrollAdminStore.getState();
+    if (store.bonusPercent !== initialBonusPercent) {
+      setBonusPercent(initialBonusPercent);
+    }
+    if (JSON.stringify(store.bonusTargets) !== JSON.stringify(initialBonusTargets)) {
+      setBonusTargets(initialBonusTargets);
+    }
+    if (JSON.stringify(store.excludedUsers) !== JSON.stringify(initialExcludedUsers)) {
+      setExcludedUsers(initialExcludedUsers || []);
+    }
+    if (store.closedState !== isClosed) {
+      setClosedState(isClosed);
+    }
   }, [
     initialBonusPercent,
     initialBonusTargets,
@@ -86,36 +304,263 @@ export default function PayrollAdminClient({
   ]);
 
   const safeData = Array.isArray(data) ? data : [];
-  const filteredData = safeData.filter((u) => {
-    const name = u?.name || u?.userName || "";
-    const email = u?.email || u?.userEmail || "";
-    return (
-      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  });
+  const filteredData = useMemo(() => {
+    return safeData.filter((u) => {
+      const name = u?.name || u?.userName || "";
+      const email = u?.email || u?.userEmail || "";
+      return (
+        name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        email.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    });
+  }, [safeData, searchTerm]);
 
-  const totalWithBonus = closedState
-    ? filteredData.reduce((sum, u) => {
-        const stats = u.stats || u || {};
-        return sum + (stats.finalNet || stats.totalSalary || 0);
-      }, 0)
-    : filteredData.reduce((sum, u) => {
-        const stats = u.stats || u || {};
-        const userName = u.name || u.userName || "";
-        const userEmail = u.email || u.userEmail || "";
-        const isThuKpiSalary =
-          (userEmail === "cuccung123456789@gmail.com" || userName === "Thư") &&
-          (year > 2026 || (year === 2026 && month >= 6));
-        const shouldApply =
-          (bonusTargets.includes(stats.employmentType) ||
-            (isThuKpiSalary && bonusTargets.includes("PART_TIME"))) &&
-          !excludedUsers.includes(u.id || u.userId);
-        const bonus = shouldApply
-          ? ((stats.baseSalary || 0) * bonusPercent) / 100
-          : 0;
-        return sum + (stats.totalSalary || 0) + bonus;
-      }, 0);
+  // Compute metrics for single user
+  const getUserMetrics = useCallback(
+    (u: any) => {
+      const userId = u.id || u.userId;
+      const userName = u.name || u.userName || "Nhân viên";
+      const userEmail = u.email || u.userEmail || "";
+      const stats = u.stats || {
+        totalSalary: u.totalSalary || 0,
+        baseSalary: u.baseSalary || 0,
+        totalHours: u.totalHours || u.actualHours || 0,
+        employmentType:
+          u.employmentType ||
+          (u.department === "Toàn thời gian" ? "FULL_TIME" : "PART_TIME"),
+        totalAdjustments: u.allowance || 0,
+      };
+
+      const isThuKpiSalary =
+        (userEmail === "cuccung123456789@gmail.com" || userName === "Thư") &&
+        (year > 2026 || (year === 2026 && month >= 6));
+
+      const shouldApply =
+        !closedState &&
+        (bonusTargets.includes(stats.employmentType) ||
+          (isThuKpiSalary && bonusTargets.includes("PART_TIME"))) &&
+        !excludedUsers.includes(userId);
+
+      const bonusAmount = closedState
+        ? stats.bonusAmount || 0
+        : shouldApply
+        ? ((stats.baseSalary || 0) * bonusPercent) / 100
+        : 0;
+
+      const finalSalary = closedState
+        ? stats.finalNet ?? stats.totalSalary
+        : (stats.totalSalary || 0) + bonusAmount;
+
+      const totalHours = Number(stats.totalHours || stats.actualHours || 0);
+
+      return {
+        userId,
+        userName,
+        userEmail,
+        stats,
+        bonusAmount,
+        finalSalary,
+        totalHours,
+      };
+    },
+    [closedState, bonusTargets, bonusPercent, excludedUsers, year, month]
+  );
+
+  // Group filtered data into 5 categories similar to UserManager.tsx
+  const groupedPayroll = useMemo(() => {
+    const adminList: any[] = [];
+    const partnerList: any[] = [];
+    const fullTimeList: any[] = [];
+    const partTimeList: any[] = [];
+    const resignedList: any[] = [];
+
+    for (const u of filteredData) {
+      const isActive = u?.isActive !== false && u?.stats?.isActive !== false;
+      if (!isActive) {
+        resignedList.push(u);
+        continue;
+      }
+
+      const role = u?.role || u?.stats?.role || "USER";
+      if (role === "ADMIN") {
+        adminList.push(u);
+        continue;
+      }
+
+      if (role === "PARTNER") {
+        partnerList.push(u);
+        continue;
+      }
+
+      const stats = u?.stats || u || {};
+      const employmentType =
+        stats.employmentType ||
+        u?.employmentType ||
+        (u?.department === "Toàn thời gian" ||
+        stats.department === "Toàn thời gian"
+          ? "FULL_TIME"
+          : "PART_TIME");
+      const department = u?.department || stats.department || "";
+
+      if (employmentType === "FULL_TIME" || department === "Toàn thời gian") {
+        fullTimeList.push(u);
+      } else {
+        partTimeList.push(u);
+      }
+    }
+
+    // Sort users inside each group
+    adminList.sort((a, b) => {
+      const salA =
+        Number(a.monthlySalary || a.stats?.baseSalary || a.stats?.totalSalary) ||
+        Number(a.hourlyRate || a.stats?.hourlyRate) ||
+        0;
+      const salB =
+        Number(b.monthlySalary || b.stats?.baseSalary || b.stats?.totalSalary) ||
+        Number(b.hourlyRate || b.stats?.hourlyRate) ||
+        0;
+      if (salB !== salA) return salB - salA;
+      return (a.name || a.userName || "").localeCompare(
+        b.name || b.userName || "",
+        "vi"
+      );
+    });
+
+    partnerList.sort((a, b) => {
+      const salA =
+        Number(a.monthlySalary || a.stats?.baseSalary || a.stats?.totalSalary) ||
+        Number(a.hourlyRate || a.stats?.hourlyRate) ||
+        0;
+      const salB =
+        Number(b.monthlySalary || b.stats?.baseSalary || b.stats?.totalSalary) ||
+        Number(b.hourlyRate || b.stats?.hourlyRate) ||
+        0;
+      if (salB !== salA) return salB - salA;
+      return (a.name || a.userName || "").localeCompare(
+        b.name || b.userName || "",
+        "vi"
+      );
+    });
+
+    fullTimeList.sort((a, b) => {
+      const salA =
+        Number(a.monthlySalary || a.stats?.baseSalary || a.stats?.totalSalary) ||
+        0;
+      const salB =
+        Number(b.monthlySalary || b.stats?.baseSalary || b.stats?.totalSalary) ||
+        0;
+      if (salB !== salA) return salB - salA;
+      return (a.name || a.userName || "").localeCompare(
+        b.name || b.userName || "",
+        "vi"
+      );
+    });
+
+    partTimeList.sort((a, b) => {
+      const rateA = Number(a.hourlyRate || a.stats?.hourlyRate) || 0;
+      const rateB = Number(b.hourlyRate || b.stats?.hourlyRate) || 0;
+      if (rateB !== rateA) return rateB - rateA;
+      return (a.name || a.userName || "").localeCompare(
+        b.name || b.userName || "",
+        "vi"
+      );
+    });
+
+    resignedList.sort((a, b) =>
+      (a.name || a.userName || "").localeCompare(
+        b.name || b.userName || "",
+        "vi"
+      )
+    );
+
+    return {
+      adminList,
+      partnerList,
+      fullTimeList,
+      partTimeList,
+      resignedList,
+    };
+  }, [filteredData]);
+
+  const calculateGroupTotals = useCallback(
+    (users: any[]) => {
+      let totalHours = 0;
+      let totalSalary = 0;
+      for (const u of users) {
+        const m = getUserMetrics(u);
+        totalHours += m.totalHours;
+        totalSalary += m.finalSalary;
+      }
+      return { totalHours, totalSalary };
+    },
+    [getUserMetrics]
+  );
+
+  const groups = useMemo(() => {
+    return [
+      {
+        id: "ADMIN",
+        title: "QUẢN TRỊ VIÊN",
+        icon: "🛡️",
+        users: groupedPayroll.adminList,
+        totals: calculateGroupTotals(groupedPayroll.adminList),
+        headerBg: "bg-amber-50/70 border-amber-200",
+        titleColor: "text-amber-900",
+        badgeClass: "bg-amber-100/80 text-amber-900 border-amber-300",
+        isCollapsible: false,
+      },
+      {
+        id: "PARTNER",
+        title: "ĐỐI TÁC WFH / MARKETING",
+        icon: "💼",
+        users: groupedPayroll.partnerList,
+        totals: calculateGroupTotals(groupedPayroll.partnerList),
+        headerBg: "bg-purple-50/70 border-purple-200",
+        titleColor: "text-purple-900",
+        badgeClass: "bg-purple-100/80 text-purple-900 border-purple-300",
+        isCollapsible: false,
+      },
+      {
+        id: "FULL_TIME",
+        title: "TOÀN THỜI GIAN",
+        icon: "🏪",
+        users: groupedPayroll.fullTimeList,
+        totals: calculateGroupTotals(groupedPayroll.fullTimeList),
+        headerBg: "bg-blue-50/70 border-blue-200",
+        titleColor: "text-blue-900",
+        badgeClass: "bg-blue-100/80 text-blue-900 border-blue-300",
+        isCollapsible: false,
+      },
+      {
+        id: "PART_TIME",
+        title: "BÁN THỜI GIAN",
+        icon: "⏱️",
+        users: groupedPayroll.partTimeList,
+        totals: calculateGroupTotals(groupedPayroll.partTimeList),
+        headerBg: "bg-emerald-50/70 border-emerald-200",
+        titleColor: "text-emerald-900",
+        badgeClass: "bg-emerald-100/80 text-emerald-900 border-emerald-300",
+        isCollapsible: false,
+      },
+      {
+        id: "RESIGNED",
+        title: "NHÂN VIÊN ĐÃ NGHỈ VIỆC",
+        icon: "📁",
+        users: groupedPayroll.resignedList,
+        totals: calculateGroupTotals(groupedPayroll.resignedList),
+        headerBg: "bg-slate-100/90 border-slate-200",
+        titleColor: "text-slate-700",
+        badgeClass: "bg-slate-200 text-slate-700 border-slate-300",
+        isCollapsible: true,
+      },
+    ];
+  }, [groupedPayroll, calculateGroupTotals]);
+
+  const totalWithBonus = useMemo(() => {
+    return filteredData.reduce((sum, u) => {
+      return sum + getUserMetrics(u).finalSalary;
+    }, 0);
+  }, [filteredData, getUserMetrics]);
 
   const handleDownloadSingleXLSX = async (user: any) => {
     try {
@@ -408,170 +853,127 @@ export default function PayrollAdminClient({
               </tr>
             </thead>
             <tbody className="[&_tr:last-child]:border-0 divide-y">
-              {filteredData.map((user) => {
-                const userId = user.id || user.userId;
-                const userName = user.name || user.userName || "Nhân viên";
-                const userEmail = user.email || user.userEmail || "";
-                const stats = user.stats || {
-                  totalSalary: user.totalSalary || 0,
-                  baseSalary: user.baseSalary || 0,
-                  totalHours: user.totalHours || user.actualHours || 0,
-                  employmentType:
-                    user.employmentType ||
-                    (user.department === "Toàn thời gian"
-                      ? "FULL_TIME"
-                      : "PART_TIME"),
-                  totalAdjustments: user.allowance || 0,
-                };
-                const isThuKpiSalary =
-                  (userEmail === "cuccung123456789@gmail.com" ||
-                    userName === "Thư") &&
-                  (year > 2026 || (year === 2026 && month >= 6));
-                const shouldApply =
-                  !closedState &&
-                  (bonusTargets.includes(stats.employmentType) ||
-                    (isThuKpiSalary && bonusTargets.includes("PART_TIME"))) &&
-                  !excludedUsers.includes(userId);
-                const bonusAmount = closedState
-                  ? stats.bonusAmount || 0
-                  : shouldApply
-                  ? ((stats.baseSalary || 0) * bonusPercent) / 100
-                  : 0;
-
-                const finalSalary = closedState
-                  ? stats.finalNet ?? stats.totalSalary
-                  : (stats.totalSalary || 0) + bonusAmount;
-
-                return (
-                  <tr
-                    key={userId}
-                    className="border-b transition-colors hover:bg-muted/50"
+              {filteredData.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="p-8 text-center text-sm text-muted-foreground italic"
                   >
-                    <td className="p-4 align-middle">
-                      <div className="flex items-center gap-3">
-                        <div className="h-9 w-9 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold text-xs uppercase border border-primary/20">
-                          {(userName || "?").charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex flex-col">
-                          <Link
-                            to={`/employees/${userId}`}
-                            className="hover:underline text-blue-600 font-semibold"
-                          >
-                            {userName}
-                          </Link>
-                          <span className="text-xs text-muted-foreground">
-                            {userEmail}
-                          </span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="p-4 align-middle font-mono">
-                      {stats.employmentType === "FULL_TIME" ? (
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-sm">
-                              {(Number(stats.totalHours) || 0).toFixed(1)}h
-                            </span>
-                            <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded text-secondary-foreground font-sans">
-                              {stats.daysWorked || 22}/
-                              {stats.standardDays || 26} công
-                            </span>
+                    {searchTerm
+                      ? `Không tìm thấy nhân viên nào phù hợp với từ khóa "${searchTerm}"`
+                      : "Không có dữ liệu bảng lương trong tháng này"}
+                  </td>
+                </tr>
+              ) : (
+                groups.map((group) => {
+                  if (group.users.length === 0) return null;
+                  const isExpanded = !group.isCollapsible || showResigned;
+
+                  return (
+                    <React.Fragment key={`group-${group.id}`}>
+                      {/* Group Header Row */}
+                      <tr
+                        className={`border-y ${group.headerBg} transition-colors ${
+                          group.isCollapsible
+                            ? "cursor-pointer select-none hover:bg-slate-200/60"
+                            : ""
+                        }`}
+                        onClick={
+                          group.isCollapsible
+                            ? () => setShowResigned((prev) => !prev)
+                            : undefined
+                        }
+                      >
+                        <td colSpan={8} className="py-2.5 px-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              {group.isCollapsible ? (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowResigned((prev) => !prev);
+                                  }}
+                                  className="flex items-center gap-1.5 text-xs sm:text-sm font-bold text-slate-700 hover:text-slate-900 transition-colors cursor-pointer focus:outline-none"
+                                >
+                                  <span className="text-xs transition-transform inline-block w-3 text-center">
+                                    {showResigned ? "▼" : "▶"}
+                                  </span>
+                                  <span className="text-base leading-none">
+                                    {group.icon}
+                                  </span>
+                                  <span className="tracking-wide uppercase">
+                                    {group.title}
+                                  </span>
+                                  <span className="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-slate-200 text-slate-700 border border-slate-300">
+                                    {group.users.length}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground font-normal ml-1">
+                                    ({showResigned ? "Thu gọn" : "Mở rộng"})
+                                  </span>
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-base leading-none">
+                                    {group.icon}
+                                  </span>
+                                  <span
+                                    className={`text-xs sm:text-sm font-bold tracking-wide uppercase ${group.titleColor}`}
+                                  >
+                                    {group.title}
+                                  </span>
+                                  <span
+                                    className={`px-2 py-0.5 text-xs font-semibold rounded-full border ${group.badgeClass}`}
+                                  >
+                                    {group.users.length} nhân viên
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+                              <span className="text-slate-600 font-medium">
+                                Tổng giờ công:{" "}
+                                <strong className="font-mono text-slate-900 font-bold">
+                                  {group.totals.totalHours.toFixed(1)}h
+                                </strong>
+                              </span>
+                              <span className="text-slate-300 hidden sm:inline">
+                                •
+                              </span>
+                              <span className="text-slate-600 font-medium">
+                                Tổng lương:{" "}
+                                <strong className="text-emerald-700 font-bold">
+                                  {f(group.totals.totalSalary)}
+                                </strong>
+                              </span>
+                            </div>
                           </div>
-                          {stats.leaveCount > 0 && (
-                            <span className="text-[10px] text-red-600 font-semibold">
-                              Nghỉ: {stats.leaveCount}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="font-bold text-sm">
-                          {(Number(stats.totalHours) || 0).toFixed(1)}h
-                        </span>
-                      )}
-                    </td>
-                    <td className="p-4 align-middle text-right font-medium text-gray-700">
-                      {f(stats.baseSalary || 0)}
-                    </td>
-                    <td className="p-4 align-middle text-center w-8">
-                      {!closedState &&
-                        (bonusTargets.includes(stats.employmentType) ||
-                          (isThuKpiSalary &&
-                            bonusTargets.includes("PART_TIME"))) && (
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
-                            checked={!excludedUsers.includes(userId)}
-                            onChange={() => toggleExcludeUser(userId)}
-                            title="Tích để nhận thưởng, bỏ tích để loại khỏi thưởng"
+                        </td>
+                      </tr>
+
+                      {/* Group Employee Rows */}
+                      {isExpanded &&
+                        group.users.map((user) => (
+                          <PayrollTableRow
+                            key={user.id || user.userId}
+                            user={user}
+                            year={year}
+                            month={month}
+                            closedState={closedState}
+                            bonusPercent={bonusPercent}
+                            bonusTargets={bonusTargets}
+                            excludedUsers={excludedUsers}
+                            toggleExcludeUser={toggleExcludeUser}
+                            openAdjustment={openAdjustment}
+                            handleDownloadSingleXLSX={handleDownloadSingleXLSX}
+                            f={f}
                           />
-                        )}
-                    </td>
-                    <td className="p-4 align-middle text-right font-medium text-blue-600">
-                      {bonusAmount > 0 ? "+" : ""}
-                      {f(bonusAmount)}
-                    </td>
-                    <td className="p-4 align-middle">
-                      <div className="flex flex-col gap-1">
-                        <span
-                          className={`font-medium ${
-                            (stats.totalAdjustments || 0) > 0
-                              ? "text-emerald-600"
-                              : (stats.totalAdjustments || 0) < 0
-                              ? "text-red-500"
-                              : "text-gray-500"
-                          }`}
-                        >
-                          {(stats.totalAdjustments || 0) > 0 ? "+" : ""}
-                          {f(stats.totalAdjustments || 0)}
-                        </span>
-                        {stats.latePenaltyAmount > 0 && (
-                          <span className="text-[10px] text-red-500 font-semibold">
-                            Trễ {stats.lateCount} lần → -
-                            {f(stats.latePenaltyAmount)}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="p-4 align-middle text-right">
-                      <span className="font-bold text-emerald-700 text-base">
-                        {f(finalSalary)}
-                      </span>
-                    </td>
-                    <td className="p-4 align-middle text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-9 min-h-[36px] min-w-[36px] px-2.5 font-bold"
-                          onClick={() => openAdjustment(user)}
-                          title="Thưởng/Phạt"
-                          disabled={closedState}
-                        >
-                          ±
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-9 min-h-[36px] min-w-[36px] px-2.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                          onClick={() => handleDownloadSingleXLSX(user)}
-                          title="Xuất phiếu lương"
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Link to={`/employees/${userId}`}>
-                          <Button
-                            variant="default"
-                            size="sm"
-                            className="h-9 min-h-[36px] px-3 text-xs font-semibold"
-                          >
-                            Chi tiết
-                          </Button>
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                        ))}
+                    </React.Fragment>
+                  );
+                })
+              )}
             </tbody>
             <tfoot className="bg-muted font-bold text-sm">
               <tr>

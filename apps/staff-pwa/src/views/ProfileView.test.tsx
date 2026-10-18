@@ -1,12 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ProfileView } from "./ProfileView";
 import { StaffProfile } from "@/lib/api-client";
 
+const mockPush = vi.fn();
 vi.mock("@/lib/router", () => ({
   useRouter: () => ({
-    push: vi.fn(),
+    push: mockPush,
   }),
 }));
 
@@ -66,5 +67,27 @@ describe("ProfileView Avatar & Performance Audit", () => {
 
     const img = screen.getByRole("img", { name: "Nguyễn Văn A" });
     expect(img.getAttribute("src")).toBe("/capybara_mascot.webp");
+  });
+
+  it("renders NotificationOptInCard with shift reminder settings in Profile tab", async () => {
+    render(<ProfileView profile={mockProfile} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Thông Báo Nhắc Ca Tự Động")).toBeDefined();
+    });
+  });
+
+  it("renders and navigates to Lịch sử chấm công (/history) and Vòng quay nhân phẩm (/lucky-wheel)", () => {
+    render(<ProfileView profile={mockProfile} />);
+
+    const historyBtn = screen.getByText("Lịch sử chấm công");
+    expect(historyBtn).toBeDefined();
+    fireEvent.click(historyBtn);
+    expect(mockPush).toHaveBeenCalledWith("/history");
+
+    const luckyWheelBtn = screen.getByText("Vòng quay nhân phẩm");
+    expect(luckyWheelBtn).toBeDefined();
+    fireEvent.click(luckyWheelBtn);
+    expect(mockPush).toHaveBeenCalledWith("/lucky-wheel");
   });
 });

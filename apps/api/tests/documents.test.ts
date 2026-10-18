@@ -456,6 +456,206 @@ describe("Documents Routes", () => {
       expect(json.data.totalDocs).toBe(2);
       expect(json.data.syncedDocs).toBe(2);
     });
+
+    it("returns complete details for attendance bonus inquiry (Điều kiện nhận thưởng chuyên cần 200k?)", async () => {
+      mockDocFindMany.mockResolvedValue([]);
+
+      const res = await app.request("/api/documents/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: "Điều kiện nhận thưởng chuyên cần 200k?",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      const reply = json.reply || json.content;
+      expect(reply).toContain("130 giờ");
+      expect(reply).toContain("200.000");
+      expect(reply).toContain("Vua Đóng Hàng");
+      expect(reply).toContain("bưng hàng lên lầu");
+    });
+
+    it("returns complete late check-in rules with 1 minute grace period and 24h explanation", async () => {
+      mockDocFindMany.mockResolvedValue([]);
+
+      const res = await app.request("/api/documents/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: "Quy định phạt đi muộn như thế nào?",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      const reply = json.reply || json.content;
+      expect(reply).toContain("1 phút");
+      expect(reply).toContain("giải trình");
+    });
+
+    it("returns complete lucky wheel policy with check-in condition and wheel spin turn", async () => {
+      mockDocFindMany.mockResolvedValue([]);
+
+      const res = await app.request("/api/documents/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: "Cách cấp quyền quay Vòng Quay May Mắn?",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      const reply = json.reply || json.content;
+      expect(reply).toContain("Check-in");
+      expect(reply).toContain("lượt quay");
+    });
+
+    it("returns explanation request procedure for 'Quy trình xin giải trình?'", async () => {
+      mockDocFindMany.mockResolvedValue([]);
+
+      const res = await app.request("/api/documents/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: "Quy trình xin giải trình?",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      const reply = json.reply || json.content;
+      expect(reply).toContain("Xin giải trình");
+      expect(reply).toContain("/requests");
+      expect(reply).toContain("24 giờ");
+    });
+
+    it("returns work schedule and shift swap guidance for 'Cách đăng ký lịch làm việc?'", async () => {
+      mockDocFindMany.mockResolvedValue([]);
+
+      const res = await app.request("/api/documents/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: "Cách đăng ký lịch làm việc?",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const json = await res.json();
+      expect(json.success).toBe(true);
+      const reply = json.reply || json.content;
+      expect(reply).toContain("Lịch trực");
+      expect(reply).toContain("/schedule");
+      expect(reply).toContain("Ca Sáng");
+      expect(reply).toContain("Kèo thơm");
+    });
+
+    it("injects CORE_OPERATIONAL_KNOWLEDGE into Gemini system instruction when API key is configured", async () => {
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const originalKey = process.env.GEMINI_API_KEY;
+      process.env.GEMINI_API_KEY = "mock-gemini-key";
+
+      let capturedSystemInstruction = "";
+      const mockGenerateContent = vi.fn().mockResolvedValue({
+        response: { text: () => "Câu trả lời từ Gemini đã nhận đủ quy chế 200k" },
+      });
+      const mockGetGenerativeModel = vi.fn().mockImplementation((opts: any) => {
+        if (opts.systemInstruction) {
+          capturedSystemInstruction = opts.systemInstruction;
+        }
+        return {
+          generateContent: mockGenerateContent,
+          embedContent: vi.fn().mockResolvedValue({
+            embedding: { values: [0.1, 0.2, 0.3] },
+          }),
+        };
+      });
+
+      const spy = vi.spyOn(GoogleGenerativeAI.prototype, "getGenerativeModel").mockImplementation(mockGetGenerativeModel);
+
+      try {
+        const res = await app.request("/api/documents/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: "Điều kiện nhận thưởng chuyên cần 200k?" }),
+        });
+
+        expect(res.status).toBe(200);
+        const json = await res.json();
+        expect(json.success).toBe(true);
+        expect(capturedSystemInstruction).toContain("CẨM NANG & QUY CHẾ VẬN HÀNH CƠ SỞ (BASELINE KNOWLEDGE):");
+        expect(capturedSystemInstruction).toContain("130 giờ công");
+        expect(capturedSystemInstruction).toContain("+200.000 ₫");
+        expect(capturedSystemInstruction).toContain("TUYỆT ĐỐI KHÔNG từ chối hoặc nói chưa có tài liệu");
+      } finally {
+        spy.mockRestore();
+        if (originalKey !== undefined) {
+          process.env.GEMINI_API_KEY = originalKey;
+        } else {
+          delete process.env.GEMINI_API_KEY;
+        }
+      }
+    });
+  });
+
+  describe("CORE_OPERATIONAL_KNOWLEDGE and getKeywordFallbackContext", () => {
+    it("contains all core operational rules in CORE_OPERATIONAL_KNOWLEDGE", async () => {
+      const { CORE_OPERATIONAL_KNOWLEDGE } = await import("../src/routes/documents.route");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("130 giờ công");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("+200.000 ₫");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("Vua Đóng Hàng");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("bưng hàng lên lầu");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("1 phút");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("Xin giải trình");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("Check-in");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("Vòng quay");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("8h30 - 21h30");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("unboxing");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("Lịch trực");
+      expect(CORE_OPERATIONAL_KNOWLEDGE).toContain("Kèo thơm");
+    });
+
+    it("extracts relevant keyword fallback context for queries", async () => {
+      const { getKeywordFallbackContext } = await import("../src/routes/documents.route");
+      const bonusContext = getKeywordFallbackContext("Điều kiện nhận thưởng chuyên cần 200k?");
+      expect(bonusContext).toContain("130 giờ công");
+      expect(bonusContext).toContain("200.000");
+      expect(bonusContext).toContain("Vua Đóng Hàng");
+      expect(bonusContext).toContain("bưng hàng lên lầu");
+
+      const lateContext = getKeywordFallbackContext("Quy định đi muộn");
+      expect(lateContext).toContain("1 phút");
+      expect(lateContext).toContain("giải trình");
+
+      const wheelContext = getKeywordFallbackContext("Vòng quay may mắn");
+      expect(wheelContext).toContain("Check-in");
+      expect(wheelContext).toContain("lượt quay");
+
+      const explainContext = getKeywordFallbackContext("Quy trình xin giải trình?");
+      expect(explainContext).toContain("Xin giải trình");
+      expect(explainContext).toContain("/requests");
+
+      const scheduleContext = getKeywordFallbackContext("Cách đăng ký lịch làm việc?");
+      expect(scheduleContext).toContain("Lịch trực");
+      expect(scheduleContext).toContain("/schedule");
+    });
   });
 
   describe("Relevance Scoring & Stopword Filtering", () => {

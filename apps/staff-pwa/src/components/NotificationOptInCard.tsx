@@ -289,37 +289,37 @@ export const NotificationOptInCard: React.FC<NotificationOptInCardProps> = ({
     <div
       data-testid="notification-opt-in-card"
       className={cn(
-        "rounded-2xl flex flex-col bg-white/95 text-stone-900 border shadow-xs relative overflow-hidden transition-all duration-200",
-        compact ? "p-3.5 gap-2.5" : "p-4 sm:p-5 gap-3.5",
+        "w-full max-w-full overflow-hidden box-border rounded-2xl flex flex-col bg-white/95 text-stone-900 border shadow-xs relative transition-all duration-200",
+        compact ? "p-3 sm:p-3.5 gap-2" : "p-4 sm:p-5 gap-3.5",
         isEnterpriseDemo ? "border-indigo-100" : "border-orange-100"
       )}
     >
       {/* Header with Title & Live Status Badge */}
-      <div className="flex items-center justify-between gap-2.5 relative z-10">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+      <div className="flex items-center justify-between gap-2 relative z-10 w-full min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <div
             className={cn(
               "rounded-xl flex items-center justify-center shrink-0 border",
-              compact ? "w-8 h-8" : "w-9 h-9",
+              compact ? "w-7 h-7" : "w-9 h-9",
               isEnterpriseDemo
                 ? "bg-indigo-50 border-indigo-200/80 text-indigo-600"
                 : "bg-orange-100/80 border-orange-200 text-orange-700"
             )}
           >
-            <BellRing className={cn(compact ? "w-4 h-4" : "w-5 h-5")} />
+            <BellRing className={cn(compact ? "w-3.5 h-3.5" : "w-5 h-5")} />
           </div>
           <div className="min-w-0 flex-1 text-left">
             <h3 className="font-bold text-xs sm:text-sm text-stone-900 tracking-tight truncate">
               Thông Báo Nhắc Ca Tự Động
             </h3>
-            <p className="text-[11px] text-stone-500 truncate">
-              Nhận nhắc nhở tự động trước giờ vào ca & tan ca
+            <p className="text-[10px] sm:text-[11px] text-stone-500 truncate">
+              Nhận nhắc nhở tự động trước giờ vào ca &amp; tan ca
             </p>
           </div>
         </div>
 
         {isActivated && (
-          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10.5px] font-bold shrink-0 whitespace-nowrap">
+          <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-bold shrink-0 whitespace-nowrap">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
             <span>Đã kích hoạt</span>
           </div>
@@ -342,27 +342,27 @@ export const NotificationOptInCard: React.FC<NotificationOptInCardProps> = ({
       )}
 
       {/* Automatic Shift Reminder Schedule Highlights */}
-      <div className={cn("grid grid-cols-1", compact ? "gap-1.5" : "gap-2")}>
+      <div className={cn("grid grid-cols-1 w-full min-w-0", compact ? "gap-1.5" : "gap-2")}>
         <div
           className={cn(
-            "flex items-start gap-2.5 rounded-xl border transition-colors text-left",
+            "flex items-start gap-2 rounded-xl border transition-colors text-left w-full min-w-0",
             compact ? "p-2" : "p-2.5",
             isEnterpriseDemo
               ? "bg-slate-50/80 border-slate-200/80"
               : "bg-orange-50/50 border-orange-100/80"
           )}
         >
-          <span className="text-sm select-none mt-0.5">⏰</span>
-          <div className="flex flex-col min-w-0">
+          <span className="text-xs select-none mt-0.5 shrink-0">⏰</span>
+          <div className="flex flex-col min-w-0 flex-1">
             <span
               className={cn(
-                "text-xs font-bold",
+                "text-[11px] sm:text-xs font-bold truncate",
                 isEnterpriseDemo ? "text-indigo-800" : "text-orange-900"
               )}
             >
               ⏰ Trước 30 phút &amp; 15 phút vào ca
             </span>
-            <span className="text-[11px] font-medium text-stone-600 leading-snug">
+            <span className="text-[10px] sm:text-[11px] font-medium text-stone-600 leading-snug">
               Nhắc chuẩn bị lên đường &amp; kết nối WiFi bấm Check-in đúng giờ
             </span>
           </div>
@@ -370,24 +370,24 @@ export const NotificationOptInCard: React.FC<NotificationOptInCardProps> = ({
 
         <div
           className={cn(
-            "flex items-start gap-2.5 rounded-xl border transition-colors text-left",
+            "flex items-start gap-2 rounded-xl border transition-colors text-left w-full min-w-0",
             compact ? "p-2" : "p-2.5",
             isEnterpriseDemo
               ? "bg-slate-50/80 border-slate-200/80"
               : "bg-amber-50/50 border-amber-100/80"
           )}
         >
-          <span className="text-sm select-none mt-0.5">🏁</span>
-          <div className="flex flex-col min-w-0">
+          <span className="text-xs select-none mt-0.5 shrink-0">🏁</span>
+          <div className="flex flex-col min-w-0 flex-1">
             <span
               className={cn(
-                "text-xs font-bold",
+                "text-[11px] sm:text-xs font-bold truncate",
                 isEnterpriseDemo ? "text-indigo-800" : "text-amber-900"
               )}
             >
               🏁 Trước 30 phút &amp; 15 phút tan ca
             </span>
-            <span className="text-[11px] font-medium text-stone-600 leading-snug">
+            <span className="text-[10px] sm:text-[11px] font-medium text-stone-600 leading-snug">
               Nhắc rà soát công việc bàn giao ca &amp; bấm Check-out trước khi về
             </span>
           </div>
@@ -397,7 +397,7 @@ export const NotificationOptInCard: React.FC<NotificationOptInCardProps> = ({
       {/* iOS Safari Notice */}
       <div
         className={cn(
-          "flex items-start gap-2 rounded-xl border text-[11px] leading-relaxed text-stone-600 text-left",
+          "flex items-start gap-1.5 rounded-xl border text-[10px] sm:text-[10.5px] leading-relaxed text-stone-600 text-left w-full min-w-0",
           compact ? "p-2" : "p-2.5",
           isEnterpriseDemo
             ? "bg-slate-50/70 border-slate-200/70"
@@ -405,13 +405,13 @@ export const NotificationOptInCard: React.FC<NotificationOptInCardProps> = ({
         )}
       >
         <Info className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-        <span>
+        <span className="min-w-0 flex-1">
           Lưu ý trên iPhone (iOS): Hãy bấm &apos;Thêm vào Màn hình chính&apos; (PWA) để nhận thông báo đẩy ngay cả khi khóa màn hình.
         </span>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex flex-col gap-2 pt-0.5">
+      <div className="flex flex-col gap-2 pt-0.5 w-full">
         {!isSubscribed && (
           <button
             type="button"
@@ -419,7 +419,7 @@ export const NotificationOptInCard: React.FC<NotificationOptInCardProps> = ({
             disabled={loading || permission === "denied"}
             className={cn(
               "w-full font-bold rounded-xl px-4 flex items-center justify-center gap-2 shadow-xs active:scale-98 transition-all text-xs tracking-wide cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-white",
-              compact ? "py-2.5" : "py-3",
+              compact ? "py-2" : "py-3",
               isEnterpriseDemo
                 ? "bg-indigo-600 hover:bg-indigo-700"
                 : "bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600"
@@ -440,8 +440,8 @@ export const NotificationOptInCard: React.FC<NotificationOptInCardProps> = ({
             onClick={handleTestNotification}
             disabled={testing}
             className={cn(
-              "w-full font-bold rounded-xl px-4 flex items-center justify-center gap-2 shadow-2xs active:scale-98 transition-all text-xs tracking-wide cursor-pointer disabled:opacity-50",
-              compact ? "py-2.5" : "py-3",
+              "w-full font-bold rounded-xl px-3 flex items-center justify-center gap-1.5 shadow-2xs active:scale-98 transition-all text-xs tracking-wide cursor-pointer disabled:opacity-50",
+              compact ? "py-2" : "py-2.5",
               isEnterpriseDemo
                 ? "bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200"
                 : "bg-orange-50 hover:bg-orange-100 text-orange-900 border border-orange-200"

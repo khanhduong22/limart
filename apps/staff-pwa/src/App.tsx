@@ -204,9 +204,9 @@ function AppContent() {
   const isStaffTasksView = pathname.startsWith("/staff-tasks");
   const isWide = isPartner || isStaffTasksView;
 
-  // Partner redirect guard: If role is PARTNER and on root `/` or `/tasks`, redirect immediately to `/staff-tasks`
+  // Partner redirect guard: If role is PARTNER and on root `/`, redirect immediately to `/staff-tasks`
   useEffect(() => {
-    if (hasCheckedSession && isPartner && (pathname === "/" || pathname === "/tasks")) {
+    if (hasCheckedSession && isPartner && pathname === "/") {
       router.push("/staff-tasks");
     }
   }, [hasCheckedSession, isPartner, pathname, router]);
@@ -229,7 +229,15 @@ function AppContent() {
     if (isPartner) {
       if (path.startsWith("/payroll")) return "payroll";
       if (path.startsWith("/profile")) return "profile";
-      return "staff-tasks";
+      return "tasks";
+    }
+    if (
+      path.startsWith("/tasks") ||
+      path.startsWith("/staff-tasks") ||
+      path.startsWith("/packing") ||
+      path.startsWith("/carrying")
+    ) {
+      return "tasks";
     }
     if (path.startsWith("/schedule")) return "schedule";
     if (path.startsWith("/payroll")) return "payroll";
@@ -241,12 +249,21 @@ function AppContent() {
 
   const handleTabChange = (tab: NavTab) => {
     if (isPartner) {
-      if (tab === "staff-tasks" || tab === "home" || tab === "tasks") {
+      if (tab === "tasks" || tab === "home" || tab === "staff-tasks") {
         router.push("/staff-tasks");
+        return;
+      }
+      if (tab === "payroll") {
+        router.push("/payroll");
+        return;
+      }
+      if (tab === "profile") {
+        router.push("/profile");
         return;
       }
     }
     if (tab === "home") router.push("/");
+    else if (tab === "tasks") router.push("/tasks");
     else if (tab === "staff-tasks") router.push("/staff-tasks");
     else router.push(`/${tab}`);
   };
@@ -362,7 +379,7 @@ function AppContent() {
               {pathname === "/requests" && <RequestsView />}
               {pathname === "/lucky-wheel" && <LuckyWheelView />}
               {pathname === "/rewards" && <RewardsView />}
-              {pathname === "/tasks" && <TasksView />}
+              {pathname === "/tasks" && <TasksView userRole={profile.role} />}
               {pathname === "/packing" && <PackingView />}
               {pathname === "/carrying" && <CarryingView />}
               {pathname === "/staff-tasks" && <StaffTasksView />}

@@ -111,6 +111,12 @@ describe("HomeCheckinView Integration", () => {
     expect(screen.getByText("🔥 12")).toBeDefined();
     expect(screen.getByText("🎁 2 kèo thơm")).toBeDefined();
     expect(screen.getByText("📍 Vào Ca (Check-in)")).toBeDefined();
+    // NotificationOptInCard moved to Profile tab to keep home view clean
+    expect(screen.queryByTestId("notification-opt-in-card")).toBeNull();
+    expect(screen.queryByText("Thông Báo Nhắc Ca Tự Động")).toBeNull();
+    // Functional menu grid & gacha removed to keep home view clean
+    expect(screen.queryByTestId("home-nav-grid")).toBeNull();
+    expect(screen.queryByText("Bảng Vàng & Khen Thưởng")).toBeNull();
   });
 
   it("renders checkin timer card when user has active check-in today", () => {

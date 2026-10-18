@@ -239,4 +239,19 @@ describe("ScheduleClient Integration", () => {
       expect(onRefresh).toHaveBeenCalled();
     });
   });
+
+  it("navigates to /requests when clicking Xin giải trình button", () => {
+    render(
+      <ScheduleClient
+        shifts={mockShifts}
+        currentUserId={testUserId}
+        viewDate={viewDate}
+      />
+    );
+
+    const requestsBtn = screen.getByText(/Xin giải trình/);
+    expect(requestsBtn).toBeDefined();
+    fireEvent.click(requestsBtn);
+    expect(mockPush).toHaveBeenCalledWith("/requests");
+  });
 });

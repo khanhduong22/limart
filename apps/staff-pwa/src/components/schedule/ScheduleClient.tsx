@@ -227,18 +227,28 @@ export default function ScheduleClient({
           </h1>
         </div>
 
-        {onRefresh && (
+        <div className="flex items-center gap-1.5">
           <Button
-            variant="ghost"
-            size="icon"
-            onClick={onRefresh}
-            disabled={isLoading}
-            className="h-7 w-7 rounded-full text-stone-500 hover:text-amber-800"
-            title="Làm mới lịch trực"
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/requests")}
+            className="h-7 sm:h-8 text-[11px] sm:text-xs px-2 sm:px-2.5 rounded-full border-amber-300 bg-amber-50/80 hover:bg-amber-100 text-amber-900 font-bold shadow-2xs transition-all flex items-center gap-1 cursor-pointer"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            <span>📝</span> Xin giải trình
           </Button>
-        )}
+          {onRefresh && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onRefresh}
+              disabled={isLoading}
+              className="h-7 w-7 rounded-full text-stone-500 hover:text-amber-800"
+              title="Làm mới lịch trực"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Weekly Vertical Schedule Card */}

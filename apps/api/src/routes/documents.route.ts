@@ -164,9 +164,188 @@ export function scoreDocuments(
 export const STRICT_NOT_FOUND_MESSAGE =
   "🍊 Hiện tại thông tin về vấn đề này chưa có trong kho tài liệu nội bộ trên hệ thống. Bạn vui lòng liên hệ trực tiếp Quản lý cửa hàng hoặc nhờ Admin bổ sung văn bản quy định này vào kho tài liệu nhé! 🦫";
 
+export const CORE_OPERATIONAL_KNOWLEDGE = `
+[CẨM NANG & QUY CHẾ VẬN HÀNH CỐT LÕI LIMART]
+
+1. CHÍNH SÁCH THƯỞNG NÓNG & CHUYÊN CẦN:
+- Top 1 Chăm chỉ (Số giờ làm cao nhất tháng): Đạt tối thiểu 130 giờ công trong tháng sẽ được thưởng nóng +200.000 ₫ cộng vào bảng lương.
+- Vua Đóng Hàng: Tích luỹ trên 50 điểm đóng gói đơn hàng trong tháng sẽ nhận thưởng nóng +200.000 ₫.
+- Thưởng bưng hàng lên lầu: Nhân viên tích luỹ từ ≥ 10 điểm bưng vác hàng lên lầu được cộng thưởng nóng trực tiếp vào kỳ lương.
+
+2. QUY TẮC PHẠT & XỬ LÝ ĐI MUỘN:
+- Thời gian ân hạn: Hệ thống áp dụng thời gian ân hạn 1 phút so với giờ ca làm việc đã đăng ký.
+- Xử lý vi phạm: Check-in muộn từ phút thứ 2 trở đi sẽ tự động tính vào Bảng vi phạm của tháng. Mức phạt được tính luỹ tiến theo số lần vi phạm trong tháng: trừ điểm chuyên cần nội bộ và quy đổi trừ giờ công theo quy chế.
+- Thủ tục giải trình: Trường hợp có lý do bất khả kháng (hỏng xe, mưa ngập, sự cố kỹ thuật...), nhân viên vào mục "📝 Xin giải trình" trong vòng 24 giờ để gửi Quản lý phê duyệt.
+
+3. QUY CHẾ VÒNG QUAY MAY MẮN:
+- Điều kiện tham gia: Nhân viên phải hoàn thành Check-in hợp lệ trong ngày và chưa thực hiện lượt quay nào trong ngày hôm đó.
+- Cấp quyền quay: Quản lý có thể cấp/mở quyền trong danh mục Nhân sự (switch Vòng quay) hoặc tab Vòng quay > Cấp quyền quay. Phần thưởng sẽ được ghi nhận và tổng hợp tự động vào bảng lương cuối tháng.
+
+4. QUY TRÌNH XỬ LÝ SỰ CỐ HÀNG VỠ / HỎNG (3 BƯỚC):
+- Bước 1: Tiếp nhận và xoa dịu khách hàng ngay lập tức. Gửi lời xin lỗi chân thành vì sự cố vận chuyển ngoài ý muốn. Nhờ khách chụp ảnh chi tiết sản phẩm hỏng, mã vận đơn bên ngoài vỏ hộp và Video mở kiện hàng (unboxing) để shop làm việc đối soát với đơn vị vận chuyển.
+- Bước 2: Đối chiếu hạn mức tự giải quyết khiếu nại:
+  + Hỏng/vỡ nhẹ vẫn dùng được: Thương lượng hỗ trợ hoàn tiền một phần (20% - 50% tuỳ mức độ) hoặc tặng mã voucher giảm giá cho đơn hàng tiếp theo.
+  + Vỡ nát, hỏng hoàn toàn (màu đổ tràn, chai lọ vỡ, toan rách không dùng được): Tiến hành gửi bù ngay 01 sản phẩm mới 100% (miễn phí ship hoàn toàn) hoặc hoàn tiền 100% giá trị sản phẩm.
+  + Lưu ý: Nếu giá trị đơn hàng vượt hạn mức nhân viên được tự duyệt theo quy chế, chụp màn hình gửi nhóm nội bộ để Quản lý duyệt ngay trong vòng 15 phút.
+- Bước 3: Lưu hồ sơ khiếu nại. Ghi nhận thông tin đơn hàng lên hệ thống để bộ phận kho tiến hành khiếu nại bồi thường từ đơn vị vận chuyển.
+- Mẫu tin nhắn chuẩn gửi khách:
+"Dạ em chào anh/chị ạ! 🎨 Dạ em thật sự xin lỗi anh/chị vì sự cố đơn hàng bị [vỡ/hỏng] trong quá trình vận chuyển, khiến trải nghiệm của mình chưa được trọn vẹn ạ. Anh/chị cho em xin thêm hình ảnh/video mở gói hàng và ảnh mã vận đơn bên ngoài hộp để shop xử lý đổi mới hoặc hoàn tiền ngay cho mình nhé ạ. Shop cam kết bảo vệ 100% quyền lợi của anh/chị, anh/chị yên tâm nha! Em đợi phản hồi của mình ạ. 🍊"
+
+5. THÔNG TIN CỬA HÀNG & KÊNH HỖ TRỢ:
+- Giờ mở cửa: 8h30 - 21h30 (Tất cả các ngày trong tuần, kể cả Thứ 7 & Chủ Nhật).
+- Địa chỉ: Cửa hàng Họa cụ LimArt (Vui lòng chọn đúng chi nhánh bạn đang trực hoặc đính kèm vị trí Google Maps của shop).
+- Kênh hỗ trợ: Hotline cửa hàng hoặc Fanpage Họa cụ LimArt.
+- Mẫu tin nhắn chuẩn gửi khách hỏi địa chỉ:
+"Dạ em chào anh/chị ạ! 🎨 Dạ cửa hàng LimArt mở cửa từ 8h30 đến 21h30 tất cả các ngày trong tuần ạ. 📍 Địa chỉ shop tại: [Điền địa chỉ cơ sở / Chi nhánh gần khách nhất]. Anh/chị có thể ghé trực tiếp để xem và trải nghiệm thử các mẫu họa cụ, giấy vẽ, cọ và màu vẽ nhé ạ! Nếu cần chỉ đường chi tiết hơn, anh/chị nhắn em hỗ trợ ngay nha! 🍊"
+
+6. QUY TRÌNH DUYỆT WFH & ĐÓNG GÓI HÀNG:
+- Làm việc tại nhà (WFH): Nhân viên gửi yêu cầu WFH trên ứng dụng → Quản lý duyệt. Khi được duyệt: nếu ngày đó không có check-in thực tế, hệ thống tự động ghi nhận 8 giờ công và hiển thị 'Làm việc từ xa (WFH)' mà không cần Check-in qua IP Wi-Fi văn phòng.
+- Đóng gói hàng: Nhân viên nhận nhiệm vụ tại mục Sàn việc / WFH Tasks, chụp ảnh/báo cáo kết quả đóng đơn để Quản lý duyệt điểm tích luỹ (>50 điểm nhận thưởng Vua Đóng Hàng +200.000 ₫).
+
+7. QUY TRÌNH XIN GIẢI TRÌNH CHẤM CÔNG:
+- Khi cần giải trình đi muộn, về sớm, quên chấm công hoặc xin nghỉ phép:
+- Nhân viên vào mục "📝 Xin giải trình" (hoặc truy cập /requests), chọn ngày cần giải trình, điền lý do rõ ràng và nhấn "Gửi yêu cầu".
+- Quản lý sẽ xem xét và phê duyệt trong vòng 24 giờ.
+
+8. CÁCH ĐĂNG KÝ LỊCH LÀM VIỆC & SANG NHƯỢNG CA:
+- Nhân viên vào mục "📅 Lịch trực" (hoặc truy cập /schedule), chọn tuần và các ca trống để đăng ký:
+  + Ca Sáng: 8h30 - 12h
+  + Ca Chiều: 13h30 - 17h30
+  + Cả ngày: 8h30 - 17h30
+- Sang nhượng ca làm ("Kèo thơm 🎁"): Khi bận đột xuất, nhân viên có thể sang nhượng ca làm cho đồng nghiệp nhận lại trên hệ thống.
+`.trim();
+
+export function getKeywordFallbackContext(userQuery: string): string {
+  const lower = userQuery.toLowerCase();
+  const snippets: string[] = [];
+
+  // 1. Thưởng nóng, chuyên cần, 200k, đóng hàng, bưng hàng
+  if (
+    lower.includes("thưởng") ||
+    lower.includes("chuyên cần") ||
+    lower.includes("200k") ||
+    lower.includes("đóng hàng") ||
+    lower.includes("bưng hàng") ||
+    lower.includes("chăm chỉ")
+  ) {
+    snippets.push(`--- QUY CHẾ THƯỞNG NÓNG & CHUYÊN CẦN LIMART ---
+1. Top 1 Chăm chỉ (Số giờ làm cao nhất tháng): Đạt tối thiểu 130 giờ công trong tháng sẽ được thưởng nóng +200.000 ₫ cộng vào bảng lương.
+2. Vua Đóng Hàng: Tích luỹ trên 50 điểm đóng gói đơn hàng trong tháng sẽ nhận thưởng nóng +200.000 ₫.
+3. Thưởng bưng hàng lên lầu: Nhân viên tích luỹ từ ≥ 10 điểm bưng vác hàng lên lầu được cộng thưởng nóng trực tiếp vào kỳ lương.`);
+  }
+
+  // 2. Đi muộn, trễ, phạt muộn
+  if (
+    lower.includes("muộn") ||
+    lower.includes("trễ") ||
+    lower.includes("đi trễ") ||
+    lower.includes("phạt muộn")
+  ) {
+    snippets.push(`--- QUY TẮC PHẠT & XỬ LÝ ĐI MUỘN LIMART ---
+1. Thời gian ân hạn: Hệ thống áp dụng thời gian ân hạn 1 phút so với giờ ca làm việc đã đăng ký.
+2. Xử lý vi phạm: Check-in muộn từ phút thứ 2 trở đi sẽ tự động tính vào Bảng vi phạm của tháng. Mức phạt được tính luỹ tiến theo số lần vi phạm trong tháng: trừ điểm chuyên cần nội bộ và quy đổi trừ giờ công theo quy chế.
+3. Thủ tục giải trình: Trường hợp có lý do bất khả kháng (hỏng xe, mưa ngập, sự cố kỹ thuật...), nhân viên vào mục "📝 Xin giải trình" trong vòng 24 giờ để gửi Quản lý phê duyệt.`);
+  }
+
+  // 3. Vòng quay may mắn
+  if (
+    lower.includes("quay") ||
+    lower.includes("vòng quay") ||
+    lower.includes("may mắn")
+  ) {
+    snippets.push(`--- QUY CHẾ VÒNG QUAY MAY MẮN LIMART ---
+1. Điều kiện tham gia: Nhân viên phải hoàn thành Check-in hợp lệ trong ngày và chưa thực hiện lượt quay nào trong ngày hôm đó.
+2. Cấp quyền quay: Quản lý có thể cấp/mở quyền trong danh mục Nhân sự (switch Vòng quay) hoặc tab Vòng quay > Cấp quyền quay. Phần thưởng sẽ được ghi nhận và tổng hợp tự động vào bảng lương cuối tháng.`);
+  }
+
+  // 4. Hàng vỡ, hỏng, khiếu nại, đổi trả, đền bù
+  if (
+    lower.includes("vỡ") ||
+    lower.includes("hỏng") ||
+    lower.includes("bể") ||
+    lower.includes("móp") ||
+    lower.includes("rách") ||
+    lower.includes("lỗi") ||
+    lower.includes("khiếu nại") ||
+    lower.includes("đổi trả") ||
+    lower.includes("đền bù")
+  ) {
+    snippets.push(`--- QUY TRÌNH XỬ LÝ SỰ CỐ HÀNG VỠ / HỎNG (3 BƯỚC) ---
+1. Bước 1: Tiếp nhận và xoa dịu khách hàng ngay lập tức. Gửi lời xin lỗi chân thành vì sự cố vận chuyển ngoài ý muốn. Nhờ khách chụp ảnh chi tiết sản phẩm hỏng, mã vận đơn bên ngoài vỏ hộp và Video mở kiện hàng (unboxing) để shop làm việc đối soát với đơn vị vận chuyển.
+2. Bước 2: Đối chiếu hạn mức tự giải quyết khiếu nại:
+   - Hỏng/vỡ nhẹ vẫn dùng được: Thương lượng hỗ trợ hoàn tiền một phần (20% - 50% tuỳ mức độ) hoặc tặng mã voucher giảm giá cho đơn hàng tiếp theo.
+   - Vỡ nát, hỏng hoàn toàn (màu đổ tràn, chai lọ vỡ, toan rách không dùng được): Tiến hành gửi bù ngay 01 sản phẩm mới 100% (miễn phí ship hoàn toàn) hoặc hoàn tiền 100% giá trị sản phẩm.
+   - Lưu ý: Nếu giá trị đơn hàng vượt hạn mức nhân viên được tự duyệt theo quy chế, chụp màn hình gửi nhóm nội bộ để Quản lý duyệt ngay trong vòng 15 phút.
+3. Bước 3: Lưu hồ sơ khiếu nại. Ghi nhận thông tin đơn hàng lên hệ thống để bộ phận kho tiến hành khiếu nại bồi thường từ đơn vị vận chuyển.
+4. Mẫu tin nhắn chuẩn gửi khách:
+   "Dạ em chào anh/chị ạ! 🎨 Dạ em thật sự xin lỗi anh/chị vì sự cố đơn hàng bị [vỡ/hỏng] trong quá trình vận chuyển, khiến trải nghiệm của mình chưa được trọn vẹn ạ. Anh/chị cho em xin thêm hình ảnh/video mở gói hàng và ảnh mã vận đơn bên ngoài hộp để shop xử lý đổi mới hoặc hoàn tiền ngay cho mình nhé ạ. Shop cam kết bảo vệ 100% quyền lợi của anh/chị, anh/chị yên tâm nha! Em đợi phản hồi của mình ạ. 🍊"`);
+  }
+
+  // 5. Thông tin địa chỉ & giờ mở cửa
+  if (
+    lower.includes("địa chỉ") ||
+    lower.includes("ở đâu") ||
+    lower.includes("cửa hàng") ||
+    lower.includes("shop ở") ||
+    (lower.includes("shop") && (lower.includes("đâu") || lower.includes("địa chỉ") || lower.includes("qua")))
+  ) {
+    snippets.push(`--- THÔNG TIN CỬA HÀNG & KÊNH HỖ TRỢ LIMART ---
+1. Giờ mở cửa: 8h30 - 21h30 (Tất cả các ngày trong tuần, kể cả Thứ 7 & Chủ Nhật).
+2. Địa chỉ: Cửa hàng Họa cụ LimArt (Vui lòng chọn đúng chi nhánh bạn đang trực hoặc đính kèm vị trí Google Maps của shop).
+3. Hotline / Fanpage: Kênh hỗ trợ chính thức của Họa cụ LimArt.
+4. Mẫu tin nhắn chuẩn gửi khách:
+   "Dạ em chào anh/chị ạ! 🎨 Dạ cửa hàng LimArt mở cửa từ 8h30 đến 21h30 tất cả các ngày trong tuần ạ. 📍 Địa chỉ shop tại: [Điền địa chỉ cơ sở / Chi nhánh gần khách nhất]. Anh/chị có thể ghé trực tiếp để xem và trải nghiệm thử các mẫu họa cụ, giấy vẽ, cọ và màu vẽ nhé ạ! Nếu cần chỉ đường chi tiết hơn, anh/chị nhắn em hỗ trợ ngay nha! 🍊"`);
+  }
+
+  // 6. WFH & Đóng gói hàng
+  if (
+    lower.includes("wfh") ||
+    lower.includes("làm việc tại nhà") ||
+    lower.includes("đóng gói")
+  ) {
+    snippets.push(`--- QUY TRÌNH DUYỆT WFH & ĐÓNG GÓI HÀNG LIMART ---
+1. Làm việc tại nhà (WFH): Nhân viên gửi yêu cầu WFH trên ứng dụng → Quản lý duyệt. Khi được duyệt: nếu ngày đó không có check-in thực tế, hệ thống tự động ghi nhận 8 giờ công và hiển thị 'Làm việc từ xa (WFH)' mà không cần Check-in qua IP Wi-Fi văn phòng.
+2. Đóng gói hàng: Nhân viên nhận nhiệm vụ tại mục Sàn việc / WFH Tasks, chụp ảnh/báo cáo kết quả đóng đơn để Quản lý duyệt điểm tích luỹ (>50 điểm nhận thưởng Vua Đóng Hàng +200.000 ₫).`);
+  }
+
+  // 7. Quy trình xin giải trình
+  if (
+    lower.includes("giải trình") ||
+    lower.includes("quên check-in") ||
+    lower.includes("quên checkin") ||
+    lower.includes("quên chấm công") ||
+    lower.includes("duyệt chấm công")
+  ) {
+    snippets.push(`--- QUY TRÌNH XIN GIẢI TRÌNH LIMART ---
+1. Thao tác: Vào mục "📝 Xin giải trình" (hoặc truy cập /requests), chọn ngày cần giải trình (đi muộn, về sớm, quên chấm công, hoặc xin nghỉ), điền lý do rõ ràng và nhấn "Gửi yêu cầu".
+2. Thời hạn phê duyệt: Quản lý sẽ xem xét và phê duyệt trong vòng 24 giờ.`);
+  }
+
+  // 8. Đăng ký lịch làm việc
+  if (
+    lower.includes("lịch làm việc") ||
+    lower.includes("đăng ký lịch") ||
+    lower.includes("lịch trực") ||
+    lower.includes("chọn ca") ||
+    lower.includes("sang nhượng ca") ||
+    lower.includes("kèo thơm")
+  ) {
+    snippets.push(`--- CÁCH ĐĂNG KÝ LỊCH LÀM VIỆC & SANG NHƯỢNG CA LIMART ---
+1. Đăng ký ca làm: Vào mục "📅 Lịch trực" (hoặc truy cập /schedule), chọn tuần và các ca trống (Ca Sáng: 8h30 - 12h, Ca Chiều: 13h30 - 17h30, hoặc Cả ngày).
+2. Sang nhượng ca làm: Nhân viên có thể sang nhượng ca ("Kèo thơm 🎁") cho đồng nghiệp khi có việc bận.`);
+  }
+
+  return snippets.join("\n\n");
+}
+
 export function buildDeterministicFallback(userQuery: string, relevantContext: string): string {
   if (relevantContext && relevantContext.trim()) {
     return `🍊 **Capy AI - Hướng dẫn nội bộ LimArt:**\n\nVề câu hỏi "${userQuery}", dưới đây là các thông tin và quy định được trích xuất từ tài liệu nội bộ công ty:\n\n${relevantContext.trim()}\n\n💡 *Nếu cần giải quyết trường hợp ngoại lệ hoặc chưa rõ mức xử lý, vui lòng liên hệ trực tiếp Quản lý cửa hàng để được hỗ trợ nhé! 🦫*`;
+  }
+
+  const fallback = getKeywordFallbackContext(userQuery);
+  if (fallback) {
+    return fallback;
   }
 
   return STRICT_NOT_FOUND_MESSAGE;
@@ -905,6 +1084,14 @@ export const handleCapyChat = async (c: any) => {
       }
     }
 
+    // Inject operational knowledge fallback if query matches core operational rules and no DB docs found
+    if (contextParts.length === 0) {
+      const keywordFallback = getKeywordFallbackContext(userQuery);
+      if (keywordFallback) {
+        contextParts.push(`--- CẨM NANG VẬN HÀNH & QUY CHẾ CỐT LÕI ---\n${keywordFallback}`);
+      }
+    }
+
     const relevantContext = contextParts.join("\n\n").trim();
 
     // 100% STRICT RAG: If no relevant context found from DB, return strict not found message immediately!
@@ -922,21 +1109,27 @@ export const handleCapyChat = async (c: any) => {
         const systemInstruction = `Bạn là Capy AI - Trợ lý vận hành và hỗ trợ nội bộ của LimArt (Cửa hàng Họa cụ & Mỹ thuật).
 Nhiệm vụ của bạn là giải đáp chính xác, đầy đủ, chi tiết từng bước cho nhân viên và quản lý dựa trên các quy định và tài liệu nội bộ của công ty.
 
-QUY TẮC BẮT BUỘC (100% STRICT RAG):
-1. NGUỒN THÔNG TIN DUY NHẤT:
-   - Bạn CHỈ ĐƯỢC PHÉP trả lời dựa trên nội dung trong mục "TÀI LIỆU NỘI BỘ THAM KHẢO" bên dưới.
+CẨM NANG & QUY CHẾ VẬN HÀNH CƠ SỞ (BASELINE KNOWLEDGE):
+${CORE_OPERATIONAL_KNOWLEDGE}
+
+NGUYÊN TẮC BẮT BUỘC:
+1. NẮM VỮNG VÀ TRÍCH DẪN CHÍNH XÁC QUY ĐỊNH CHÍNH THỨC:
+   - Các quy định và quy chế trong CẨM NANG & QUY CHẾ VẬN HÀNH CƠ SỞ trên là quy định chính thức của LimArt.
+   - Khi người dùng hỏi về thưởng chuyên cần, đi muộn, vòng quay, sự cố hàng hóa..., bạn PHẢI trích dẫn chính xác các điều kiện, số giờ, số điểm, số tiền thưởng và các bước hành động cụ thể, TUYỆT ĐỐI KHÔNG từ chối hoặc nói chưa có tài liệu.
+2. NGUỒN THÔNG TIN DUY NHẤT:
+   - Bạn CHỈ ĐƯỢC PHÉP trả lời dựa trên nội dung trong mục "TÀI LIỆU NỘI BỘ THAM KHẢO" và "CẨM NANG & QUY CHẾ VẬN HÀNH CƠ SỞ" ở trên.
    - CẤM TUYỆT ĐỐI tự sáng tạo, suy diễn, phỏng đoán, bịa thêm quy định, chính sách, số liệu, địa chỉ hoặc bất kỳ thông tin nào không nằm trong TÀI LIỆU NỘI BỘ THAM KHẢO.
-2. TRÌNH BÀY RÕ RÀNG, DỄ ĐỌC TRÊN ĐIỆN THOẠI DI ĐỘNG:
+3. TRÌNH BÀY RÕ RÀNG, DỄ ĐỌC TRÊN ĐIỆN THOẠI DI ĐỘNG:
    - Trình bày câu trả lời rõ ràng, thoáng đãng, chia thành các mục ngắn gọn có icon hoặc số thứ tự đầu dòng (ví dụ: 1️⃣, 2️⃣, 📌, 💬, •).
    - TUYỆT ĐỐI KHÔNG dùng công thức toán học LaTeX ($...$, \\ge, \\times, \\le) — hãy viết bằng tiếng Việt tự nhiên hoặc ký hiệu phổ thông (≥, ≤, ×, ÷).
    - Tránh dùng bảng Markdown phức tạp (|---|---|) gây tràn màn hình điện thoại, hãy chuyển sang dạng danh sách các gạch đầu dòng phân cấp rõ ràng, dễ nhìn.
    - Khi thông tin CÓ trong tài liệu tham khảo: Trình bày đầy đủ, chi tiết từng bước, giữ nguyên định mức, quy định, mốc thời gian, số tiền và mẫu câu chuẩn có trong tài liệu.
    - Tuyệt đối không tóm tắt cụt lủn và TUYỆT ĐỐI KHÔNG ghi câu dạng "xem chi tiết ở tab Kho tài liệu" hay "tra cứu cẩm nang".
-3. KHI KHÔNG CÓ THÔNG TIN TRONG TÀI LIỆU:
+4. KHI KHÔNG CÓ THÔNG TIN TRONG TÀI LIỆU:
    - Nếu câu hỏi của người dùng hoàn toàn KHÔNG CÓ thông tin hoặc không thể trả lời dựa trên TÀI LIỆU NỘI BỘ THAM KHẢO, bạn BẮT BUỘC trả lời chính xác câu sau:
      "${STRICT_NOT_FOUND_MESSAGE}"
-4. PHONG CÁCH: Thân thiện, tận tâm như chú chuột lang nước Capy (sử dụng emoji 🍊, 🦫).
-5. Luôn trả lời bằng tiếng Việt.
+5. PHONG CÁCH: Thân thiện, tận tâm như chú chuột lang nước Capy (sử dụng emoji 🍊, 🦫).
+6. Luôn trả lời bằng tiếng Việt.
 
 TÀI LIỆU NỘI BỘ THAM KHẢO:
 ${relevantContext}`;

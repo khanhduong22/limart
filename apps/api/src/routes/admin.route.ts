@@ -2429,6 +2429,7 @@ const payrollSummaryHandler = async (c: any) => {
             name: true,
             email: true,
             role: true,
+            isActive: true,
             hourlyRate: true,
             monthlySalary: true,
             employmentType: true,
@@ -2458,6 +2459,7 @@ const payrollSummaryHandler = async (c: any) => {
                   name: true,
                   email: true,
                   role: true,
+                  isActive: true,
                   employmentType: true,
                   hourlyRate: true,
                   adjustments: {
@@ -2478,6 +2480,7 @@ const payrollSummaryHandler = async (c: any) => {
               name: p.user.name,
               email: p.user.email,
               role: p.user.role,
+              isActive: p.user.isActive ?? true,
               stats: content,
               recentAdjustments: (p.user.adjustments || []).map((a: any) => ({
                 id: a.id,
@@ -2547,6 +2550,7 @@ const payrollSummaryHandler = async (c: any) => {
             name: u.name,
             email: u.email,
             role: u.role,
+            isActive: u.isActive ?? true,
             stats: {
               ...(stats || {}),
               employmentType: stats?.employmentType || u.employmentType,

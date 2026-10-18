@@ -157,6 +157,17 @@ export function FormattedAiMessage({ content }: { content: string }) {
   );
 }
 
+const LOCAL_KNOWLEDGE: Record<string, string> = {
+  "Làm sao để check-in?":
+    "Để check-in, bạn chỉ cần bấm nút lớn **📍 Vào Ca (Check-in)** ở ngay màn hình chính khi đang kết nối Wi-Fi cửa hàng hoặc ở trong bán kính GPS cho phép. Hệ thống hỗ trợ lưu ngoại tuyến nếu mất mạng và tự động đồng bộ khi có kết nối!",
+  "Quy trình xin giải trình?":
+    "Vào mục **📝 Xin giải trình** (hoặc truy cập `/requests`), chọn ngày cần giải trình (đi muộn, về sớm, quên chấm công, hoặc xin nghỉ), điền lý do rõ ràng và nhấn **Gửi yêu cầu**. Quản lý sẽ xem xét và phê duyệt trong vòng 24 giờ.",
+  "Cách đăng ký lịch làm việc?":
+    "Bạn vào mục **📅 Lịch trực** (hoặc truy cập `/schedule`), chọn tuần và các ca trống (Ca Sáng: 8h30 - 12h, Ca Chiều: 13h30 - 17h30, hoặc Cả ngày). Nhân viên cũng có thể sang nhượng ca làm (\"Kèo thơm 🎁\") cho đồng nghiệp khi bận.",
+  "Cách xem chi tiết lương?":
+    "Bấm vào **💰 Chi tiết lương** (`/payroll`) để xem tổng số giờ công, lương tạm tính theo giờ, phụ cấp đóng gói/bưng lầu, thưởng và các khoản điều chỉnh trong tháng.",
+};
+
 export default function CapyAssistant({ currentUser }: { currentUser: any }) {
   const isEnterpriseDemo =
     isLikelyDemoHost() || Boolean(currentUser?.email?.endsWith("@demomart.vn"));
@@ -191,6 +202,35 @@ export default function CapyAssistant({ currentUser }: { currentUser: any }) {
     const aiMessageId = (Date.now() + 1).toString();
     setMessages((prev) => [...prev, { id: aiMessageId, role: "assistant", content: "" }]);
 
+    // Check if we have instant local knowledge (normalize ?, punctuation, whitespace, and check both ways)
+    const normalizeQuery = (str: string) =>
+      str
+        .toLowerCase()
+        .replace(/[?？.,!！:;]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+
+    const normalizedText = normalizeQuery(textToSend);
+
+    const matchedKey = Object.keys(LOCAL_KNOWLEDGE).find((k) => {
+      const normalizedK = normalizeQuery(k);
+      return (
+        normalizedText.includes(normalizedK) ||
+        normalizedK.includes(normalizedText)
+      );
+    });
+
+    if (matchedKey) {
+      setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiMessageId ? { ...m, content: LOCAL_KNOWLEDGE[matchedKey] } : m
+          )
+        );
+        setIsLoading(false);
+      }, 500);
+      return;
+    }
     try {
       const res = await fetch("/api/chat", {
         method: "POST",

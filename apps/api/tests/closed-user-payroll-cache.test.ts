@@ -109,6 +109,7 @@ vi.mock("../src/lib/schedule-lock", () => ({
 
 vi.mock("../src/lib/schedule-penalty", () => ({
   applyLateSchedulePenalty: vi.fn().mockResolvedValue(undefined),
+  reconcileFalseLateSchedulePenalties: vi.fn().mockResolvedValue({ deletedCount: 0, details: [] }),
 }));
 
 import { app } from "../src/app";

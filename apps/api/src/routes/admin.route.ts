@@ -12,7 +12,7 @@ import { assertPeriodOpen } from "../lib/payroll-period";
 import { sendPayslipEmail } from "../lib/email";
 import { getClientIP } from "../lib/ip-utils";
 import { recordSecureAuditLog } from "../lib/audit";
-import { applyLateSchedulePenalty } from "../lib/schedule-penalty";
+import { applyLateSchedulePenalty, reconcileFalseLateSchedulePenalties } from "../lib/schedule-penalty";
 import { ensureAdminNaSchedule } from "../lib/auto-schedule";
 import { closePayrollMonth } from "../lib/payroll-close";
 import { isDemoSandboxEnabled } from "../lib/demo-sandbox";
@@ -1665,7 +1665,8 @@ adminRoute.post("/schedule", async (c) => {
       return c.json({ success: false, error: "Thời gian làm việc tối thiểu 4 tiếng!" }, 400);
     }
 
-    await applyLateSchedulePenalty(userId, startDate, Boolean(skipPenalty));
+    const shouldSkipPenalty = skipPenalty !== undefined ? Boolean(skipPenalty) : true;
+    await applyLateSchedulePenalty(userId, startDate, shouldSkipPenalty);
 
     const shift = await prisma.workShift.create({
       data: {
@@ -1696,6 +1697,10 @@ adminRoute.post("/schedule", async (c) => {
       },
     }).catch(() => {});
 
+    if (typeof reconcileFalseLateSchedulePenalties === "function") {
+      await reconcileFalseLateSchedulePenalties(userId).catch(() => {});
+    }
+
     const event = {
       id: shift.id,
       title: shift.user?.name || "Staff",
@@ -1723,6 +1728,20 @@ adminRoute.post("/schedule", async (c) => {
     return c.json({ success: true, data: event, id: shift.id }, 201);
   } catch (err: any) {
     return c.json({ success: false, error: err?.message || "Failed to create shift" }, 500);
+  }
+});
+
+
+
+// POST /api/admin/schedule/reconcile-penalties
+adminRoute.post("/schedule/reconcile-penalties", async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const { userId } = body;
+    const result = await reconcileFalseLateSchedulePenalties(userId);
+    return c.json({ success: true, ...result });
+  } catch (error: any) {
+    return c.json({ success: false, error: error?.message || "Failed to reconcile penalties" }, 500);
   }
 });
 

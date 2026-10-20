@@ -12,6 +12,7 @@ export { cronRoute } from "./routes/cron.route";
 export { demoRoute } from "./routes/demo.route";
 export { notificationsRoute } from "./routes/notifications.route";
 import { isDemoSandboxEnabled, seedAndSanitizeDemoDatabase } from "./lib/demo-sandbox";
+import { reconcileFalseLateSchedulePenalties } from "./lib/schedule-penalty";
 import {
   ensureDefaultNotificationRules,
   shiftNotificationWorker,
@@ -37,6 +38,18 @@ if (typeof (globalThis as any).Bun === "undefined" && process.env.NODE_ENV !== "
 // - When DEMO_SANDBOX_MODE === "true", seed & sanitize the isolated demo database on startup
 // - When DEMO_SANDBOX_MODE !== "true", ensure phuckhanh22 has PARTNER role, staffTasksAllowed enabled, and clear old work shifts
 if (process.env.NODE_ENV !== "test") {
+  reconcileFalseLateSchedulePenalties()
+    .then((res) => {
+      if (res.deletedCount > 0) {
+        console.log(
+          `[Checkin API] Reconciled ${res.deletedCount} false late schedule penalty record(s) on startup.`
+        );
+      }
+    })
+    .catch((err) => {
+      console.error("[Checkin API] Error reconciling late schedule penalties on startup:", err);
+    });
+
   ensureDefaultNotificationRules()
     .then(() => syncShiftNotificationSchedule())
     .catch((err) => {

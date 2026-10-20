@@ -2,6 +2,7 @@ import { prisma } from "@checkin/db";
 import { calculateLatePenalty, isLate as checkIsLate, applyHardworkingBonus } from "@checkin/shared";
 import { getVietnamMonthRange, toVNDateString, VN_OFFSET_MS } from "./date-utils";
 import { getOrSetCache } from "./cache";
+import { reconcileFalseLateSchedulePenalties } from "./schedule-penalty";
 
 export interface DailyDetail {
   date: string;
@@ -167,6 +168,9 @@ export async function calculateUserMonthlyStats(
   const cacheKey = `stats:monthly:${userId}:${month}:${year}`;
 
   return getOrSetCache(cacheKey, 300, async () => {
+    if (typeof reconcileFalseLateSchedulePenalties === "function") {
+      await reconcileFalseLateSchedulePenalties(userId).catch(() => {});
+    }
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {

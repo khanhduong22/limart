@@ -55,10 +55,22 @@ export const DEMO_MODULE_METADATA = [
 
 export const DEMO_MODULES_REDIS_KEY = "demo:modules:config";
 
+export interface SeedDemoResult {
+  skipped: boolean;
+  usersSeeded: number;
+  shiftsSeeded: number;
+  checkinsSeeded: number;
+  payslipsSeeded: number;
+  documentsSeeded: number;
+  auditLogsSeeded: number;
+}
+
 let memoryModulesConfig: DemoModulesConfig = { ...DEFAULT_DEMO_MODULES };
+let activeSeedPromise: Promise<SeedDemoResult> | null = null;
 
 export function _resetDemoModulesMemory(): void {
   memoryModulesConfig = { ...DEFAULT_DEMO_MODULES };
+  activeSeedPromise = null;
 }
 
 export function isDemoSandboxEnabled(): boolean {
@@ -551,15 +563,7 @@ export interface SeedDemoOptions {
  * Clones from SOURCE_DATABASE_URL (if configured) or seeds rich fallback data,
  * scrubbing all PII and randomizing staff names & salaries.
  */
-export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Promise<{
-  skipped: boolean;
-  usersSeeded: number;
-  shiftsSeeded: number;
-  checkinsSeeded: number;
-  payslipsSeeded: number;
-  documentsSeeded: number;
-  auditLogsSeeded: number;
-}> {
+export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Promise<SeedDemoResult> {
   // CRITICAL SAFETY LOCK 1
   if (!isDemoSandboxEnabled()) {
     throw new Error("DEMO_SANDBOX_MODE is not enabled");
@@ -571,6 +575,19 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     throw new Error("SAFETY LOCK: Refusing to run demo sanitizer on non-demo database!");
   }
 
+  if (activeSeedPromise) {
+    return activeSeedPromise;
+  }
+
+  activeSeedPromise = executeSeedAndSanitizeDemoDatabase(options).finally(() => {
+    activeSeedPromise = null;
+  });
+
+  return await activeSeedPromise;
+}
+
+async function executeSeedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Promise<SeedDemoResult> {
+  const targetUrl = process.env.DATABASE_URL || "";
   const targetPrisma = options?.prismaClient || defaultPrisma;
 
   // Skip re-seeding on startup if already populated unless force === true
@@ -963,6 +980,26 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     }
   }
 
+  async function batchSeed<T>(
+    model: {
+      createMany?: (args: { data: T[]; skipDuplicates?: boolean }) => Promise<{ count?: number }>;
+      create?: (args: { data: T }) => Promise<any>;
+    } | undefined,
+    records: T[]
+  ): Promise<number> {
+    if (!model || records.length === 0) return 0;
+    if (typeof model.createMany === "function") {
+      const res = await safeExec(() => model.createMany!({ data: records, skipDuplicates: true }));
+      return typeof res?.count === "number" ? res.count : records.length;
+    }
+    let seeded = 0;
+    for (const record of records) {
+      const created = await safeExec(() => model.create?.({ data: record }));
+      if (created !== undefined) seeded++;
+    }
+    return seeded;
+  }
+
   // Clear existing tables in safe reverse-FK order
   await safeExec(() => targetPrisma.sessionAuditLog?.deleteMany?.({}));
   await safeExec(() => targetPrisma.announcementRead?.deleteMany?.({}));
@@ -997,41 +1034,42 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   await safeExec(() => targetPrisma.user?.deleteMany?.({}));
 
   // 1. Insert Users
-  for (const u of sanitizedUsers) {
-    await targetPrisma.user.create({
-      data: {
-        id: u.id,
-        name: u.name,
-        email: u.email,
-        image: u.image,
-        role: u.role,
-        isActive: u.isActive,
-        luckyWheelAllowed: u.luckyWheelAllowed,
-        staffTasksAllowed: u.staffTasksAllowed,
-        employmentType: u.employmentType,
-        hourlyRate: u.hourlyRate,
-        monthlySalary: u.monthlySalary,
-        birthday: u.birthday,
-        startDate: u.startDate,
-      },
-    });
-  }
+  const uniqueUsers = Array.from(
+    new Map(
+      sanitizedUsers.map((u) => [
+        u.id,
+        {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          image: u.image,
+          role: u.role,
+          isActive: u.isActive,
+          luckyWheelAllowed: u.luckyWheelAllowed,
+          staffTasksAllowed: u.staffTasksAllowed,
+          employmentType: u.employmentType,
+          hourlyRate: u.hourlyRate,
+          monthlySalary: u.monthlySalary,
+          birthday: u.birthday,
+          startDate: u.startDate,
+        },
+      ])
+    ).values()
+  );
+  await batchSeed(targetPrisma.user, uniqueUsers);
 
   // 2. Insert AllowedIP (Public Demo Mode + Store WiFi)
-  if (targetPrisma.allowedIP?.create) {
-    await targetPrisma.allowedIP.create({
-      data: {
-        prefix: "0.0.0.0/0",
-        label: "Demo Public Mode (Mọi mạng WiFi/4G)",
-      },
-    });
-    await targetPrisma.allowedIP.create({
-      data: {
-        prefix: "103.199.",
-        label: "WiFi Cửa Hàng DemoMart Tầng 1",
-      },
-    });
-  }
+  const allowedIPsToSeed = [
+    {
+      prefix: "0.0.0.0/0",
+      label: "Demo Public Mode (Mọi mạng WiFi/4G)",
+    },
+    {
+      prefix: "103.199.",
+      label: "WiFi Cửa Hàng DemoMart Tầng 1",
+    },
+  ];
+  await batchSeed(targetPrisma.allowedIP, allowedIPsToSeed);
 
   // 3. Insert Holidays
   const holidaysToSeed =
@@ -1051,18 +1089,20 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
             multiplier: 1.5,
           },
         ];
-  for (const h of holidaysToSeed) {
-    await safeExec(() =>
-      targetPrisma.holiday?.create?.({
-        data: {
+  const uniqueHolidays = Array.from(
+    new Map(
+      holidaysToSeed.map((h) => [
+        h.id,
+        {
           id: h.id,
           date: new Date(h.date),
           name: sanitizeText(h.name, nameMap),
           multiplier: Number(h.multiplier) || 1.5,
         },
-      })
-    );
-  }
+      ])
+    ).values()
+  );
+  await batchSeed(targetPrisma.holiday, uniqueHolidays);
 
   // 4. Insert TaskDefinitions, TaskItems, UserTasks
   const taskDefsToSeed =
@@ -1099,37 +1139,43 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   for (const td of taskDefsToSeed) {
     const reward = Number(td.baseReward) || 2000;
     taskDefRewardMap.set(td.id, reward);
-    await safeExec(() =>
-      targetPrisma.taskDefinition?.create?.({
-        data: {
+  }
+
+  const uniqueTaskDefs = Array.from(
+    new Map(
+      taskDefsToSeed.map((td) => [
+        td.id,
+        {
           id: td.id,
           name: sanitizeText(td.name, nameMap),
           description: sanitizeText(td.description || "", nameMap),
-          baseReward: reward,
+          baseReward: taskDefRewardMap.get(td.id) || 2000,
           unit: sanitizeText(td.unit || "Đơn", nameMap),
           active: td.active !== false,
         },
-      })
-    );
-  }
+      ])
+    ).values()
+  );
+  await batchSeed(targetPrisma.taskDefinition, uniqueTaskDefs);
 
+  const preparedTaskItems = [];
   for (const ti of sourceData.taskItems) {
     if (!taskDefRewardMap.has(ti.taskDefId)) continue;
     const validAssignee = ti.assigneeId && userMapById.has(ti.assigneeId) ? ti.assigneeId : null;
-    await safeExec(() =>
-      targetPrisma.taskItem?.create?.({
-        data: {
-          id: ti.id,
-          taskDefId: ti.taskDefId,
-          title: sanitizeText(ti.title, nameMap),
-          description: sanitizeText(ti.description || "", nameMap),
-          deadline: ti.deadline ? new Date(ti.deadline) : null,
-          status: ti.status || "OPEN",
-          assigneeId: validAssignee,
-        },
-      })
-    );
+    preparedTaskItems.push({
+      id: ti.id,
+      taskDefId: ti.taskDefId,
+      title: sanitizeText(ti.title, nameMap),
+      description: sanitizeText(ti.description || "", nameMap),
+      deadline: ti.deadline ? new Date(ti.deadline) : null,
+      status: ti.status || "OPEN",
+      assigneeId: validAssignee,
+    });
   }
+  const uniqueTaskItems = Array.from(
+    new Map(preparedTaskItems.map((ti) => [ti.id, ti])).values()
+  );
+  await batchSeed(targetPrisma.taskItem, uniqueTaskItems);
 
   const userTasksToSeed =
     sourceData.userTasks.length > 0
@@ -1145,35 +1191,35 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           bonusPenalty: 0,
         }));
 
+  const preparedUserTasks = [];
   for (const ut of userTasksToSeed) {
     if (!userMapById.has(ut.userId) || !taskDefRewardMap.has(ut.taskDefId)) continue;
     const unitPrice = taskDefRewardMap.get(ut.taskDefId) || 1500;
     const quantity = Math.max(1, Number(ut.quantity) || 1);
     const bonusPenalty = Number(ut.bonusPenalty) || 0;
     const finalAmount = Math.max(0, quantity * unitPrice + bonusPenalty);
-
-    await safeExec(() =>
-      targetPrisma.userTask?.create?.({
-        data: {
-          id: ut.id,
-          userId: ut.userId,
-          taskDefId: ut.taskDefId,
-          unitPrice,
-          quantity,
-          status: ut.status || "APPROVED",
-          evidenceLink: "https://limart2.khanhdp.com/admin",
-          note: sanitizeText(ut.note || "Hoàn thành định mức công việc tại DemoMart", nameMap),
-          adminNote: ut.adminNote ? sanitizeText(ut.adminNote, nameMap) : null,
-          bonusPenalty,
-          finalAmount,
-          startedAt: ut.startedAt ? new Date(ut.startedAt) : now,
-          submittedAt: ut.submittedAt ? new Date(ut.submittedAt) : now,
-          reviewedAt: ut.reviewedAt ? new Date(ut.reviewedAt) : now,
-          reviewedBy: adminUser.id,
-        },
-      })
-    );
+    preparedUserTasks.push({
+      id: ut.id,
+      userId: ut.userId,
+      taskDefId: ut.taskDefId,
+      unitPrice,
+      quantity,
+      status: ut.status || "APPROVED",
+      evidenceLink: "https://limart2.khanhdp.com/admin",
+      note: sanitizeText(ut.note || "Hoàn thành định mức công việc tại DemoMart", nameMap),
+      adminNote: ut.adminNote ? sanitizeText(ut.adminNote, nameMap) : null,
+      bonusPenalty,
+      finalAmount,
+      startedAt: ut.startedAt ? new Date(ut.startedAt) : now,
+      submittedAt: ut.submittedAt ? new Date(ut.submittedAt) : now,
+      reviewedAt: ut.reviewedAt ? new Date(ut.reviewedAt) : now,
+      reviewedBy: adminUser.id,
+    });
   }
+  const uniqueUserTasks = Array.from(
+    new Map(preparedUserTasks.map((ut) => [ut.id, ut])).values()
+  );
+  await batchSeed(targetPrisma.userTask, uniqueUserTasks);
 
   // 5. LuckyWheelPrize, LuckyWheelHistory & UserAchievement
   const prizesToSeed =
@@ -1216,6 +1262,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
         ];
 
   const validPrizeIds = new Set<string>();
+  const preparedPrizes = [];
   for (const p of prizesToSeed) {
     validPrizeIds.add(p.id);
     const sanitizedPrizeName = sanitizeText(p.name, nameMap);
@@ -1223,59 +1270,58 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
       p.image && !String(p.image).toLowerCase().includes("capy")
         ? p.image
         : buildCorporateAvatarSvg(sanitizedPrizeName || "DemoMart Prize", "ADMIN");
-    await safeExec(() =>
-      targetPrisma.luckyWheelPrize?.create?.({
-        data: {
-          id: p.id,
-          name: sanitizedPrizeName,
-          description: sanitizeText(p.description || "", nameMap),
-          image: prizeImage,
-          quantity: Math.max(20, Number(p.quantity) || 20),
-          remaining: Math.max(15, Number(p.remaining) || 15),
-          probability: Number(p.probability) || 25,
-          type: p.type || "PHYSICAL",
-          active: true,
-          value: Number(p.value) || 30000,
-        },
-      })
-    );
+    preparedPrizes.push({
+      id: p.id,
+      name: sanitizedPrizeName,
+      description: sanitizeText(p.description || "", nameMap),
+      image: prizeImage,
+      quantity: Math.max(20, Number(p.quantity) || 20),
+      remaining: Math.max(15, Number(p.remaining) || 15),
+      probability: Number(p.probability) || 25,
+      type: p.type || "PHYSICAL",
+      active: true,
+      value: Number(p.value) || 30000,
+    });
   }
+  const uniquePrizes = Array.from(new Map(preparedPrizes.map((p) => [p.id, p])).values());
+  await batchSeed(targetPrisma.luckyWheelPrize, uniquePrizes);
 
+  const preparedWheelHistories = [];
   for (const h of sourceData.wheelHistory) {
     if (!userMapById.has(h.userId)) continue;
-    await safeExec(() =>
-      targetPrisma.luckyWheelHistory?.create?.({
-        data: {
-          id: h.id,
-          userId: h.userId,
-          prizeId: h.prizeId && validPrizeIds.has(h.prizeId) ? h.prizeId : null,
-          prizeName: sanitizeText(h.prizeName, nameMap),
-          createdAt: h.createdAt ? new Date(h.createdAt) : now,
-        },
-      })
-    );
+    preparedWheelHistories.push({
+      id: h.id,
+      userId: h.userId,
+      prizeId: h.prizeId && validPrizeIds.has(h.prizeId) ? h.prizeId : null,
+      prizeName: sanitizeText(h.prizeName, nameMap),
+      createdAt: h.createdAt ? new Date(h.createdAt) : now,
+    });
   }
+  const uniqueWheelHistories = Array.from(
+    new Map(preparedWheelHistories.map((h) => [h.id, h])).values()
+  );
+  await batchSeed(targetPrisma.luckyWheelHistory, uniqueWheelHistories);
 
+  const preparedAchievements = [];
   for (const ach of sourceData.achievements) {
     if (!userMapById.has(ach.userId)) continue;
-    await safeExec(() =>
-      targetPrisma.userAchievement?.create?.({
-        data: {
-          id: ach.id,
-          userId: ach.userId,
-          code: ach.code,
-          title: sanitizeText(ach.title || "", nameMap),
-          description: sanitizeText(ach.description || "", nameMap),
-          icon: ach.icon,
-          unlockedAt: ach.unlockedAt ? new Date(ach.unlockedAt) : now,
-        },
-      })
-    );
+    preparedAchievements.push({
+      id: ach.id,
+      userId: ach.userId,
+      code: ach.code,
+      title: sanitizeText(ach.title || "", nameMap),
+      description: sanitizeText(ach.description || "", nameMap),
+      icon: ach.icon,
+      unlockedAt: ach.unlockedAt ? new Date(ach.unlockedAt) : now,
+    });
   }
+  const uniqueAchievements = Array.from(
+    new Map(preparedAchievements.map((a) => [a.id, a])).values()
+  );
+  await batchSeed(targetPrisma.userAchievement, uniqueAchievements);
 
   // 6. WorkShifts & CheckIns (recent 60 days + guarantee TODAY shifts & check-ins for >= 4 staff)
   let shiftsSeededCount = 0;
-  let checkinsSeededCount = 0;
   const shiftIdMap = new Map<number, number>();
 
   for (const s of sourceData.shifts) {
@@ -1317,45 +1363,35 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     partnerUser,
   ].slice(0, 4);
 
+  const todayShiftsToSeed = [];
   for (let i = 0; i < todayStaffPool.length; i++) {
     const staffMember = todayStaffPool[i];
     if (!staffMember) continue;
     const isMorning = i % 2 === 0;
-    try {
-      await targetPrisma.workShift.create({
-        data: {
-          userId: staffMember.id,
-          start: isMorning ? todayMorningStart : todayAfternoonStart,
-          end: isMorning ? todayMorningEnd : todayAfternoonEnd,
-          shiftType: isMorning ? "Ca Sáng (08:00 - 12:00)" : "Ca Chiều (13:00 - 17:30)",
-          status: "APPROVED",
-          isOpenForSwap: i === 3,
-          isSenior: i === 0,
-        },
-      });
-      shiftsSeededCount++;
-    } catch {
-      // Ignore
-    }
+    todayShiftsToSeed.push({
+      userId: staffMember.id,
+      start: isMorning ? todayMorningStart : todayAfternoonStart,
+      end: isMorning ? todayMorningEnd : todayAfternoonEnd,
+      shiftType: isMorning ? "Ca Sáng (08:00 - 12:00)" : "Ca Chiều (13:00 - 17:30)",
+      status: "APPROVED",
+      isOpenForSwap: i === 3,
+      isSenior: i === 0,
+    });
   }
+  const todayShiftsCount = await batchSeed(targetPrisma.workShift, todayShiftsToSeed);
+  shiftsSeededCount += todayShiftsCount;
 
   // Copy source CheckIns with scrubbed IP and notes
+  const preparedCheckins = [];
   for (const ck of sourceData.checkins) {
     if (!userMapById.has(ck.userId)) continue;
-    try {
-      await targetPrisma.checkIn.create({
-        data: {
-          userId: ck.userId,
-          type: ck.type || "checkin",
-          timestamp: new Date(ck.timestamp),
-          ipAddress: "103.199.18.88",
-          note: ck.note ? sanitizeText(ck.note, nameMap) : null,
-        },
-      });
-      checkinsSeededCount++;
-    } catch {
-      // Ignore
-    }
+    preparedCheckins.push({
+      userId: ck.userId,
+      type: ck.type || "checkin",
+      timestamp: new Date(ck.timestamp),
+      ipAddress: "103.199.18.88",
+      note: ck.note ? sanitizeText(ck.note, nameMap) : null,
+    });
   }
 
   // Ensure TODAY has live check-ins so Admin Dashboard is lively immediately
@@ -1363,43 +1399,36 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     const staffMember = todayStaffPool[i];
     if (!staffMember) continue;
     const checkinTime = new Date(todayMorningStart.getTime() - (5 - i * 2) * 60 * 1000);
-    try {
-      await targetPrisma.checkIn.create({
-        data: {
-          userId: staffMember.id,
-          type: "checkin",
-          timestamp: checkinTime,
-          ipAddress: "103.199.18.88",
-          note: "Check-in ca sáng tại cửa hàng DemoMart",
-        },
-      });
-      checkinsSeededCount++;
-    } catch {
-      // Ignore
-    }
+    preparedCheckins.push({
+      userId: staffMember.id,
+      type: "checkin",
+      timestamp: checkinTime,
+      ipAddress: "103.199.18.88",
+      note: "Check-in ca sáng tại cửa hàng DemoMart",
+    });
   }
+  const checkinsSeededCount = await batchSeed(targetPrisma.checkIn, preparedCheckins);
 
   // 7. ShiftDuties, ManagerTasks, StaffTasks, Checklists, WeeklyTasks
+  const shiftDutiesToSeed = [];
   for (const sd of sourceData.shiftDuties) {
     if (!userMapById.has(sd.userId)) continue;
     const creatorId = userMapById.has(sd.createdById) ? sd.createdById : adminUser.id;
     const mappedShiftId = sd.shiftId && shiftIdMap.has(sd.shiftId) ? shiftIdMap.get(sd.shiftId) : null;
-    await safeExec(() =>
-      targetPrisma.shiftDuty?.create?.({
-        data: {
-          id: sd.id,
-          shiftId: mappedShiftId ?? null,
-          userId: sd.userId,
-          createdById: creatorId,
-          date: new Date(sd.date),
-          title: sanitizeText(sd.title, nameMap),
-          description: sd.description ? sanitizeText(sd.description, nameMap) : null,
-          isCompleted: Boolean(sd.isCompleted),
-          completedAt: sd.completedAt ? new Date(sd.completedAt) : null,
-        },
-      })
-    );
+    shiftDutiesToSeed.push({
+      id: sd.id,
+      shiftId: mappedShiftId ?? null,
+      userId: sd.userId,
+      createdById: creatorId,
+      date: new Date(sd.date),
+      title: sanitizeText(sd.title, nameMap),
+      description: sd.description ? sanitizeText(sd.description, nameMap) : null,
+      isCompleted: Boolean(sd.isCompleted),
+      completedAt: sd.completedAt ? new Date(sd.completedAt) : null,
+    });
   }
+  const uniqueShiftDuties = Array.from(new Map(shiftDutiesToSeed.map((sd) => [sd.id, sd])).values());
+  await batchSeed(targetPrisma.shiftDuty, uniqueShiftDuties);
 
   const managerTasksToSeed =
     sourceData.managerTasks.length > 0
@@ -1427,27 +1456,28 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           },
         ];
 
+  const preparedManagerTasks = [];
   for (const mt of managerTasksToSeed) {
     const creatorId = userMapById.has(mt.createdById) ? mt.createdById : adminUser.id;
     const assigneeId = mt.assigneeId && userMapById.has(mt.assigneeId) ? mt.assigneeId : partnerUser.id;
-    await safeExec(() =>
-      targetPrisma.managerTask?.create?.({
-        data: {
-          id: mt.id,
-          title: sanitizeText(mt.title, nameMap),
-          description: mt.description ? sanitizeText(mt.description, nameMap) : null,
-          isUrgent: Boolean(mt.isUrgent),
-          isImportant: Boolean(mt.isImportant),
-          status: mt.status || "TODO",
-          assigneeId,
-          parentId: null,
-          startDate: mt.startDate ? new Date(mt.startDate) : now,
-          deadline: mt.deadline ? new Date(mt.deadline) : new Date(now.getTime() + 86400000),
-          createdById: creatorId,
-        },
-      })
-    );
+    preparedManagerTasks.push({
+      id: mt.id,
+      title: sanitizeText(mt.title, nameMap),
+      description: mt.description ? sanitizeText(mt.description, nameMap) : null,
+      isUrgent: Boolean(mt.isUrgent),
+      isImportant: Boolean(mt.isImportant),
+      status: mt.status || "TODO",
+      assigneeId,
+      parentId: null,
+      startDate: mt.startDate ? new Date(mt.startDate) : now,
+      deadline: mt.deadline ? new Date(mt.deadline) : new Date(now.getTime() + 86400000),
+      createdById: creatorId,
+    });
   }
+  const uniqueManagerTasks = Array.from(
+    new Map(preparedManagerTasks.map((mt) => [mt.id, mt])).values()
+  );
+  await batchSeed(targetPrisma.managerTask, uniqueManagerTasks);
 
   const staffTasksToSeed =
     sourceData.staffTasks.length > 0
@@ -1465,153 +1495,141 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           },
         ];
 
+  const preparedStaffTasks = [];
   for (const st of staffTasksToSeed) {
     const assigneeId = userMapById.has(st.assigneeId) ? st.assigneeId : defaultStaffUser.id;
     const creatorId = userMapById.has(st.createdById) ? st.createdById : partnerUser.id;
-    await safeExec(() =>
-      targetPrisma.staffTask?.create?.({
-        data: {
-          id: st.id,
-          title: sanitizeText(st.title, nameMap),
-          description: st.description ? sanitizeText(st.description, nameMap) : null,
-          status: st.status || "TODO",
-          assigneeId,
-          createdById: creatorId,
-          startDate: st.startDate ? new Date(st.startDate) : now,
-          deadline: st.deadline ? new Date(st.deadline) : new Date(now.getTime() + 86400000),
-          submittedAt: st.submittedAt ? new Date(st.submittedAt) : null,
-          completedAt: st.completedAt ? new Date(st.completedAt) : null,
-          adminNote: st.adminNote ? sanitizeText(st.adminNote, nameMap) : null,
-          evidenceLink: st.evidenceLink
-            ? "https://limart2.khanhdp.com/admin"
-            : null,
-          evidenceNote: st.evidenceNote ? sanitizeText(st.evidenceNote, nameMap) : null,
-        },
-      })
-    );
+    preparedStaffTasks.push({
+      id: st.id,
+      title: sanitizeText(st.title, nameMap),
+      description: st.description ? sanitizeText(st.description, nameMap) : null,
+      status: st.status || "TODO",
+      assigneeId,
+      createdById: creatorId,
+      startDate: st.startDate ? new Date(st.startDate) : now,
+      deadline: st.deadline ? new Date(st.deadline) : new Date(now.getTime() + 86400000),
+      submittedAt: st.submittedAt ? new Date(st.submittedAt) : null,
+      completedAt: st.completedAt ? new Date(st.completedAt) : null,
+      adminNote: st.adminNote ? sanitizeText(st.adminNote, nameMap) : null,
+      evidenceLink: st.evidenceLink ? "https://limart2.khanhdp.com/admin" : null,
+      evidenceNote: st.evidenceNote ? sanitizeText(st.evidenceNote, nameMap) : null,
+    });
   }
+  const uniqueStaffTasks = Array.from(
+    new Map(preparedStaffTasks.map((st) => [st.id, st])).values()
+  );
+  await batchSeed(targetPrisma.staffTask, uniqueStaffTasks);
 
   const validChecklistIds = new Set<string>();
+  const preparedChecklistTasks = [];
   for (const ct of sourceData.checklistTasks) {
     const assigneeId = userMapById.has(ct.assigneeId) ? ct.assigneeId : partnerUser.id;
     validChecklistIds.add(ct.id);
-    await safeExec(() =>
-      targetPrisma.managerChecklistTask?.create?.({
-        data: {
-          id: ct.id,
-          title: sanitizeText(ct.title, nameMap),
-          description: ct.description ? sanitizeText(ct.description, nameMap) : null,
-          assigneeId,
-          active: ct.active !== false,
-          targetDate: ct.targetDate || null,
-          order: Number(ct.order) || 0,
-        },
-      })
-    );
+    preparedChecklistTasks.push({
+      id: ct.id,
+      title: sanitizeText(ct.title, nameMap),
+      description: sanitizeText(ct.description || "", nameMap),
+      assigneeId,
+      active: ct.active !== false,
+      targetDate: ct.targetDate || null,
+      order: Number(ct.order) || 0,
+    });
   }
+  const uniqueChecklistTasks = Array.from(
+    new Map(preparedChecklistTasks.map((ct) => [ct.id, ct])).values()
+  );
+  await batchSeed(targetPrisma.managerChecklistTask, uniqueChecklistTasks);
 
+  const preparedChecklistCompletions = [];
   for (const cc of sourceData.checklistCompletions) {
     if (!validChecklistIds.has(cc.taskId)) continue;
-    await safeExec(() =>
-      targetPrisma.managerChecklistCompletion?.create?.({
-        data: {
-          id: cc.id,
-          taskId: cc.taskId,
-          date: cc.date,
-          completed: Boolean(cc.completed),
-          completedAt: cc.completedAt ? new Date(cc.completedAt) : null,
-        },
-      })
-    );
+    preparedChecklistCompletions.push({
+      id: cc.id,
+      taskId: cc.taskId,
+      date: cc.date,
+      completed: Boolean(cc.completed),
+      completedAt: cc.completedAt ? new Date(cc.completedAt) : null,
+    });
   }
+  const uniqueChecklistCompletions = Array.from(
+    new Map(preparedChecklistCompletions.map((cc) => [cc.id, cc])).values()
+  );
+  await batchSeed(targetPrisma.managerChecklistCompletion, uniqueChecklistCompletions);
 
+  const preparedWeeklyTasks = [];
   for (const wt of sourceData.weeklyTasks) {
     const assigneeId = userMapById.has(wt.assigneeId) ? wt.assigneeId : partnerUser.id;
-    await safeExec(() =>
-      targetPrisma.managerWeeklyTask?.create?.({
-        data: {
-          id: wt.id,
-          title: sanitizeText(wt.title, nameMap),
-          description: wt.description ? sanitizeText(wt.description, nameMap) : null,
-          assigneeId,
-          weekStart: new Date(wt.weekStart),
-          weekEnd: new Date(wt.weekEnd),
-          completed: Boolean(wt.completed),
-          completedAt: wt.completedAt ? new Date(wt.completedAt) : null,
-          explanation: wt.explanation ? sanitizeText(wt.explanation, nameMap) : null,
-          isCarriedOver: Boolean(wt.isCarriedOver),
-        },
-      })
-    );
+    preparedWeeklyTasks.push({
+      id: wt.id,
+      title: sanitizeText(wt.title, nameMap),
+      description: wt.description ? sanitizeText(wt.description, nameMap) : null,
+      assigneeId,
+      weekStart: new Date(wt.weekStart),
+      weekEnd: new Date(wt.weekEnd),
+      completed: Boolean(wt.completed),
+      completedAt: wt.completedAt ? new Date(wt.completedAt) : null,
+      explanation: wt.explanation ? sanitizeText(wt.explanation, nameMap) : null,
+      isCarriedOver: Boolean(wt.isCarriedOver),
+    });
   }
+  const uniqueWeeklyTasks = Array.from(
+    new Map(preparedWeeklyTasks.map((wt) => [wt.id, wt])).values()
+  );
+  await batchSeed(targetPrisma.managerWeeklyTask, uniqueWeeklyTasks);
 
   // 8. Announcements (welcome demo announcement + sanitized announcements)
-  await safeExec(() =>
-    targetPrisma.announcement?.create?.({
-      data: {
-        id: "demo-welcome-announcement",
-        title: "Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise",
-        content:
-          "Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise. Bạn đang ở môi trường Demo Sandbox độc lập với dữ liệu nhân sự và bảng lương đã được ẩn danh hoàn toàn. Hãy sử dụng thanh công cụ phía trên để chuyển đổi vai trò (Chủ Cửa Hàng / Quản Lý Ca / Nhân Viên) và trải nghiệm toàn bộ quy trình vận hành.",
-        type: "INFO",
-        active: true,
-      },
-    })
-  );
+  const preparedAnnouncements = [
+    {
+      id: "demo-welcome-announcement",
+      title: "Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise",
+      content:
+        "Chào mừng đến với Hệ thống Quản trị Nhân sự & Vận hành Bán lẻ DemoMart Enterprise. Bạn đang ở môi trường Demo Sandbox độc lập với dữ liệu nhân sự và bảng lương đã được ẩn danh hoàn toàn. Hãy sử dụng thanh công cụ phía trên để chuyển đổi vai trò (Chủ Cửa Hàng / Quản Lý Ca / Nhân Viên) và trải nghiệm toàn bộ quy trình vận hành.",
+      type: "INFO",
+      active: true,
+    },
+  ];
 
   for (const ann of sourceData.announcements) {
     if (ann.id === "demo-welcome-announcement") continue;
-    await safeExec(() =>
-      targetPrisma.announcement?.create?.({
-        data: {
-          id: ann.id,
-          title: sanitizeText(ann.title, nameMap),
-          content: sanitizeText(ann.content, nameMap),
-          type: ann.type || "INFO",
-          active: ann.active !== false,
-        },
-      })
-    );
+    preparedAnnouncements.push({
+      id: ann.id,
+      title: sanitizeText(ann.title, nameMap),
+      content: sanitizeText(ann.content, nameMap),
+      type: ann.type || "INFO",
+      active: ann.active !== false,
+    });
   }
+  const uniqueAnnouncements = Array.from(
+    new Map(preparedAnnouncements.map((a) => [a.id, a])).values()
+  );
+  await batchSeed(targetPrisma.announcement, uniqueAnnouncements);
 
   // 9. Documents (SOP Knowledge Base — always seed 6 comprehensive Enterprise SOP documents + non-colliding source docs)
-  let documentsSeededCount = 0;
+  const preparedDocs = [];
   const seededDocPaths = new Set<string>();
 
   for (const doc of ENTERPRISE_DEMO_DOCUMENTS) {
     seededDocPaths.add(doc.path);
-    const createdDoc = await safeExec(() =>
-      targetPrisma.document?.create?.({
-        data: {
-          id: doc.id,
-          path: doc.path,
-          title: doc.title,
-          content: doc.content,
-        },
-      })
-    );
-    if (createdDoc !== undefined) {
-      documentsSeededCount++;
-    }
+    preparedDocs.push({
+      id: doc.id,
+      path: doc.path,
+      title: doc.title,
+      content: doc.content,
+    });
   }
 
   for (const doc of sourceData.documents) {
     if (!doc?.path || seededDocPaths.has(doc.path)) continue;
     seededDocPaths.add(doc.path);
-    const createdDoc = await safeExec(() =>
-      targetPrisma.document?.create?.({
-        data: {
-          id: doc.id,
-          path: doc.path,
-          title: sanitizeText(doc.title, nameMap),
-          content: sanitizeText(doc.content, nameMap),
-        },
-      })
-    );
-    if (createdDoc !== undefined) {
-      documentsSeededCount++;
-    }
+    preparedDocs.push({
+      id: doc.id,
+      path: doc.path,
+      title: sanitizeText(doc.title, nameMap),
+      content: sanitizeText(doc.content, nameMap),
+    });
   }
+  const uniqueDocs = Array.from(new Map(preparedDocs.map((d) => [d.id, d])).values());
+  const documentsSeededCount = await batchSeed(targetPrisma.document, uniqueDocs);
 
   // 10. Requests (generic reasons)
   const requestsToSeed =
@@ -1625,38 +1643,39 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           status: idx === 0 ? "PENDING" : "APPROVED",
         }));
 
+  const preparedRequests = [];
   for (let i = 0; i < requestsToSeed.length; i++) {
     const reqItem = requestsToSeed[i];
     if (!userMapById.has(reqItem.userId)) continue;
-    await safeExec(() =>
-      targetPrisma.request?.create?.({
-        data: {
-          userId: reqItem.userId,
-          type: reqItem.type || "LEAVE",
-          date: reqItem.date ? new Date(reqItem.date) : now,
-          reason: DEMO_REQUEST_REASONS[i % DEMO_REQUEST_REASONS.length],
-          status: reqItem.status || "PENDING",
-        },
-      })
-    );
+    preparedRequests.push({
+      userId: reqItem.userId,
+      type: reqItem.type || "LEAVE",
+      date: reqItem.date ? new Date(reqItem.date) : now,
+      reason: DEMO_REQUEST_REASONS[i % DEMO_REQUEST_REASONS.length],
+      status: reqItem.status || "PENDING",
+    });
   }
+  await batchSeed(targetPrisma.request, preparedRequests);
 
   // 11. PayrollPeriod, PayrollAdjustment & Sanitized Payslips
+  const uniquePeriodKeyMap = new Map<string, any>();
+  const seenPeriodIds = new Set<string>();
   for (const pp of sourceData.payrollPeriods) {
-    await safeExec(() =>
-      targetPrisma.payrollPeriod?.create?.({
-        data: {
-          id: pp.id,
-          month: pp.month,
-          year: pp.year,
-          status: pp.status || "OPEN",
-          bonusPercent: Number(pp.bonusPercent) || 0,
-          bonusTargets: pp.bonusTargets || ["PART_TIME"],
-          excludedBonusUsers: [],
-        },
-      })
-    );
+    const periodKey = `${pp.month}:${pp.year}`;
+    if (uniquePeriodKeyMap.has(periodKey) || seenPeriodIds.has(pp.id)) continue;
+    seenPeriodIds.add(pp.id);
+    uniquePeriodKeyMap.set(periodKey, {
+      id: pp.id,
+      month: pp.month,
+      year: pp.year,
+      status: pp.status || "OPEN",
+      bonusPercent: Number(pp.bonusPercent) || 0,
+      bonusTargets: pp.bonusTargets || ["PART_TIME"],
+      excludedBonusUsers: [],
+    });
   }
+  const uniquePayrollPeriods = Array.from(uniquePeriodKeyMap.values());
+  await batchSeed(targetPrisma.payrollPeriod, uniquePayrollPeriods);
 
   const adjustmentsToSeed =
     sourceData.payrollAdjustments.length > 0
@@ -1667,23 +1686,23 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           date: now,
         }));
 
+  const preparedAdjustments = [];
   for (let i = 0; i < adjustmentsToSeed.length; i++) {
     const adj = adjustmentsToSeed[i];
     if (!userMapById.has(adj.userId)) continue;
-    await safeExec(() =>
-      targetPrisma.payrollAdjustment?.create?.({
-        data: {
-          id: adj.id,
-          userId: adj.userId,
-          amount: DEMO_ADJUSTMENT_AMOUNTS[i % DEMO_ADJUSTMENT_AMOUNTS.length],
-          reason: DEMO_ADJUSTMENT_REASONS[i % DEMO_ADJUSTMENT_REASONS.length],
-          date: adj.date ? new Date(adj.date) : now,
-        },
-      })
-    );
+    preparedAdjustments.push({
+      id: adj.id,
+      userId: adj.userId,
+      amount: DEMO_ADJUSTMENT_AMOUNTS[i % DEMO_ADJUSTMENT_AMOUNTS.length],
+      reason: DEMO_ADJUSTMENT_REASONS[i % DEMO_ADJUSTMENT_REASONS.length],
+      date: adj.date ? new Date(adj.date) : now,
+    });
   }
+  const uniqueAdjustments = Array.from(
+    new Map(preparedAdjustments.map((a) => [a.id, a])).values()
+  );
+  await batchSeed(targetPrisma.payrollAdjustment, uniqueAdjustments);
 
-  let payslipsSeededCount = 0;
   const payslipsToSeed =
     sourceData.payslips.length > 0
       ? sourceData.payslips
@@ -1722,33 +1741,37 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
           },
         }));
 
+  const payslipKeyMap = new Map<string, any>();
+  const payslipIdMap = new Set<string>();
+
   for (const ps of payslipsToSeed) {
     const demoUser = userMapById.get(ps.userId);
     if (!demoUser) continue;
+    if (ps.id && payslipIdMap.has(ps.id)) continue;
+
+    const userMonthKey = `${demoUser.id}:${ps.month}:${ps.year}`;
+    if (payslipKeyMap.has(userMonthKey)) continue;
 
     const { content, netSalary } = sanitizePayslipRecord(ps, demoUser, nameMap);
+    const payslipRecord = {
+      id: ps.id,
+      userId: demoUser.id,
+      month: ps.month,
+      year: ps.year,
+      content,
+      netSalary,
+      status: ps.status || "PENDING",
+      emailSentAt: null,
+    };
 
-    try {
-      await targetPrisma.payslip.create({
-        data: {
-          id: ps.id,
-          userId: demoUser.id,
-          month: ps.month,
-          year: ps.year,
-          content,
-          netSalary,
-          status: ps.status || "PENDING",
-          emailSentAt: null,
-        },
-      });
-      payslipsSeededCount++;
-    } catch {
-      // Ignore duplicate month/year payslip
-    }
+    if (ps.id) payslipIdMap.add(ps.id);
+    payslipKeyMap.set(userMonthKey, payslipRecord);
   }
 
+  const uniquePayslips = Array.from(payslipKeyMap.values());
+  const payslipsSeededCount = await batchSeed(targetPrisma.payslip, uniquePayslips);
+
   // 12. SessionAuditLog (25 realistic entries spanning the last 7 days with SHA-256 hash chain)
-  let auditLogsSeededCount = 0;
   const auditUserPool = [
     adminUser,
     partnerUser,
@@ -1800,6 +1823,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
   ];
 
   let prevAuditHash = "0".repeat(64);
+  const preparedAuditLogs = [];
   for (let i = 0; i < auditScenarioTemplates.length; i++) {
     const tpl = auditScenarioTemplates[i];
     const actorUser = auditUserPool[i % auditUserPool.length] || adminUser;
@@ -1829,26 +1853,23 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
     };
     prevAuditHash = currentHash;
 
-    const createdAudit = await safeExec(() =>
-      targetPrisma.sessionAuditLog?.create?.({
-        data: {
-          id: `demo-audit-log-${String(i + 1).padStart(2, "0")}`,
-          userId: actorUser.id,
-          action: tpl.action,
-          status: tpl.status,
-          ipAddress,
-          userAgent,
-          device: tpl.device,
-          city,
-          details,
-          createdAt,
-        },
-      })
-    );
-    if (createdAudit !== undefined) {
-      auditLogsSeededCount++;
-    }
+    preparedAuditLogs.push({
+      id: `demo-audit-log-${String(i + 1).padStart(2, "0")}`,
+      userId: actorUser.id,
+      action: tpl.action,
+      status: tpl.status,
+      ipAddress,
+      userAgent,
+      device: tpl.device,
+      city,
+      details,
+      createdAt,
+    });
   }
+  const uniqueAuditLogs = Array.from(
+    new Map(preparedAuditLogs.map((log) => [log.id, log])).values()
+  );
+  const auditLogsSeededCount = await batchSeed(targetPrisma.sessionAuditLog, uniqueAuditLogs);
 
   // Clear Redis caches after demo seed
   await safeExec(() => invalidateCachePattern("meta:documents:*"));
@@ -1857,7 +1878,7 @@ export async function seedAndSanitizeDemoDatabase(options?: SeedDemoOptions): Pr
 
   return {
     skipped: false,
-    usersSeeded: sanitizedUsers.length,
+    usersSeeded: uniqueUsers.length,
     shiftsSeeded: shiftsSeededCount,
     checkinsSeeded: checkinsSeededCount,
     payslipsSeeded: payslipsSeededCount,

@@ -513,6 +513,22 @@ model DocumentChunk {
   @@index([documentId, createdAt])
 }
 
+model SemanticQaCache {
+  id              String                 @id @default(cuid())
+  tenantId        String                 @default("limart")
+  normalizedQuery String
+  question        String
+  answer          String
+  sources         Json?
+  embedding       Unsupported("vector")?
+  hitCount        Int                    @default(0)
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([tenantId, normalizedQuery])
+  @@index([tenantId, createdAt])
+}
+
 model ManagerTask {
   id          String    @id @default(cuid())
   tenantId    String    @default("limart")

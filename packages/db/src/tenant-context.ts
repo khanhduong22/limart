@@ -55,6 +55,7 @@ export const TENANT_SCOPED_MODELS = new Set([
   "PushSubscription",
   "NotificationRule",
   "NotificationLog",
+  "SemanticQaCache",
 ]);
 
 const READ_FILTER_OPERATIONS = new Set([

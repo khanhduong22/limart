@@ -4,6 +4,20 @@ import mammoth from "mammoth";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { authMiddleware, adminMiddleware, AppEnv } from "../middleware/auth.middleware";
 import { getOrSetCache, invalidateCachePattern } from "../lib/cache";
+import { getCurrentTenantId } from "../middleware/tenant.middleware";
+import {
+  normalizeCapyQuery,
+  removeVietnameseAccents,
+  lookupTier1ExactOrGrep,
+  lookupTier2SemanticCache,
+  saveToCapyRagCache,
+  invalidateCapyRagCache,
+  ensurePgvectorHalfvecIndexes,
+  hybridSearchDocumentChunksRRF,
+  computeRrfScore,
+  syncDocumentsToMeilisearch,
+  searchDocumentsInMeilisearch,
+} from "../lib/capy-rag-cache";
 
 export const documentsRoute = new Hono<AppEnv>();
 
@@ -123,31 +137,41 @@ export function scoreDocuments(
   }
 
   const scored: ScoredDocument[] = [];
+  const unaccentedPhrases = phrases.map((p) => removeVietnameseAccents(p.toLowerCase()));
+  const unaccentedKeywords = keywords.map((k) => removeVietnameseAccents(k.toLowerCase()));
 
   for (const doc of docs) {
     const titleLower = doc.title.toLowerCase();
     const contentLower = doc.content.toLowerCase();
+    const titleUnacc = removeVietnameseAccents(titleLower);
+    const contentUnacc = removeVietnameseAccents(contentLower);
     let score = 0;
 
     // 1. Phrase match (+50 points)
-    for (const phrase of phrases) {
-      if (titleLower.includes(phrase)) {
+    for (let i = 0; i < phrases.length; i++) {
+      const phrase = phrases[i];
+      const unacc = unaccentedPhrases[i];
+      if (titleLower.includes(phrase) || (unacc && titleUnacc.includes(unacc))) {
         score += 50;
-      } else if (contentLower.includes(phrase)) {
+      } else if (contentLower.includes(phrase) || (unacc && contentUnacc.includes(unacc))) {
         score += 50;
       }
     }
 
     // 2. Keyword match in title (+20 points)
-    for (const kw of keywords) {
-      if (titleLower.includes(kw)) {
+    for (let i = 0; i < keywords.length; i++) {
+      const kw = keywords[i];
+      const unacc = unaccentedKeywords[i];
+      if (titleLower.includes(kw) || (unacc && titleUnacc.includes(unacc))) {
         score += 20;
       }
     }
 
     // 3. Keyword match in content (+5 points)
-    for (const kw of keywords) {
-      if (contentLower.includes(kw)) {
+    for (let i = 0; i < keywords.length; i++) {
+      const kw = keywords[i];
+      const unacc = unaccentedKeywords[i];
+      if (contentLower.includes(kw) || (unacc && contentUnacc.includes(unacc))) {
         score += 5;
       }
     }
@@ -464,6 +488,7 @@ export async function ensurePgVectorAndSyncChunks(
   totalChunks: number;
 }> {
   await ensurePgVector();
+  await ensurePgvectorHalfvecIndexes().catch(() => {});
 
   const allDocs =
     docs ||
@@ -476,6 +501,11 @@ export async function ensurePgVectorAndSyncChunks(
 
   if (allDocs.length === 0) {
     return { success: true, totalDocs: 0, syncedDocs: 0, totalChunks: 0 };
+  }
+
+  // Non-blocking sync to Meilisearch
+  if (typeof syncDocumentsToMeilisearch === "function") {
+    syncDocumentsToMeilisearch(allDocs as any).catch(() => {});
   }
 
   let docIdsToSync: string[] = [];
@@ -624,6 +654,7 @@ documentsRoute.post("/reindex", async (c) => {
   try {
     const force = c.req.query("force") === "true";
     const result = await ensurePgVectorAndSyncChunks(force);
+    await invalidateCapyRagCache().catch(() => {});
     return c.json({
       success: true,
       message: `Đã đồng bộ vector embedding cho ${result.syncedDocs}/${result.totalDocs} tài liệu (${result.totalChunks} chunks)`,
@@ -798,6 +829,17 @@ documentsRoute.post("/", authMiddleware, adminMiddleware, async (c) => {
     await syncDocumentChunks(document.id, content);
 
     await invalidateCachePattern("meta:documents:*").catch(() => {});
+    await invalidateCapyRagCache().catch(() => {});
+    if (typeof syncDocumentsToMeilisearch === "function") {
+      syncDocumentsToMeilisearch([
+        {
+          id: document.id,
+          path: document.path,
+          title: document.title,
+          content: document.content,
+        },
+      ]).catch(() => {});
+    }
 
     return c.json({
       success: true,
@@ -842,6 +884,7 @@ documentsRoute.delete("/:id", authMiddleware, adminMiddleware, async (c) => {
     });
 
     await invalidateCachePattern("meta:documents:*").catch(() => {});
+    await invalidateCapyRagCache().catch(() => {});
 
     return c.json({
       success: true,
@@ -886,10 +929,21 @@ documentsRoute.patch("/:id", authMiddleware, adminMiddleware, async (c) => {
     });
 
     if (content !== undefined) {
-      await syncDocumentChunks(id, updated.content);
+      await syncDocumentChunks(id!, updated.content || "");
     }
 
     await invalidateCachePattern("meta:documents:*").catch(() => {});
+    await invalidateCapyRagCache().catch(() => {});
+    if (typeof syncDocumentsToMeilisearch === "function") {
+      syncDocumentsToMeilisearch([
+        {
+          id: updated.id,
+          path: updated.path,
+          title: updated.title,
+          content: updated.content,
+        },
+      ]).catch(() => {});
+    }
 
     return c.json({
       success: true,
@@ -932,10 +986,21 @@ documentsRoute.put("/:id", authMiddleware, adminMiddleware, async (c) => {
     });
 
     if (content !== undefined) {
-      await syncDocumentChunks(id, updated.content);
+      await syncDocumentChunks(id!, updated.content || "");
     }
 
     await invalidateCachePattern("meta:documents:*").catch(() => {});
+    await invalidateCapyRagCache().catch(() => {});
+    if (typeof syncDocumentsToMeilisearch === "function") {
+      syncDocumentsToMeilisearch([
+        {
+          id: updated.id,
+          path: updated.path,
+          title: updated.title,
+          content: updated.content,
+        },
+      ]).catch(() => {});
+    }
 
     return c.json({
       success: true,
@@ -998,53 +1063,10 @@ export const handleCapyChat = async (c: any) => {
       );
     }
 
+    const currentTenantId = getCurrentTenantId() || "limart";
     const geminiApiKey = getCleanGeminiApiKey();
 
-    type SimilarChunk = {
-      documentId?: string;
-      content: string;
-      path: string;
-      title: string;
-      distance: number;
-    };
-
-    let closeChunks: SimilarChunk[] = [];
-    const matchedDocIds = new Set<string>();
-
-    if (geminiApiKey) {
-      try {
-        const genAI = new GoogleGenerativeAI(geminiApiKey);
-        const embeddingModel = genAI.getGenerativeModel({
-          model: "gemini-embedding-001",
-        });
-        const embeddingResult = await embeddingModel.embedContent(userQuery);
-        const queryVector = `[${embeddingResult.embedding.values.join(",")}]`;
-
-        const similarChunks = await prisma.$queryRaw<SimilarChunk[]>`
-          SELECT
-            c."documentId",
-            c.content,
-            d.path,
-            d.title,
-            c.embedding <=> ${queryVector}::vector AS distance
-          FROM "DocumentChunk" c
-          JOIN "Document" d ON c."documentId" = d.id
-          WHERE c.embedding IS NOT NULL
-          ORDER BY distance ASC
-          LIMIT 8
-        `;
-
-        // Only accept chunks with distance <= 0.65 (avoiding 0.35 drop of valid Vietnamese chunks)
-        closeChunks = (similarChunks || []).filter((chunk) => chunk.distance <= 0.65);
-        for (const chunk of closeChunks) {
-          if (chunk.documentId) matchedDocIds.add(chunk.documentId);
-        }
-      } catch (ragErr) {
-        console.warn("[RAG_SEARCH_FALLBACK]", ragErr);
-      }
-    }
-
-    // Hybrid keyword search across all documents
+    // 1. Load allDocs via Cache
     const allDocs = await getOrSetCache("meta:documents:all", 600, () =>
       prisma.document.findMany({
         select: { id: true, title: true, path: true, content: true },
@@ -1060,31 +1082,141 @@ export const handleCapyChat = async (c: any) => {
       });
     }
 
+    // 2. TIER 1: Grep / Lexical Instant Match & Valkey Exact Cache (1-5ms, 0 API Calls)
+    const tier1 = await lookupTier1ExactOrGrep(userQuery, allDocs, {
+      tenantId: currentTenantId,
+    });
+
+    if (tier1.hit && tier1.reply) {
+      return c.json({
+        success: true,
+        data: {
+          reply: tier1.reply,
+          sources: tier1.sources || [],
+          tier: tier1.tier,
+          cached: true,
+        },
+        tier: tier1.tier,
+        cached: true,
+        reply: tier1.reply,
+        content: tier1.reply,
+      });
+    }
+
+    // 3. TIER 2: Semantic Embedding Response Cache (~80ms, 0 LLM Calls)
+    // Compute embedding ONCE if geminiApiKey is configured
+    let queryVectorValues: number[] | null = null;
+    let genAI: GoogleGenerativeAI | null = null;
+
+    if (geminiApiKey) {
+      try {
+        genAI = new GoogleGenerativeAI(geminiApiKey);
+        const embeddingModel = genAI.getGenerativeModel({
+          model: "gemini-embedding-001",
+        });
+        const embeddingResult = await embeddingModel.embedContent(userQuery);
+        const values = embeddingResult.embedding?.values;
+        if (Array.isArray(values) && values.length > 0) {
+          queryVectorValues = values;
+        }
+      } catch (embErr) {
+        console.warn("[EMBEDDING_QUERY_WARN]", embErr);
+      }
+    }
+
+    if (queryVectorValues && queryVectorValues.length > 0) {
+      const tier2 = await lookupTier2SemanticCache(queryVectorValues, currentTenantId);
+      if (tier2.hit && tier2.reply) {
+        // Warm Tier 1 Exact Cache for userQuery so repeating exact string later is 1-5ms!
+        saveToCapyRagCache({
+          userQuery,
+          answer: tier2.reply,
+          sources: tier2.sources || [],
+          embedding: queryVectorValues,
+          tenantId: currentTenantId,
+        }).catch(() => {});
+
+        const similarity = Number((1 - (tier2.distance ?? 0)).toFixed(4));
+        return c.json({
+          success: true,
+          data: {
+            reply: tier2.reply,
+            sources: tier2.sources || [],
+            tier: "TIER_2_SEMANTIC_CACHE",
+            similarity,
+            cached: true,
+          },
+          tier: "TIER_2_SEMANTIC_CACHE",
+          similarity,
+          cached: true,
+          reply: tier2.reply,
+          content: tier2.reply,
+        });
+      }
+    }
+
+    // 4. Hybrid Context Retrieval:
+    // (pgvector DocumentChunk via pure-SQL RRF + Meilisearch documents + Grep scoreDocuments + Fallback)
+    const matchedDocIds = new Set<string>();
+    const matchedPaths = new Set<string>();
+    const contextParts: string[] = [];
+
+    // 4a. Pure-SQL Hybrid RRF (halfvec + tsvector)
+    try {
+      const rrfChunks = await hybridSearchDocumentChunksRRF(
+        queryVectorValues,
+        userQuery,
+        8
+      );
+      for (let i = 0; i < rrfChunks.length; i++) {
+        const chunk = rrfChunks[i];
+        if (chunk.documentId) matchedDocIds.add(chunk.documentId);
+        if (chunk.path) matchedPaths.add(chunk.path);
+        const distStr = chunk.distance !== undefined ? chunk.distance.toFixed(3) : "N/A";
+        const rrfStr = chunk.rrfScore !== undefined ? chunk.rrfScore.toFixed(4) : "N/A";
+        contextParts.push(
+          `--- ĐOẠN TRÍCH ${i + 1}: ${chunk.title} (${chunk.path}) [Khoảng cách vector: ${distStr}, RRF: ${rrfStr}] ---\n${chunk.content}`
+        );
+      }
+    } catch (rrfErr) {
+      console.warn("[HYBRID_RRF_WARN]", rrfErr);
+    }
+
+    // 4b. Meilisearch Typo-Tolerant Vietnamese Search
+    try {
+      if (typeof searchDocumentsInMeilisearch === "function") {
+        const meiliHits = await searchDocumentsInMeilisearch(userQuery, currentTenantId, 4);
+        for (const hit of meiliHits || []) {
+          if (!matchedDocIds.has(hit.id)) {
+            matchedDocIds.add(hit.id);
+            if (hit.path) matchedPaths.add(hit.path);
+            contextParts.push(
+              `--- TÀI LIỆU MEILISEARCH: ${hit.title} (${hit.path}) ---\n${hit.content}`
+            );
+          }
+        }
+      }
+    } catch (meiliErr) {
+      console.warn("[MEILISEARCH_RAG_WARN]", meiliErr);
+    }
+
+    // 4c. Grep / Lexical ScoreDocuments
     const scoredDocs = scoreDocuments(userQuery, allDocs);
     const topScoredDocs = scoredDocs
       .filter((d) => d.score >= MIN_RELEVANCE_SCORE)
       .slice(0, 3);
 
-    const contextParts: string[] = [];
-
-    if (closeChunks.length > 0) {
-      closeChunks.forEach((chunk, index) => {
-        contextParts.push(
-          `--- ĐOẠN TRÍCH ${index + 1}: ${chunk.title} (${chunk.path}) [Khoảng cách vector: ${chunk.distance.toFixed(3)}] ---\n${chunk.content}`
-        );
-      });
-    }
-
     for (const doc of topScoredDocs) {
       if (!matchedDocIds.has(doc.id)) {
+        matchedDocIds.add(doc.id);
+        if (doc.path) matchedPaths.add(doc.path);
         contextParts.push(
           `--- TÀI LIỆU KHỚP TỪ KHOÁ: ${doc.title} (${doc.path}) [Điểm tương quan: ${doc.score}đ] ---\n${doc.content}`
         );
-        matchedDocIds.add(doc.id);
       }
     }
 
-    // Inject operational knowledge fallback if query matches core operational rules and no DB docs found
+    // 4d. Fallback context if no DB docs matched
     if (contextParts.length === 0) {
       const keywordFallback = getKeywordFallbackContext(userQuery);
       if (keywordFallback) {
@@ -1094,18 +1226,29 @@ export const handleCapyChat = async (c: any) => {
 
     const relevantContext = contextParts.join("\n\n").trim();
 
-    // 100% STRICT RAG: If no relevant context found from DB, return strict not found message immediately!
+    // 100% STRICT RAG: If no relevant context found, return strict not found message immediately!
     if (!relevantContext) {
       return c.json({
         success: true,
         reply: STRICT_NOT_FOUND_MESSAGE,
         content: STRICT_NOT_FOUND_MESSAGE,
+        data: {
+          reply: STRICT_NOT_FOUND_MESSAGE,
+          sources: [],
+          tier: "TIER_3_GEMINI_LLM",
+          cached: false,
+        },
+        tier: "TIER_3_GEMINI_LLM",
+        cached: false,
       });
     }
 
+    // 5. TIER 3: Gemini LLM Generation + Write-Back to Tier 1 & Tier 2
     if (geminiApiKey) {
       try {
-        const genAI = new GoogleGenerativeAI(geminiApiKey);
+        if (!genAI) {
+          genAI = new GoogleGenerativeAI(geminiApiKey);
+        }
         const systemInstruction = `Bạn là Capy AI - Trợ lý vận hành và hỗ trợ nội bộ của LimArt (Cửa hàng Họa cụ & Mỹ thuật).
 Nhiệm vụ của bạn là giải đáp chính xác, đầy đủ, chi tiết từng bước cho nhân viên và quản lý dựa trên các quy định và tài liệu nội bộ của công ty.
 
@@ -1138,8 +1281,25 @@ ${relevantContext}`;
         const rawReply = await generateWithGeminiFallback(genAI, systemInstruction, prompt);
         const replyText = cleanAiOutputForHumans(rawReply);
 
+        // Write-Back to Tier 1 & Tier 2 Cache
+        await saveToCapyRagCache({
+          userQuery,
+          answer: replyText,
+          sources: Array.from(matchedPaths),
+          embedding: queryVectorValues || undefined,
+          tenantId: currentTenantId,
+        });
+
         return c.json({
           success: true,
+          data: {
+            reply: replyText,
+            sources: Array.from(matchedPaths),
+            tier: "TIER_3_GEMINI_LLM",
+            cached: false,
+          },
+          tier: "TIER_3_GEMINI_LLM",
+          cached: false,
           reply: replyText,
           content: replyText,
         });
@@ -1154,6 +1314,14 @@ ${relevantContext}`;
 
     return c.json({
       success: true,
+      data: {
+        reply: fallbackAnswer,
+        sources: Array.from(matchedPaths),
+        tier: "TIER_3_GEMINI_LLM",
+        cached: false,
+      },
+      tier: "TIER_3_GEMINI_LLM",
+      cached: false,
       reply: fallbackAnswer,
       content: fallbackAnswer,
     });
@@ -1167,5 +1335,6 @@ ${relevantContext}`;
 };
 
 documentsRoute.post("/chat", handleCapyChat);
+
 
 

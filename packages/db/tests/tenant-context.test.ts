@@ -143,13 +143,14 @@ describe("Multi-Tenant AsyncLocalStorage Context & Filter Injection", () => {
     });
   });
 
-  it("includes all 27 tenant-scoped models in TENANT_SCOPED_MODELS", () => {
-    expect(TENANT_SCOPED_MODELS.size).toBe(27);
+  it("includes all 28 tenant-scoped models in TENANT_SCOPED_MODELS", () => {
+    expect(TENANT_SCOPED_MODELS.size).toBe(28);
     expect(TENANT_SCOPED_MODELS.has("User")).toBe(true);
     expect(TENANT_SCOPED_MODELS.has("WorkShift")).toBe(true);
     expect(TENANT_SCOPED_MODELS.has("SessionAuditLog")).toBe(true);
     expect(TENANT_SCOPED_MODELS.has("PushSubscription")).toBe(true);
     expect(TENANT_SCOPED_MODELS.has("NotificationRule")).toBe(true);
     expect(TENANT_SCOPED_MODELS.has("NotificationLog")).toBe(true);
+    expect(TENANT_SCOPED_MODELS.has("SemanticQaCache")).toBe(true);
   });
 });

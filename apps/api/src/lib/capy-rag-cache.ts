@@ -737,13 +737,13 @@ export async function ensurePgvectorHalfvecIndexes(): Promise<boolean> {
     try {
       await prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS idx_document_chunk_halfvec 
-        ON "DocumentChunk" USING hnsw ((embedding::halfvec) halfvec_cosine_ops);
+        ON "DocumentChunk" USING hnsw (((embedding)::halfvec(3072)) halfvec_cosine_ops);
       `);
     } catch {
       // Fallback to standard vector index if halfvec unsupported
       await prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS idx_document_chunk_vector 
-        ON "DocumentChunk" USING hnsw (embedding vector_cosine_ops);
+        ON "DocumentChunk" USING hnsw (((embedding)::vector(3072)) vector_cosine_ops);
       `).catch(() => {});
     }
 
@@ -761,12 +761,12 @@ export async function ensurePgvectorHalfvecIndexes(): Promise<boolean> {
     try {
       await prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS idx_semantic_qa_cache_halfvec 
-        ON "SemanticQaCache" USING hnsw ((embedding::halfvec) halfvec_cosine_ops);
+        ON "SemanticQaCache" USING hnsw (((embedding)::halfvec(3072)) halfvec_cosine_ops);
       `);
     } catch {
       await prisma.$executeRawUnsafe(`
         CREATE INDEX IF NOT EXISTS idx_semantic_qa_cache_vector 
-        ON "SemanticQaCache" USING hnsw (embedding vector_cosine_ops);
+        ON "SemanticQaCache" USING hnsw (((embedding)::vector(3072)) vector_cosine_ops);
       `).catch(() => {});
     }
 

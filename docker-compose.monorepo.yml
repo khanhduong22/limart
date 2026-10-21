@@ -174,13 +174,13 @@ services:
           - checkin-valkey
 
   # ----------------------------------------------------------------------------
-  # 5. PostgreSQL 17 Database with pgvector & pgBackRest
+  # 5. PostgreSQL 18 Database with pgvector & pgBackRest
   # ----------------------------------------------------------------------------
   limart-db:
     build:
       context: ./docker/postgres
       dockerfile: Dockerfile
-    image: limart-db:pg17-pgbackrest
+    image: limart-db:pg18-pgbackrest
     container_name: limart-db
     restart: unless-stopped
     shm_size: 256mb

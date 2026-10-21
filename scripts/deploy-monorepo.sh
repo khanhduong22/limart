@@ -105,6 +105,12 @@ deploy_dual_run() {
     log_info "Legacy monolith container (checkin-app) is permanently decommissioned."
 
     # Step 2: Start persistent database & cache if not running (with pgBackRest built into limart-db)
+    log_info "Checking PostgreSQL 18 upgrade for limart-db..."
+    if [ -f "scripts/upgrade-limart-db-pg18.sh" ]; then
+        chmod +x scripts/upgrade-limart-db-pg18.sh
+        ./scripts/upgrade-limart-db-pg18.sh
+    fi
+
     log_info "Ensuring backing services (limart-db, limart-valkey) are running..."
     docker volume create checkin-app_checkin_pgbackrest_data >/dev/null 2>&1 || true
     docker compose -f "${COMPOSE_FILE}" up -d --build limart-db limart-valkey
@@ -239,10 +245,13 @@ deploy_dual_run() {
 
     # Step 9b: Provision & Deploy Isolated Public Demo Tenant (checkin_demo_db + limart-demo-api)
     log_info "Ensuring isolated demo database 'checkin_demo_db' exists and schema is synced..."
-    docker exec limart-db psql -U kido -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'checkin_demo_db'" | grep -q 1 || \
+    if ! docker exec limart-db psql -U kido -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'checkin_demo_db'" | grep -q 1; then
         docker exec limart-db psql -U kido -d postgres -c "CREATE DATABASE checkin_demo_db;"
-    docker exec limart-db psql -U kido -d checkin_demo_db -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1 || true
-    docker exec limart-db sh -c "pg_dump -U kido --schema-only --no-owner --no-privileges checkin_db | psql -U kido -d checkin_demo_db >/dev/null 2>&1 || true"
+        docker exec limart-db psql -U kido -d checkin_demo_db -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1 || true
+        docker exec limart-db sh -c "pg_dump -U kido --schema-only --no-owner --no-privileges checkin_db | psql -U kido -d checkin_demo_db >/dev/null 2>&1 || true"
+    else
+        docker exec limart-db psql -U kido -d checkin_demo_db -c "CREATE EXTENSION IF NOT EXISTS vector;" >/dev/null 2>&1 || true
+    fi
     for DB_TARGET in checkin_db checkin_demo_db; do
         docker exec limart-db psql -U kido -d "$DB_TARGET" -c '
           CREATE TABLE IF NOT EXISTS "Tenant" (
@@ -387,8 +396,7 @@ deploy_dual_run() {
         log_info "Syncing demo database schema via Prisma in limart-demo-api..."
         docker exec limart-demo-api bunx prisma db push --skip-generate --schema=packages/db/prisma/schema.prisma >/dev/null 2>&1 || true
         log_info "Triggering initial anonymized data sync on limart-demo-api (POST /api/demo/reset)..."
-        docker exec limart-demo-api wget -q -O - --post-data="" http://127.0.0.1:4010/api/demo/reset >/dev/null 2>&1 || \
-            docker exec limart-demo-api bun -e "fetch('http://127.0.0.1:4010/api/demo/reset', {method:'POST'}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1 || \
+        docker exec limart-demo-api bun -e "fetch('http://127.0.0.1:4010/api/demo/reset', {method:'POST', signal: AbortSignal.timeout(30000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1 || \
             log_warn "Initial demo reset trigger deferred (will lazy-seed on first request)."
         log_success "Public Demo API (limart-demo-api) is ready and synced!"
     else

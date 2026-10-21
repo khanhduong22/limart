@@ -1,4 +1,6 @@
-FROM pgvector/pgvector:pg17
+FROM pgvector/pgvector:0.8.7-pg18-bookworm
+
+ENV PGDATA=/var/lib/postgresql/data
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     pgbackrest \

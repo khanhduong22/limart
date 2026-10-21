@@ -128,10 +128,10 @@ services:
       start_period: 5s
 
   # ----------------------------------------------------------------------------
-  # 5. PostgreSQL 17 Database with pgvector
+  # 5. PostgreSQL 18 Database with pgvector
   # ----------------------------------------------------------------------------
   limart-db:
-    image: pgvector/pgvector:pg17
+    image: pgvector/pgvector:0.8.7-pg18-bookworm
     container_name: limart-db
     restart: unless-stopped
     shm_size: 256mb

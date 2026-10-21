@@ -105,6 +105,7 @@ vi.mock("@checkin/db", () => ({
 }));
 
 import { app } from "../src/app";
+import { prisma } from "@checkin/db";
 import {
   _resetDemoModulesMemory,
   buildCorporateAvatarSvg,
@@ -458,6 +459,149 @@ describe("Demo Sandbox Sanitizer, Cloning Engine & /api/demo/* Endpoints", () =>
         expect(log.details?.requestId).toBeTruthy();
         expect(log.details?.note).toBeTruthy();
       }
+    });
+
+    it("coalesces concurrent seedAndSanitizeDemoDatabase calls via single-flight lock to prevent race conditions", async () => {
+      process.env.DEMO_SANDBOX_MODE = "true";
+      _resetDemoModulesMemory();
+
+      // Trigger concurrent calls
+      const [res1, res2] = await Promise.all([
+        seedAndSanitizeDemoDatabase({ force: true }),
+        seedAndSanitizeDemoDatabase({ force: true }),
+      ]);
+
+      // Both callers receive the exact same result
+      expect(res1).toBe(res2);
+      expect(res1.skipped).toBe(false);
+
+      // mockUserDeleteMany is only called once because execution was not duplicated
+      expect(mockUserDeleteMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses createMany({ skipDuplicates: true }) and deduplicates duplicate keys when model supports createMany", async () => {
+      process.env.DEMO_SANDBOX_MODE = "true";
+      _resetDemoModulesMemory();
+
+      const mockUserCreateMany = vi.fn().mockResolvedValue({ count: 4 });
+      const mockPayslipCreateMany = vi.fn().mockResolvedValue({ count: 1 });
+      const mockAdjustmentCreateMany = vi.fn().mockResolvedValue({ count: 2 });
+      const mockAuditLogCreateMany = vi.fn().mockResolvedValue({ count: 25 });
+      const mockWorkShiftCreateMany = vi.fn().mockResolvedValue({ count: 4 });
+      const mockCheckInCreateMany = vi.fn().mockResolvedValue({ count: 4 });
+
+      const customPrisma = {
+        ...prisma,
+        user: {
+          ...prisma.user,
+          createMany: mockUserCreateMany,
+        },
+        payslip: {
+          ...prisma.payslip,
+          createMany: mockPayslipCreateMany,
+        },
+        payrollAdjustment: {
+          ...prisma.payrollAdjustment,
+          createMany: mockAdjustmentCreateMany,
+        },
+        sessionAuditLog: {
+          ...prisma.sessionAuditLog,
+          createMany: mockAuditLogCreateMany,
+        },
+        workShift: {
+          ...prisma.workShift,
+          createMany: mockWorkShiftCreateMany,
+        },
+        checkIn: {
+          ...prisma.checkIn,
+          createMany: mockCheckInCreateMany,
+        },
+      };
+
+      // Provide source data with duplicate payslips (same user, same month/year or duplicate IDs)
+      const mockSourcePrisma = {
+        user: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              id: "src-admin-1",
+              name: "Chủ Cửa Hàng",
+              email: "boss@test.com",
+              role: "ADMIN",
+              employmentType: "FULL_TIME",
+              monthlySalary: 20000000,
+              isActive: true,
+            },
+          ]),
+        },
+        payslip: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              id: "ps-dup-1",
+              userId: "src-admin-1",
+              month: 10,
+              year: 2026,
+              netSalary: 10000000,
+              status: "PAID",
+              content: { name: "Chủ Cửa Hàng" },
+            },
+            // Duplicate 1: same userId, same month, same year
+            {
+              id: "ps-dup-2",
+              userId: "src-admin-1",
+              month: 10,
+              year: 2026,
+              netSalary: 10000000,
+              status: "PAID",
+              content: { name: "Chủ Cửa Hàng" },
+            },
+            // Duplicate 2: duplicate id
+            {
+              id: "ps-dup-1",
+              userId: "src-admin-1",
+              month: 11,
+              year: 2026,
+              netSalary: 10000000,
+              status: "PAID",
+              content: { name: "Chủ Cửa Hàng" },
+            },
+          ]),
+        },
+        payrollAdjustment: {
+          findMany: vi.fn().mockResolvedValue([
+            { id: "adj-1", userId: "src-admin-1", date: new Date() },
+            { id: "adj-1", userId: "src-admin-1", date: new Date() }, // duplicate ID
+            { id: "adj-2", userId: "src-admin-1", date: new Date() },
+          ]),
+        },
+      };
+
+      const res = await seedAndSanitizeDemoDatabase({
+        force: true,
+        prismaClient: customPrisma,
+        sourcePrismaClient: mockSourcePrisma,
+      });
+
+      expect(res.skipped).toBe(false);
+
+      // Verify createMany was called with skipDuplicates: true
+      expect(mockPayslipCreateMany).toHaveBeenCalledTimes(1);
+      const payslipCallData = mockPayslipCreateMany.mock.calls[0][0];
+      expect(payslipCallData.skipDuplicates).toBe(true);
+      // In-memory deduplication should reduce 3 payslips to 1 unique payslip
+      expect(payslipCallData.data.length).toBe(1);
+      expect(payslipCallData.data[0].id).toBe("ps-dup-1");
+
+      // Verify PayrollAdjustment createMany was called with skipDuplicates: true
+      expect(mockAdjustmentCreateMany).toHaveBeenCalledTimes(1);
+      const adjCallData = mockAdjustmentCreateMany.mock.calls[0][0];
+      expect(adjCallData.skipDuplicates).toBe(true);
+      // In-memory deduplication should reduce 3 adjustments to 2 unique IDs
+      expect(adjCallData.data.length).toBe(2);
+
+      // Verify SessionAuditLog createMany was called
+      expect(mockAuditLogCreateMany).toHaveBeenCalledTimes(1);
+      expect(mockAuditLogCreateMany.mock.calls[0][0].skipDuplicates).toBe(true);
+      expect(mockAuditLogCreateMany.mock.calls[0][0].data.length).toBe(25);
     });
   });
 

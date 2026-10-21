@@ -167,4 +167,5 @@ export function setServer(s: ServerType | null) {
 export default {
   port,
   fetch: app.fetch,
+  idleTimeout: 60,
 };

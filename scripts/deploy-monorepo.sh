@@ -403,6 +403,13 @@ deploy_dual_run() {
         log_warn "limart-demo-api health check timed out; continuing production deployment."
     fi
 
+    # Step 9c: Sync sanitized RAG documents & embeddings to checkin_demo_db
+    if [ -f "scripts/sync-demo-documents.sh" ]; then
+        log_info "Synchronizing sanitized RAG documents to checkin_demo_db..."
+        chmod +x scripts/sync-demo-documents.sh
+        ./scripts/sync-demo-documents.sh || log_warn "Demo documents sync completed with warning."
+    fi
+
     # Step 10: Reload Caddy Reverse Proxy
     log_info "Reloading Caddy reverse proxy..."
     if docker inspect caddy >/dev/null 2>&1; then

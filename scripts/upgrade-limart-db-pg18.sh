@@ -61,6 +61,10 @@ docker exec limart-db psql -U kido -d postgres -c "DROP DATABASE IF EXISTS check
 
 if [ "$CURRENT_VER" = "18" ]; then
     log_success "✅ limart-db is already on PostgreSQL 18. Skipping migration."
+    if [ -f "scripts/sync-demo-documents.sh" ]; then
+        chmod +x scripts/sync-demo-documents.sh
+        ./scripts/sync-demo-documents.sh || log_warn "Demo documents sync skipped or warning."
+    fi
     exit 0
 fi
 
@@ -197,6 +201,12 @@ log_success "pgBackRest full backup completed for PostgreSQL 18 cluster."
 # Final touch: Restart limart-api to reset connection pool
 log_info "Restarting limart-api to refresh database connection pool..."
 docker restart limart-api 2>/dev/null || true
+
+# Sync sanitized RAG documents & embeddings to checkin_demo_db
+if [ -f "scripts/sync-demo-documents.sh" ]; then
+    chmod +x scripts/sync-demo-documents.sh
+    ./scripts/sync-demo-documents.sh || log_warn "Demo documents sync skipped or warning."
+fi
 
 echo -e "${GREEN}==============================================================================${NC}"
 echo -e "${GREEN}🎉 POSTGRESQL 18 UPGRADE COMPLETED SUCCESSFULLY FOR limart-db!${NC}"

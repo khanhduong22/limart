@@ -56,6 +56,9 @@ fi
 
 log_info "Detected limart-db PG_VERSION: '${CURRENT_VER}'"
 
+# Clean up obsolete legacy databases (checkin_db_v2 is decommissioned)
+docker exec limart-db psql -U kido -d postgres -c "DROP DATABASE IF EXISTS checkin_db_v2;" >/dev/null 2>&1 || true
+
 if [ "$CURRENT_VER" = "18" ]; then
     log_success "✅ limart-db is already on PostgreSQL 18. Skipping migration."
     exit 0
@@ -172,7 +175,7 @@ log_info "Step 6/8: Restoring cluster data from PG17 dumpall..."
 docker exec -i limart-db psql -U kido -d postgres < "${DUMP_FILE}" || true
 
 log_info "Verifying restored user databases and public tables..."
-for db in checkin_db checkin_db_v2 checkin_demo_db; do
+for db in checkin_db checkin_demo_db; do
     TBL_COUNT=$(docker exec limart-db psql -U kido -d "$db" -t -A -c "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';")
     log_info "Database '${db}' verified: ${TBL_COUNT} public tables present."
 done
@@ -180,7 +183,7 @@ log_success "Cluster data restored successfully into PostgreSQL 18."
 
 # Step 7: Run VACUUM ANALYZE across all user databases
 log_info "Step 7/8: Running VACUUM ANALYZE across all user databases..."
-for db in checkin_db checkin_db_v2 checkin_demo_db; do
+for db in checkin_db checkin_demo_db; do
     log_info "Running VACUUM ANALYZE on ${db}..."
     docker exec limart-db psql -U kido -d "${db}" -c "VACUUM ANALYZE;" || log_warn "VACUUM ANALYZE on ${db} finished with warning"
 done

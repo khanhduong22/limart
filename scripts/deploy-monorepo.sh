@@ -32,8 +32,8 @@ HEALTH_TIMEOUT=45
 DRAIN_SECONDS=3
 
 # Target services to deploy (e.g. "api admin staff", "staff", "api")
-# Default: all services if BUILT_SERVICES is unset
-if [ -z "${BUILT_SERVICES+x}" ]; then
+# Default: all services if BUILT_SERVICES is unset or empty
+if [ -z "${BUILT_SERVICES:-}" ]; then
     BUILT_SERVICES="api admin staff"
 fi
 
@@ -112,6 +112,7 @@ deploy_dual_run() {
     fi
 
     log_info "Ensuring backing services (limart-db, limart-valkey) are running..."
+    docker volume create checkin-app_checkin_pgdata >/dev/null 2>&1 || true
     docker volume create checkin-app_checkin_pgbackrest_data >/dev/null 2>&1 || true
     docker compose -f "${COMPOSE_FILE}" up -d --build limart-db limart-valkey
     docker exec -u postgres limart-db pgbackrest --stanza=checkin stanza-create >/dev/null 2>&1 || true

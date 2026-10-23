@@ -367,3 +367,97 @@ jobs:
             BUILT_SERVICES="$BUILT_SERVICES" ./scripts/deploy-monorepo.sh deploy
             
             echo "Production monorepo deployment successful!"
+
+      # ------------------------------------------------------------------------
+      # Canary Trunk-Based Deployment (limart3.khanhdp.com on OVH Singapore)
+      # ------------------------------------------------------------------------
+      - name: Deploy OVH Singapore Canary (limart3.khanhdp.com)
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NEXTAUTH_URL: "https://limart3.khanhdp.com"
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_GENERATIVE_AI_API_KEY: ${{ secrets.GOOGLE_GENERATIVE_AI_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+          BUILT_SERVICES: ${{ needs.changes.outputs.built_services }}
+        with:
+          host: ${{ secrets.OVH_VPS_HOST || '15.235.244.192' }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          envs: DATABASE_URL,NEXTAUTH_URL,NEXTAUTH_SECRET,GOOGLE_CLIENT_ID,GOOGLE_CLIENT_SECRET,GEMINI_API_KEY,GOOGLE_GENERATIVE_AI_API_KEY,RESEND_API_KEY,EMAIL_FROM,CRON_SECRET,GITHUB_TOKEN,GITHUB_ACTOR,BUILT_SERVICES
+          script: |
+            set -euo pipefail
+            mkdir -p /opt/limart
+            cd /opt/limart
+
+            # Wait for docker daemon to be responsive
+            until command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; do
+              echo "Waiting for Docker daemon on OVH Singapore..."
+              sleep 3
+            done
+
+            if [ ! -d ".git" ]; then
+              git init
+              git remote add origin "https://x-access-token:${GITHUB_TOKEN}@github.com/khanhduong22/limart.git" 2>/dev/null || git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/khanhduong22/limart.git"
+              git fetch origin main
+              git reset --hard origin/main
+            else
+              git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/khanhduong22/limart.git"
+              git stash || true
+              git fetch origin main
+              git reset --hard origin/main
+              git clean -fd
+            fi
+
+            cat << EOF > .env
+            DATABASE_URL="$DATABASE_URL"
+            NEXTAUTH_URL="$NEXTAUTH_URL"
+            NEXTAUTH_SECRET="$NEXTAUTH_SECRET"
+            GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID"
+            GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET"
+            NODE_ENV="production"
+            GEMINI_API_KEY="$GEMINI_API_KEY"
+            GOOGLE_GENERATIVE_AI_API_KEY="$GOOGLE_GENERATIVE_AI_API_KEY"
+            RESEND_API_KEY="$RESEND_API_KEY"
+            EMAIL_FROM="$EMAIL_FROM"
+            CRON_SECRET="$CRON_SECRET"
+            REDIS_URL="redis://checkin-valkey:6379"
+            MEILISEARCH_HOST="http://meilisearch:7700"
+            MEILISEARCH_KEY="kt_meilisearch_master_key_2026_safe"
+            PORT=4000
+            EOF
+
+            echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+            # Pull container images (pull all if pristine node or BUILT_SERVICES empty)
+            if ! docker inspect limart-api >/dev/null 2>&1 || [ -z "$BUILT_SERVICES" ]; then
+              docker compose -f docker-compose.monorepo.yml pull limart-api limart-admin limart-staff limart-demo-api 2>/dev/null || docker compose pull limart-api limart-admin limart-staff limart-demo-api 2>/dev/null || true
+            else
+              PULL_TARGETS=""
+              for svc in $BUILT_SERVICES; do
+                case "$svc" in
+                  api) PULL_TARGETS="$PULL_TARGETS limart-api limart-demo-api" ;;
+                  admin) PULL_TARGETS="$PULL_TARGETS limart-admin" ;;
+                  staff) PULL_TARGETS="$PULL_TARGETS limart-staff" ;;
+                esac
+              done
+              if [ -n "$PULL_TARGETS" ]; then
+                docker compose -f docker-compose.monorepo.yml pull $PULL_TARGETS || docker compose pull $PULL_TARGETS || true
+              fi
+            fi
+
+            chmod +x scripts/deploy-monorepo.sh scripts/sync-db-from-contabo.sh
+            BUILT_SERVICES="$BUILT_SERVICES" ./scripts/deploy-monorepo.sh deploy
+
+            # Replicate database and sync RAG from Contabo if fresh node (user count == 0)
+            ./scripts/sync-db-from-contabo.sh
+
+            echo "OVH Singapore canary monorepo deployment successful!"
